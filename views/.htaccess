@@ -1,0 +1,13 @@
+# =========================================================================
+#  Plan Attainment · views/  · hardening
+# -------------------------------------------------------------------------
+#  Las herramientas wrapper "mant_prev_*.php" exponen scripts internos de
+#  tools/ (instalación de schema PG, importación a BD, planificación,
+#  inspección, etc.). Algunas modifican estado de la BD con ?commit=1.
+#  Aunque hay un require de Auth dentro de cada uno, denegamos el acceso
+#  por HTTP como defensa en profundidad: solo deben usarse desde CLI o
+#  habilitándolas explícitamente.
+# =========================================================================
+<FilesMatch "^mant_prev_.*\.php$">
+    Require all denied
+</FilesMatch>

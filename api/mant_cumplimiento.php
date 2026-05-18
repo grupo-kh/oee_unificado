@@ -1,0 +1,226 @@
+<?php
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/helpers.php';
+require_once __DIR__ . '/../lib/Auth.php';
+require_once __DIR__ . '/../lib/MaintenancePlanStore.php';
+require_once __DIR__ . '/../lib/MaintenanceCompletionStore.php';
+require_once __DIR__ . '/../lib/MaintenancePeriodicidadStore.php';
+
+Auth::requireLoginApi();
+
+/**
+ * Cumplimiento preventivo (snapshot del estado actual del plan).
+ * Para cada tarea de "PROXIMAS REV." se mira si su próxima revisión ya está
+ * vencida (no_cumple) o todavía no (cumple).
+ *
+ *   % cumplimiento = en_plazo / total
+ *
+ * Devuelve global + agregado por periodicidad.
+ *
+ * Parámetros:
+ *   - cod_maquina_mant (opcional)
+ *   - periodicidad     (opcional)
+ */
+try {
+    $cm = getParam('cod_maquina_mant');
+    $pe = getParam('periodicidad');
+    $hoy = date('Y-m-d');
+
+    // Rango de fechas para el gauge (default: últimos 12 meses).
+    $defDesde = date('Y-m-d', strtotime('-12 months'));
+    $fdesde   = (string)getParam('fecha_desde', $defDesde);
+    $fhasta   = (string)getParam('fecha_hasta', $hoy);
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fdesde)) jsonError('fecha_desde inválida');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fhasta)) jsonError('fecha_hasta inválida');
+
+    $data = MaintenancePlanStore::load();
+    $proximas = $data['proximas'];
+    $marcadasIdx = MaintenanceCompletionStore::loadIndexed();
+    $perOverrideIdx = MaintenancePeriodicidadStore::loadIndexed();
+
+    $perAcc = [];
+    $maquinasSet = [];
+    $periodicidadesSet = [];
+
+    // Catálogo de máquinas y periodicidades (para los selectores).
+    foreach ($proximas as $p) {
+        if ($p['cod_maquina_mant'] !== '') $maquinasSet[$p['cod_maquina_mant']] = $p['desc_maquina'];
+        if ($p['periodicidad']     !== '') $periodicidadesSet[$p['periodicidad']] = true;
+    }
+
+    // Detección de máquinas del grupo SECUENCIA (E66, RACKS, PLATAFORMAS):
+    // se excluyen del cómputo de "no realizadas" y "recuperaciones" tanto
+    // en el gauge como en el detalle por mes.
+    $isSecuencia = function(string $desc): bool {
+        $s = trim($desc);
+        return preg_match('/^E66($|[^A-Za-z0-9])/i', $s)
+            || preg_match('/^RACK[\s\-_]/i', $s)
+            || preg_match('/^PLATAFORMA/i', $s);
+    };
+
+    // ───────── Métrica del gauge: realizadas / (realizadas + previstas + atrasadas) ─────────
+    //
+    // El cuadro muestra el porcentaje de tareas realizadas frente a las que
+    // quedan por hacer dentro del rango filtrado. Se desglosa así:
+    //
+    //   realizadas = intervenciones con tipo 'completada' o 'recuperacion' y
+    //                fecha_intervencion en [fdesde, fhasta]
+    //   previstas  = tareas pendientes (en proximas) con proxima_revision
+    //                dentro del rango
+    //   atrasadas  = tareas pendientes (en proximas) con proxima_revision
+    //                anterior a fdesde (vienen vencidas de antes del rango)
+    //
+    //   cumpl = realizadas / (realizadas + previstas + atrasadas) * 100
+    //
+    // Conforme avanza el mes en curso (rango = mes actual), realizadas crece
+    // y el porcentaje se acerca al 100%. Las máquinas SECUENCIA quedan fuera
+    // del cómputo de previstas / atrasadas (no aparecen como pendientes).
+    $realizadas = 0;
+    foreach ($marcadasIdx as $rec) {
+        $tipo = (string)($rec['tipo'] ?? '');
+        if ($tipo !== 'completada' && $tipo !== 'recuperacion') continue;
+        if ($cm && ($rec['cod_maquina_mant'] ?? '') !== $cm) continue;
+        $fi = (string)($rec['fecha_intervencion'] ?? '');
+        if ($fi === '' || $fi < $fdesde || $fi > $fhasta) continue;
+        $descRec = (string)($rec['desc_maquina'] ?? '');
+        if ($tipo === 'recuperacion' && $isSecuencia($descRec)) continue;
+        $realizadas++;
+    }
+
+    // previstas / atrasadas vienen del plan vigente (mant_plan vía proximas).
+    $previstas = 0;
+    $atrasadas = 0;
+    foreach ($proximas as $p) {
+        $px = $p['proxima_revision'] ?? null;
+        if ($px === null || $px === '') continue;
+        if ($cm && $p['cod_maquina_mant'] !== $cm) continue;
+        if ($isSecuencia((string)$p['desc_maquina'])) continue;
+
+        if ($px >= $fdesde && $px <= $fhasta) {
+            $previstas++;
+        } elseif ($px < $fdesde) {
+            $atrasadas++;
+        }
+        // Si $px > $fhasta: tarea programada para después del rango → no cuenta.
+    }
+
+    $denomTotal = $realizadas + $previstas + $atrasadas;
+    $cumpl = $denomTotal > 0 ? round($realizadas / $denomTotal * 100, 2) : 0;
+
+    $global = [
+        'cumplimiento' => $cumpl,
+        'realizadas'   => $realizadas,
+        'previstas'    => $previstas,
+        'atrasadas'    => $atrasadas,
+        'cumple'       => $realizadas,
+        'no_cumple'    => $previstas + $atrasadas,
+        'total'        => $denomTotal,
+        'fecha_desde'  => $fdesde,
+        'fecha_hasta'  => $fhasta,
+    ];
+
+    // perAcc se mantiene como esqueleto vacío (compatibilidad con el endpoint).
+    foreach ($proximas as $p) {
+        $per = $p['periodicidad'] ?: 'SIN PERIODICIDAD';
+        if (!isset($perAcc[$per])) $perAcc[$per] = ['total' => 0, 'cumple' => 0];
+    }
+
+    $periodicidadesArr = [];
+    foreach ($perAcc as $per => $v) {
+        $periodicidadesArr[] = [
+            'periodicidad' => $per,
+            'cumplimiento' => $v['total'] > 0 ? round($v['cumple'] / $v['total'] * 100, 2) : 0,
+            'cumple'       => $v['cumple'],
+            'no_cumple'    => $v['total'] - $v['cumple'],
+            'total'        => $v['total'],
+        ];
+    }
+    usort($periodicidadesArr, fn($a, $b) => strcmp($a['periodicidad'], $b['periodicidad']));
+
+    $maquinas = [];
+    foreach ($maquinasSet as $cod => $desc) {
+        $maquinas[] = ['cod_maquina_mant' => $cod, 'desc_maquina' => $desc];
+    }
+    usort($maquinas, fn($a, $b) => strcmp($a['desc_maquina'], $b['desc_maquina']));
+
+    $periodicidades = array_keys($periodicidadesSet);
+    sort($periodicidades);
+
+    // ───────── Cumplimiento por mes ─────────
+    //
+    // Métrica por mes M:
+    //   denom_M = registros 'completada' o 'no_realizada' con fpo en M
+    //   numer_M = registros 'completada' (fpo en M)
+    //             + registros 'recuperacion' con fecha_intervencion en M
+    // Solo se incluyen meses cuyas fechas (fpo o fi) caen dentro del rango
+    // de filtrado [fdesde, fhasta]. Las máquinas SECUENCIA están excluidas
+    // de no_realizada/recuperacion.
+
+    $perMesAcc = [];
+    foreach ($marcadasIdx as $rec) {
+        $tipo = (string)($rec['tipo'] ?? '');
+        if ($tipo === '') {
+            $tipo = empty($rec['fecha_intervencion']) ? 'no_realizada' : 'completada';
+        }
+        $cmRec = (string)($rec['cod_maquina_mant'] ?? '');
+        $peRec = (string)($rec['periodicidad'] ?? '');
+        $descRec = (string)($rec['desc_maquina'] ?? '');
+        if ($cm && $cmRec !== $cm) continue;
+        if ($pe && $peRec !== $pe) continue;
+
+        if (($tipo === 'no_realizada' || $tipo === 'recuperacion') && $isSecuencia($descRec)) {
+            continue;
+        }
+
+        if ($tipo === 'recuperacion') {
+            $fi = (string)($rec['fecha_intervencion'] ?? '');
+            if ($fi === '' || $fi < $fdesde || $fi > $fhasta) continue;
+            $m = substr($fi, 0, 7);
+            if (!isset($perMesAcc[$m])) $perMesAcc[$m] = ['denom'=>0,'numer'=>0,'completadas'=>0,'no_realizadas'=>0,'recuperaciones'=>0];
+            $perMesAcc[$m]['numer']++;
+            $perMesAcc[$m]['recuperaciones']++;
+        } else {
+            $fpo = (string)($rec['fecha_proxima_original'] ?? '');
+            if ($fpo === '' || $fpo < $fdesde || $fpo > $fhasta) continue;
+            $m = substr($fpo, 0, 7);
+            if (!isset($perMesAcc[$m])) $perMesAcc[$m] = ['denom'=>0,'numer'=>0,'completadas'=>0,'no_realizadas'=>0,'recuperaciones'=>0];
+            $perMesAcc[$m]['denom']++;
+            if ($tipo === 'completada' || !empty($rec['fecha_intervencion'])) {
+                $perMesAcc[$m]['numer']++;
+                $perMesAcc[$m]['completadas']++;
+            } else {
+                $perMesAcc[$m]['no_realizadas']++;
+            }
+        }
+    }
+
+    ksort($perMesAcc);
+    $perMesArr = [];
+    foreach ($perMesAcc as $mes => $v) {
+        $pct = $v['denom'] > 0 ? round($v['numer'] / $v['denom'] * 100, 2) : null;
+        $perMesArr[] = [
+            'mes'              => $mes,
+            'cumplimiento'     => $pct,
+            'denom'            => $v['denom'],
+            'numer'            => $v['numer'],
+            'completadas'      => $v['completadas'],
+            'no_realizadas'    => $v['no_realizadas'],
+            'recuperaciones'   => $v['recuperaciones'],
+        ];
+    }
+
+    jsonOk([
+        'hoy'              => $hoy,
+        'cod_maquina_mant' => $cm ?: null,
+        'periodicidad'     => $pe ?: null,
+        'global'           => $global,
+        'periodicidades_data' => $periodicidadesArr,
+        'meses_data'       => $perMesArr,
+        'maquinas'         => $maquinas,
+        'periodicidades'   => $periodicidades,
+        'fichero_actualizado' => date('Y-m-d H:i:s', $data['file_mtime']),
+    ]);
+
+} catch (Exception $e) {
+    jsonError('Error: ' . $e->getMessage(), 500);
+}

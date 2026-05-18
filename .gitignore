@@ -1,0 +1,48 @@
+# ─── Credenciales / configuración local ───
+.env
+.env.local
+.env.*.local
+
+# ─── Caché generado ───
+cache/plan_excel/
+cache/plan_parsed/
+cache/plan_attain/
+cache/
+
+# ─── Datos legacy en JSON (modo pre-migración a Postgres) ───
+data/maintenance_completed.json
+data/maintenance_pendiente.json
+data/maintenance_periodicidad.json
+data/*.json.lock
+data/*.json.tmp.*
+
+# ─── Editor / IDE ───
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# ─── PHP ───
+*.log
+*.swp
+*.swo
+
+# ─── Vendor: si algún día se publica el repo, vendor se reinstala
+#    con `composer install`. Comentado para no romper deploy actual:
+# vendor/
+
+# ─── Carpetas Claude / herramientas locales ───
+.claude/
+
+# ─── Backups Postgres si están en el repo ───
+backups/
+*.sql.gz
+*.dump
+
+# ─── Scripts de diagnóstico temporales ───
+tools/debug_*.php
+scripts/diag_*.php
+
+# ─── Scripts con credenciales locales hardcoded ───
+tools/reset_postgres_password.ps1

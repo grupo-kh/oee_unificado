@@ -1,0 +1,61 @@
+# =========================================================================
+#  Plan Attainment · Apache hardening
+# -------------------------------------------------------------------------
+#  Reglas de acceso para Apache 2.4 (XAMPP). Bloquea ficheros y carpetas
+#  internas para que no sean accesibles vía HTTP aunque estén dentro de
+#  htdocs. Las URL públicas siguen siendo:
+#     /                   → index.php
+#     /views/*.php        → vistas
+#     /api/*.php          → endpoints
+#     /assets/*           → CSS / JS / imágenes
+# =========================================================================
+
+# ─── Bloquear ficheros sensibles por nombre ────────────────────────────────
+<FilesMatch "(^\.|\.env(\..*)?|\.git.*|composer\.(json|lock)|package(-lock)?\.json|\.htaccess|\.htpasswd|\.ini|\.bak|\.sql|\.log|\.swp|\.swo|~)$">
+    Require all denied
+</FilesMatch>
+
+# ─── Permitir explícitamente el .env.example (es plantilla, sin secretos) ──
+<Files ".env.example">
+    Require all granted
+</Files>
+
+# ─── Bloquear directorios internos (lib, includes, config, etc.) ───────────
+RedirectMatch 404 "^/(lib|includes|config|cache|data|migrations|scripts|tools|vendor|docs|\.claude)(/|$)"
+
+# ─── Bloquear proxies de diagnóstico expuestos en raíz ─────────────────────
+#   _mant_prev_inspect.php es un wrapper temporal a tools/. Solo CLI.
+<FilesMatch "^_mant_prev_.*\.php$">
+    Require all denied
+</FilesMatch>
+
+# ─── Cabeceras de seguridad ────────────────────────────────────────────────
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    # CSP relajada (la app usa CDN de ApexCharts y Google Fonts).
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self'"
+    # Si el sitio se publica solo por HTTPS, descomenta:
+    # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+</IfModule>
+
+# ─── Compresión y cache de estáticos ───────────────────────────────────────
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json
+</IfModule>
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 day"
+    ExpiresByType application/javascript "access plus 1 day"
+    ExpiresByType image/png "access plus 7 days"
+    ExpiresByType image/jpeg "access plus 7 days"
+    ExpiresByType image/svg+xml "access plus 7 days"
+</IfModule>
+
+# ─── Index por defecto ─────────────────────────────────────────────────────
+DirectoryIndex index.php index.html
+
+# ─── Desactivar listado de directorios ─────────────────────────────────────
+Options -Indexes
