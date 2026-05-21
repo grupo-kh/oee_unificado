@@ -25,9 +25,27 @@ try {
     $solo = (int)getParam('solo_vencidas', '0') === 1;
 
     $data = MaintenancePlanStore::load();
-    $proximas = $data['proximas'];
     $marcadasIdx = MaintenanceCompletionStore::loadIndexed();
     $perOverrideIdx = MaintenancePeriodicidadStore::loadIndexed();
+
+    // Pre-filtrar las tareas YA marcadas antes de consolidar — así una
+    // tarea de RACK ya marcada no se cuenta como sub-tarea pendiente
+    // dentro de la fila consolidada.
+    $proximasFiltradas = array_values(array_filter(
+        $data['proximas'],
+        function($p) use ($marcadasIdx) {
+            $idMark = MaintenanceCompletionStore::buildId(
+                (string)$p['orden'], (string)$p['tarea'], (string)($p['proxima_revision'] ?? '')
+            );
+            return !isset($marcadasIdx[$idMark]);
+        }
+    ));
+
+    // Consolidar racks / plataformas: las N micro-tareas de un mismo rack o
+    // plataforma con la misma periodicidad se funden en una sola fila
+    // "Revisión completa". Útil para no generar muchas acciones pequeñas
+    // separadas por días en una misma máquina (las del grupo SECUENCIA).
+    $proximas = MaintenancePlanStore::consolidateSecuenciaProximas($proximasFiltradas);
 
     $hoy = date('Y-m-d');
     $limite = date('Y-m-d', strtotime("+$dias days"));

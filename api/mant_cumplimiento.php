@@ -150,13 +150,24 @@ try {
     //
     // Métrica por mes M:
     //   denom_M = registros 'completada' o 'no_realizada' con fpo en M
+    //             + tareas vivas en el plan con proxima_revision en M y
+    //               proxima_revision < hoy ("vencidas sin marcar")
     //   numer_M = registros 'completada' (fpo en M)
     //             + registros 'recuperacion' con fecha_intervencion en M
-    // Solo se incluyen meses cuyas fechas (fpo o fi) caen dentro del rango
-    // de filtrado [fdesde, fhasta]. Las máquinas SECUENCIA están excluidas
-    // de no_realizada/recuperacion.
+    // Las "vencidas sin marcar" son tareas cuya fecha pasó pero nadie las
+    // marcó: se cuentan como pendientes para que el mes en curso no aparezca
+    // engañosamente al 100% (bug previo). Solo se incluyen meses cuyas
+    // fechas (fpo, fi o proxima_revision) caen dentro de [fdesde, fhasta].
+    // Las máquinas SECUENCIA están excluidas de no_realizada/recuperacion
+    // y también de "vencidas sin marcar".
 
     $perMesAcc = [];
+
+    // Set de pares (orden, tarea, fpo) ya cubiertos por una marca — evita
+    // doble conteo cuando la próxima_revision viva coincide con la fpo de
+    // una marca (caso poco frecuente pero posible).
+    $marcasClaves = [];
+
     foreach ($marcadasIdx as $rec) {
         $tipo = (string)($rec['tipo'] ?? '');
         if ($tipo === '') {
@@ -165,6 +176,10 @@ try {
         $cmRec = (string)($rec['cod_maquina_mant'] ?? '');
         $peRec = (string)($rec['periodicidad'] ?? '');
         $descRec = (string)($rec['desc_maquina'] ?? '');
+        $ordenRec = (string)($rec['orden'] ?? '');
+        $tareaRec = (string)($rec['tarea'] ?? '');
+        $fpoRec   = (string)($rec['fecha_proxima_original'] ?? '');
+
         if ($cm && $cmRec !== $cm) continue;
         if ($pe && $peRec !== $pe) continue;
 
@@ -176,14 +191,27 @@ try {
             $fi = (string)($rec['fecha_intervencion'] ?? '');
             if ($fi === '' || $fi < $fdesde || $fi > $fhasta) continue;
             $m = substr($fi, 0, 7);
-            if (!isset($perMesAcc[$m])) $perMesAcc[$m] = ['denom'=>0,'numer'=>0,'completadas'=>0,'no_realizadas'=>0,'recuperaciones'=>0];
+            if (!isset($perMesAcc[$m])) $perMesAcc[$m] = ['denom'=>0,'numer'=>0,'completadas'=>0,'no_realizadas'=>0,'recuperaciones'=>0,'vencidas_sin_marcar'=>0,'pendientes_futuras'=>0,'anticipadas'=>0];
             $perMesAcc[$m]['numer']++;
             $perMesAcc[$m]['recuperaciones']++;
         } else {
-            $fpo = (string)($rec['fecha_proxima_original'] ?? '');
-            if ($fpo === '' || $fpo < $fdesde || $fpo > $fhasta) continue;
-            $m = substr($fpo, 0, 7);
-            if (!isset($perMesAcc[$m])) $perMesAcc[$m] = ['denom'=>0,'numer'=>0,'completadas'=>0,'no_realizadas'=>0,'recuperaciones'=>0];
+            if ($fpoRec === '' || $fpoRec < $fdesde || $fpoRec > $fhasta) continue;
+            $m = substr($fpoRec, 0, 7);
+            if (!isset($perMesAcc[$m])) $perMesAcc[$m] = ['denom'=>0,'numer'=>0,'completadas'=>0,'no_realizadas'=>0,'recuperaciones'=>0,'vencidas_sin_marcar'=>0,'pendientes_futuras'=>0,'anticipadas'=>0];
+
+            // Las marcas anticipadas (fpo > hoy) NO cuentan en el cumplimiento
+            // del mes futuro: no se puede "hacer" una tarea antes de que llegue
+            // su fecha programada. Se guardan en 'anticipadas' como dato
+            // informativo, pero el cumplimiento futuro queda en 0% mientras no
+            // haya intervenciones reales con fecha en ese mes.
+            if ($fpoRec > $hoy) {
+                $perMesAcc[$m]['anticipadas']++;
+                // Registramos la clave igualmente para evitar doble conteo
+                // contra pendientes_futuras del bucle de abajo.
+                $marcasClaves[$ordenRec . '||' . $tareaRec . '||' . $fpoRec] = true;
+                continue;
+            }
+
             $perMesAcc[$m]['denom']++;
             if ($tipo === 'completada' || !empty($rec['fecha_intervencion'])) {
                 $perMesAcc[$m]['numer']++;
@@ -191,23 +219,87 @@ try {
             } else {
                 $perMesAcc[$m]['no_realizadas']++;
             }
+            $marcasClaves[$ordenRec . '||' . $tareaRec . '||' . $fpoRec] = true;
+        }
+    }
+
+    // ── Añadir tareas vivas del plan al denominador del mes que toque ──
+    //   - Si proxima_revision está en el pasado y nadie la marcó →
+    //     'vencidas_sin_marcar' (cuenta como pendiente).
+    //   - Si proxima_revision está en el futuro → 'pendientes_futuras'
+    //     (suma al denom para que el mes futuro tenga un 0% honesto, no
+    //     un 100% engañoso ni un "—" vacío).
+    foreach ($proximas as $p) {
+        $px = (string)($p['proxima_revision'] ?? '');
+        if ($px === '' || $px < $fdesde || $px > $fhasta) continue;
+
+        $cmP = (string)($p['cod_maquina_mant'] ?? '');
+        $peP = (string)($p['periodicidad'] ?? '');
+        if ($cm && $cmP !== $cm) continue;
+        if ($pe && $peP !== $pe) continue;
+        if ($isSecuencia((string)($p['desc_maquina'] ?? ''))) continue;
+
+        $clave = (string)($p['orden'] ?? '') . '||' . (string)($p['tarea'] ?? '') . '||' . $px;
+        if (isset($marcasClaves[$clave])) continue;  // ya contada por marca
+
+        $m = substr($px, 0, 7);
+        if (!isset($perMesAcc[$m])) $perMesAcc[$m] = ['denom'=>0,'numer'=>0,'completadas'=>0,'no_realizadas'=>0,'recuperaciones'=>0,'vencidas_sin_marcar'=>0,'pendientes_futuras'=>0,'anticipadas'=>0];
+        $perMesAcc[$m]['denom']++;
+        if ($px < $hoy) {
+            $perMesAcc[$m]['vencidas_sin_marcar']++;
+        } else {
+            $perMesAcc[$m]['pendientes_futuras']++;
         }
     }
 
     ksort($perMesAcc);
     $perMesArr = [];
+    // Acumulador global recalculado: sumamos los numer/denom de todos los meses
+    // del rango para que el gauge central y la barra del mes muestren EL MISMO
+    // número (antes el gauge usaba realizadas/(realizadas+previstas+atrasadas)
+    // y daba un valor distinto al de la barra).
+    $sumDenom = 0; $sumNumer = 0;
+    $sumCompletadas = 0; $sumNoRealizadas = 0; $sumRecuperaciones = 0;
+    $sumVencSinMarcar = 0; $sumPendFuturas = 0; $sumAnticipadas = 0;
     foreach ($perMesAcc as $mes => $v) {
         $pct = $v['denom'] > 0 ? round($v['numer'] / $v['denom'] * 100, 2) : null;
         $perMesArr[] = [
-            'mes'              => $mes,
-            'cumplimiento'     => $pct,
-            'denom'            => $v['denom'],
-            'numer'            => $v['numer'],
-            'completadas'      => $v['completadas'],
-            'no_realizadas'    => $v['no_realizadas'],
-            'recuperaciones'   => $v['recuperaciones'],
+            'mes'                 => $mes,
+            'cumplimiento'        => $pct,
+            'denom'               => $v['denom'],
+            'numer'               => $v['numer'],
+            'completadas'         => $v['completadas'],
+            'no_realizadas'       => $v['no_realizadas'],
+            'recuperaciones'      => $v['recuperaciones'],
+            'vencidas_sin_marcar' => $v['vencidas_sin_marcar'],
+            'pendientes_futuras'  => $v['pendientes_futuras'] ?? 0,
+            'anticipadas'         => $v['anticipadas']        ?? 0,
         ];
+        $sumDenom         += $v['denom'];
+        $sumNumer         += $v['numer'];
+        $sumCompletadas   += $v['completadas'];
+        $sumNoRealizadas  += $v['no_realizadas'];
+        $sumRecuperaciones+= $v['recuperaciones'];
+        $sumVencSinMarcar += $v['vencidas_sin_marcar'];
+        $sumPendFuturas   += $v['pendientes_futuras'] ?? 0;
+        $sumAnticipadas   += $v['anticipadas']        ?? 0;
     }
+
+    // Sobrescribir el global con la métrica unificada (la misma que las barras
+    // y la misma que el detalle del mes). Mantenemos también las claves
+    // antiguas (realizadas/previstas/atrasadas) por compatibilidad — pero
+    // 'cumplimiento' ya viene de aquí.
+    $cumplGlobalUnificado = $sumDenom > 0
+        ? round($sumNumer / $sumDenom * 100, 2) : 0;
+    $global['cumplimiento']        = $cumplGlobalUnificado;
+    $global['numer']               = $sumNumer;
+    $global['denom']               = $sumDenom;
+    $global['completadas']         = $sumCompletadas;
+    $global['no_realizadas']       = $sumNoRealizadas;
+    $global['recuperaciones']      = $sumRecuperaciones;
+    $global['vencidas_sin_marcar'] = $sumVencSinMarcar;
+    $global['pendientes_futuras']  = $sumPendFuturas;
+    $global['anticipadas']         = $sumAnticipadas;
 
     jsonOk([
         'hoy'              => $hoy,

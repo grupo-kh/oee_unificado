@@ -34,6 +34,10 @@ class MaintenancePlanStore
             //   - tareas dadas de baja (alta_baja = 'BAJA' o activa = 'B'):
             //     son máquinas inactivas que no deben aparecer en ningún panel
             //     de la app (planificador, cumplimiento, histórico…).
+            //   - tareas con bloqueo temporal vigente
+            //     (CURRENT_DATE BETWEEN fecha_bloqueo_ini AND fecha_bloqueo_fin):
+            //     máquinas fuera de producción o racks en stand-by; al
+            //     pasar la fecha fin la tarea vuelve sola al plan.
             $rows = Db::pgFetchAll("
                 SELECT orden, cod_maquina_mant, desc_maquina, grupo, desc_grupo,
                        periodicidad, tarea, desc_tarea, activa,
@@ -44,6 +48,11 @@ class MaintenancePlanStore
                  WHERE fecha_pausado IS NULL
                    AND COALESCE(alta_baja, 'ALTA') = 'ALTA'
                    AND COALESCE(activa,    'A')    = 'A'
+                   AND NOT (
+                       fecha_bloqueo_ini IS NOT NULL
+                       AND fecha_bloqueo_fin IS NOT NULL
+                       AND CURRENT_DATE BETWEEN fecha_bloqueo_ini AND fecha_bloqueo_fin
+                   )
                  ORDER BY orden, tarea
             ");
             $proximas = [];
@@ -348,12 +357,12 @@ class MaintenancePlanStore
     /**
      * Tareas asociadas a una máquina, con número de intervenciones registradas.
      */
-    public static function listTareasByMaquina(string $codMaquina): array
+    public static function listTareasByMaquina(string $codMaquina, bool $consolidar = true): array
     {
         if (!self::usePg()) {
             throw new RuntimeException('listTareasByMaquina requiere modo PostgreSQL');
         }
-        return Db::pgFetchAll("
+        $rows = Db::pgFetchAll("
             SELECT mp.id,
                    mp.orden, mp.tarea,
                    mp.cod_maquina_mant, mp.desc_maquina,
@@ -371,7 +380,10 @@ class MaintenancePlanStore
                    mp.ip_interna,
                    mp.tipo_realizacion,
                    mp.tipo_mantenimiento,
-                   to_char(mp.fecha_pausado, 'YYYY-MM-DD') AS fecha_pausado
+                   mp.tiempo_estimado,
+                   to_char(mp.fecha_pausado,     'YYYY-MM-DD') AS fecha_pausado,
+                   to_char(mp.fecha_bloqueo_ini, 'YYYY-MM-DD') AS fecha_bloqueo_ini,
+                   to_char(mp.fecha_bloqueo_fin, 'YYYY-MM-DD') AS fecha_bloqueo_fin
               FROM mant_plan mp
               LEFT JOIN (
                     SELECT orden, tarea, COUNT(*) AS cnt
@@ -381,6 +393,123 @@ class MaintenancePlanStore
              WHERE mp.cod_maquina_mant = :cod
              ORDER BY mp.is_user_added DESC, mp.periodicidad, mp.tarea
         ", [':cod' => $codMaquina]);
+
+        // Si la máquina es un rack o plataforma y el caller no pide vista
+        // detallada (consolidar=true por defecto), consolidamos TODAS sus
+        // tareas en una sola fila virtual. Las originales quedan accesibles
+        // dentro de `sub_tareas` por si el operario quiere editarlas.
+        $descMaq = $rows ? (string)($rows[0]['desc_maquina'] ?? '') : '';
+        if ($consolidar && self::esConsolidable($descMaq) && count($rows) > 1) {
+            return [self::buildConsolidatedTareasRow($rows)];
+        }
+        return $rows;
+    }
+
+    /**
+     * Construye UNA fila "virtual" que agrupa todas las tareas de un mismo
+     * rack/plataforma. La descripción combina cada sub-tarea como un bullet,
+     * la periodicidad mostrada es la más exigente (intervalo más corto), la
+     * próxima_revision es la más temprana, intervenciones son la suma, etc.
+     *
+     * Campos especiales:
+     *   - id           : 0 (no es una fila real de mant_plan)
+     *   - tarea        : 'CONSOL'
+     *   - consolidada  : true
+     *   - sub_tareas   : array de las filas originales
+     */
+    private static function buildConsolidatedTareasRow(array $rows): array
+    {
+        $first = $rows[0];
+        $cod = (string)($first['cod_maquina_mant'] ?? '');
+
+        $rankFn = [self::class, 'periodicidadRank'];
+        $sub = [];
+        $sumInt = 0;
+        $pers = [];
+        $proxima = null;
+        $ultima = null;
+        $perMain = (string)($first['periodicidad'] ?? '');
+        $pausados = []; $bloqueados = []; $bajas = 0;
+        $bloqIniMin = null; $bloqFinMax = null;
+
+        foreach ($rows as $r) {
+            $sumInt += (int)($r['intervenciones'] ?? 0);
+            $per = strtoupper((string)($r['periodicidad'] ?? ''));
+            if ($per !== '') {
+                $pers[$per] = true;
+                if (call_user_func($rankFn, $per) < call_user_func($rankFn, $perMain)) {
+                    $perMain = $per;
+                }
+            }
+            $px = $r['proxima_revision'] ?? null;
+            if ($px !== null && ($proxima === null || $px < $proxima)) $proxima = $px;
+            $ul = $r['ultima_revision'] ?? null;
+            if ($ul !== null && ($ultima === null || $ul > $ultima)) $ultima = $ul;
+            if (!empty($r['fecha_pausado'])) $pausados[] = $r['fecha_pausado'];
+            if (!empty($r['fecha_bloqueo_ini']) && !empty($r['fecha_bloqueo_fin'])) {
+                $bloqueados[] = [$r['fecha_bloqueo_ini'], $r['fecha_bloqueo_fin']];
+                if ($bloqIniMin === null || $r['fecha_bloqueo_ini'] < $bloqIniMin) $bloqIniMin = $r['fecha_bloqueo_ini'];
+                if ($bloqFinMax === null || $r['fecha_bloqueo_fin'] > $bloqFinMax) $bloqFinMax = $r['fecha_bloqueo_fin'];
+            }
+            if (strtoupper((string)($r['alta_baja'] ?? 'ALTA')) === 'BAJA') $bajas++;
+            $sub[] = [
+                'id'                => (int)($r['id'] ?? 0),
+                'orden'             => (string)($r['orden'] ?? ''),
+                'tarea'             => (string)($r['tarea'] ?? ''),
+                'periodicidad'      => $per,
+                'desc_tarea'        => (string)($r['desc_tarea'] ?? ''),
+                'ultima_revision'   => $r['ultima_revision']  ?? null,
+                'proxima_revision'  => $r['proxima_revision'] ?? null,
+                'intervenciones'    => (int)($r['intervenciones'] ?? 0),
+                'alta_baja'         => (string)($r['alta_baja']        ?? 'ALTA'),
+                'ip_interna'        => (string)($r['ip_interna']       ?? ''),
+                'tipo_realizacion'  => (string)($r['tipo_realizacion'] ?? ''),
+                'tipo_mantenimiento'=> (string)($r['tipo_mantenimiento']?? ''),
+                'fecha_pausado'     => $r['fecha_pausado']     ?? null,
+                'fecha_bloqueo_ini' => $r['fecha_bloqueo_ini'] ?? null,
+                'fecha_bloqueo_fin' => $r['fecha_bloqueo_fin'] ?? null,
+            ];
+        }
+
+        // Construye la descripción agregada: encabezado + cada sub-tarea como
+        // bullet con su periodicidad y el detalle de qué se hace.
+        $n = count($rows);
+        $persStr = count($pers) > 1 ? ' (' . implode(', ', array_keys($pers)) . ')' : '';
+        $descLines = ['Revisión completa · ' . $n . ' tareas' . $persStr . ':'];
+        foreach ($sub as $s) {
+            $line = '  • [' . $s['tarea'] . '] ' . ($s['periodicidad'] ? $s['periodicidad'] . ' · ' : '');
+            $line .= $s['desc_tarea'] !== '' ? $s['desc_tarea'] : '(sin descripción)';
+            $descLines[] = $line;
+        }
+        $desc = implode("\n", $descLines);
+
+        return [
+            'id'                 => 0,
+            'orden'              => 'CONSOL:' . $cod,
+            'tarea'              => 'CONSOL',
+            'cod_maquina_mant'   => $cod,
+            'desc_maquina'       => $first['desc_maquina'] ?? '',
+            'grupo'              => $first['grupo']        ?? '',
+            'desc_grupo'         => $first['desc_grupo']   ?? '',
+            'periodicidad'       => $perMain,
+            'desc_tarea'         => $desc,
+            'activa'             => $bajas === $n ? 'B' : 'A',
+            'ultima_revision'    => $ultima,
+            'proxima_revision'   => $proxima,
+            'is_user_added'      => false,
+            'created_by'         => null,
+            'created_at'         => null,
+            'intervenciones'     => $sumInt,
+            'alta_baja'          => $bajas === $n ? 'BAJA' : 'ALTA',
+            'ip_interna'         => '',
+            'tipo_realizacion'   => '',
+            'tipo_mantenimiento' => 'Preventivo',
+            'fecha_pausado'      => $pausados ? min($pausados) : null,
+            'fecha_bloqueo_ini'  => count($bloqueados) === $n ? $bloqIniMin : null,
+            'fecha_bloqueo_fin'  => count($bloqueados) === $n ? $bloqFinMax : null,
+            'consolidada'        => true,
+            'sub_tareas'         => $sub,
+        ];
     }
 
     /** Devuelve una tarea por id (o null). */
@@ -394,7 +523,10 @@ class MaintenancePlanStore
                    to_char(proxima_revision, 'YYYY-MM-DD') AS proxima_revision,
                    is_user_added, created_by,
                    alta_baja, ip_interna, tipo_realizacion, tipo_mantenimiento,
-                   to_char(fecha_pausado, 'YYYY-MM-DD') AS fecha_pausado
+                   tiempo_estimado,
+                   to_char(fecha_pausado,     'YYYY-MM-DD') AS fecha_pausado,
+                   to_char(fecha_bloqueo_ini, 'YYYY-MM-DD') AS fecha_bloqueo_ini,
+                   to_char(fecha_bloqueo_fin, 'YYYY-MM-DD') AS fecha_bloqueo_fin
               FROM mant_plan
              WHERE id = ?
         ", [$id]);
@@ -443,19 +575,34 @@ class MaintenancePlanStore
         $tMant = trim((string)($data['tipo_mantenimiento'] ?? ''));
         $tMant = ($tMant === 'Preventivo' || $tMant === 'Predictivo') ? $tMant : null;
 
+        // Tiempo estimado (migracion 011): minutos enteros 0..10000, null aceptado.
+        $tiempo = null;
+        if (isset($data['tiempo_estimado']) && $data['tiempo_estimado'] !== '' && $data['tiempo_estimado'] !== null) {
+            if (!is_numeric($data['tiempo_estimado'])) {
+                throw new InvalidArgumentException("tiempo_estimado debe ser numero entero (minutos)");
+            }
+            $iv = (int)$data['tiempo_estimado'];
+            if ($iv < 0 || $iv > 10000) {
+                throw new InvalidArgumentException("tiempo_estimado fuera de rango (0..10000)");
+            }
+            $tiempo = $iv;
+        }
+
         $st = $pdo->prepare("
             INSERT INTO mant_plan (
                 orden, tarea, cod_maquina_mant, desc_maquina,
                 grupo, desc_grupo, periodicidad, desc_tarea, activa,
                 ultima_revision, proxima_revision,
                 is_user_added, created_by,
-                alta_baja, ip_interna, tipo_realizacion, tipo_mantenimiento
+                alta_baja, ip_interna, tipo_realizacion, tipo_mantenimiento,
+                tiempo_estimado
             ) VALUES (
                 :orden, :tarea, :cmm, :desc_maquina,
                 :grupo, :desc_grupo, :periodicidad, :desc_tarea, :activa,
                 NULL, :primera,
                 TRUE, :created_by,
-                :alta, :ip, :tipo_real, :tipo_mant
+                :alta, :ip, :tipo_real, :tipo_mant,
+                :tiempo
             )
             RETURNING id
         ");
@@ -475,6 +622,7 @@ class MaintenancePlanStore
             ':ip'           => $ipInterna,
             ':tipo_real'    => $tReal,
             ':tipo_mant'    => $tMant,
+            ':tiempo'       => $tiempo,
         ]);
         $id = (int)$st->fetch()['id'];
         return self::getTareaById($id);
@@ -497,7 +645,11 @@ class MaintenancePlanStore
         $editable = ['tarea','desc_tarea','periodicidad','ultima_revision','proxima_revision',
                      'activa','grupo','desc_grupo',
                      'alta_baja','ip_interna','tipo_realizacion','tipo_mantenimiento',
-                     'fecha_pausado'];
+                     'tiempo_estimado',
+                     'fecha_pausado',
+                     'fecha_bloqueo_ini','fecha_bloqueo_fin'];
+        $dateFields = ['ultima_revision','proxima_revision','fecha_pausado',
+                       'fecha_bloqueo_ini','fecha_bloqueo_fin'];
         $sets = []; $params = [':id' => $id];
         foreach ($editable as $k) {
             if (!array_key_exists($k, $data)) continue;
@@ -524,12 +676,26 @@ class MaintenancePlanStore
                 }
                 $v = $u !== '' ? $u : null;
             }
-            if (in_array($k, ['ultima_revision','proxima_revision','fecha_pausado'], true)) {
+            if ($k === 'tiempo_estimado') {
+                if ($v === '' || $v === null) {
+                    $v = null;
+                } else {
+                    if (!is_numeric($v)) {
+                        throw new InvalidArgumentException("tiempo_estimado debe ser un entero (minutos) o null");
+                    }
+                    $iv = (int)$v;
+                    if ($iv < 0 || $iv > 10000) {
+                        throw new InvalidArgumentException("tiempo_estimado fuera de rango (0..10000 minutos)");
+                    }
+                    $v = $iv;
+                }
+            }
+            if (in_array($k, $dateFields, true)) {
                 $v = ($v !== '' && $v !== null) ? (string)$v : null;
                 if ($v !== null && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) {
                     throw new InvalidArgumentException("$k debe ser YYYY-MM-DD o null");
                 }
-            } elseif (!in_array($k, ['alta_baja','tipo_realizacion','tipo_mantenimiento'], true)) {
+            } elseif (!in_array($k, ['alta_baja','tipo_realizacion','tipo_mantenimiento','tiempo_estimado'], true)) {
                 $v = is_string($v) ? trim($v) : $v;
                 if ($v === '') $v = null;
             }
@@ -537,6 +703,21 @@ class MaintenancePlanStore
             $params[":$k"] = $v;
         }
         if (!$sets) return $current;
+
+        // Coherencia del rango de bloqueo: si llegan los dos, ini <= fin.
+        // Si llega solo uno, replicar el otro desde el estado actual.
+        $iniIn = array_key_exists('fecha_bloqueo_ini', $data);
+        $finIn = array_key_exists('fecha_bloqueo_fin', $data);
+        if ($iniIn || $finIn) {
+            $ini = $iniIn ? ($data['fecha_bloqueo_ini'] ?: null) : ($current['fecha_bloqueo_ini'] ?? null);
+            $fin = $finIn ? ($data['fecha_bloqueo_fin'] ?: null) : ($current['fecha_bloqueo_fin'] ?? null);
+            if (($ini && !$fin) || (!$ini && $fin)) {
+                throw new InvalidArgumentException('Bloqueo: indica fecha de inicio y de fin (o deja ambos vacíos)');
+            }
+            if ($ini && $fin && $ini > $fin) {
+                throw new InvalidArgumentException('Bloqueo: fecha de inicio no puede ser posterior a la de fin');
+            }
+        }
 
         Db::pgExec("UPDATE mant_plan SET " . implode(', ', $sets) . " WHERE id = :id", $params);
         return self::getTareaById($id);
@@ -570,5 +751,162 @@ class MaintenancePlanStore
             $pdo->rollBack();
             throw $e;
         }
+    }
+
+    // ────────────── Consolidación SECUENCIA (racks / plataformas) ──────────────
+
+    /**
+     * ¿La descripción de máquina pertenece a SECUENCIA (E66, RACKS, PLATAFORMAS)?
+     * Misma lógica que el JS de la vista de mantenimiento (ACC_GROUPS).
+     */
+    public static function esSecuencia(string $desc): bool
+    {
+        $s = trim($desc);
+        if ($s === '') return false;
+        if (preg_match('/^E66\b|^E66[_\s\-]/i', $s)) return true;
+        if (preg_match('/^RACK[\s\-]/i', $s))        return true;
+        if (preg_match('/^PLATAFORMA/i', $s))        return true;
+        return false;
+    }
+
+    /**
+     * ¿La descripción es de las consolidables (RACKS o PLATAFORMAS)? E66 NO
+     * se consolida: tiene tareas variadas que no encajan en una revisión única.
+     */
+    public static function esConsolidable(string $desc): bool
+    {
+        $s = trim($desc);
+        if ($s === '') return false;
+        if (preg_match('/^RACK[\s\-]/i', $s))    return true;
+        if (preg_match('/^PLATAFORMA/i', $s))    return true;
+        return false;
+    }
+
+    /**
+     * Periodicidad → "rango" de exigencia. Menor número = más exigente
+     * (intervalo más corto). Para una máquina con tareas de varias
+     * periodicidades elegimos la más exigente como la "principal" de la
+     * fila consolidada → todas las tareas se hacen el día que toque esa.
+     */
+    public static function periodicidadRank(string $per): int
+    {
+        $tab = [
+            'DIARIO'        => 1,
+            'SEMANAL'       => 2,
+            'QUINCENAL'     => 3,
+            'MENSUAL'       => 4,
+            'BIMESTRAL'     => 5,
+            'BIMENSUAL'     => 5,
+            'TRIMESTRAL'    => 6,
+            'CUATRIMESTRAL' => 7,
+            'SEMESTRAL'     => 8,
+            'ANUAL'         => 9,
+        ];
+        return $tab[strtoupper(trim($per))] ?? 99;
+    }
+
+    /**
+     * Toma una lista plana de "proximas" (las que devuelve load()) y consolida
+     * las máquinas de RACKS / PLATAFORMAS: TODAS las tareas de la misma máquina
+     * (sin importar periodicidades) se funden en UNA sola fila "consolidada".
+     *
+     * La idea: para no generar muchas acciones pequeñas separadas por días en
+     * el mismo rack/plataforma, el operario hace TODAS sus revisiones de una
+     * vez el día que la primera vence. Las tareas con periodicidad mayor (p.ej.
+     * MENSUAL, ANUAL) se ejecutan también en ese visita, aunque eso suponga
+     * adelantarlas — es lo que el usuario pide explícitamente.
+     *
+     * La fila consolidada contiene:
+     *   - cod_maquina_mant / desc_maquina / desc_grupo
+     *   - periodicidad      → la MÁS EXIGENTE (intervalo más corto) entre
+     *                         las periodicidades originales — es la que marca
+     *                         la cadencia con la que se vuelve a hacer todo.
+     *   - proxima_revision  (la más temprana del grupo)
+     *   - ultima_revision   (la más reciente del grupo)
+     *   - tarea             (clave sintética 'CONSOL')
+     *   - desc_tarea        "Revisión completa · N tareas"
+     *   - consolidada       = true
+     *   - sub_tareas        = [{orden, tarea, periodicidad, desc_tarea, ultima_revision, proxima_revision}, …]
+     *
+     * Para máquinas que NO son consolidables (E66, no SECUENCIA), las filas
+     * pasan tal cual.
+     */
+    public static function consolidateSecuenciaProximas(array $proximas): array
+    {
+        $consolGroups = []; // key: cod_maquina_mant → group (UNA fila por máquina)
+        $passThrough  = [];
+
+        foreach ($proximas as $p) {
+            $desc = (string)($p['desc_maquina'] ?? '');
+            if (!self::esConsolidable($desc)) {
+                $passThrough[] = $p;
+                continue;
+            }
+            $cod = (string)($p['cod_maquina_mant'] ?? '');
+            $per = strtoupper((string)($p['periodicidad'] ?? ''));
+            $key = $cod; // UNA fila por máquina, todas las periodicidades juntas
+            if (!isset($consolGroups[$key])) {
+                $consolGroups[$key] = [
+                    'cod_maquina_mant' => $cod,
+                    'desc_maquina'     => $desc,
+                    'grupo'            => $p['grupo']      ?? '',
+                    'desc_grupo'       => $p['desc_grupo'] ?? '',
+                    'periodicidad'     => $per,  // se actualiza a la más exigente
+                    'activa'           => $p['activa']     ?? '',
+                    'orden'            => 'CONSOL:' . $cod,
+                    'tarea'            => 'CONSOL',
+                    'desc_tarea'       => '',
+                    'ultima_revision'  => null,
+                    'proxima_revision' => null,
+                    'consolidada'      => true,
+                    'sub_tareas'       => [],
+                    '_periodicidades'  => [],
+                ];
+            }
+            $g = &$consolGroups[$key];
+            $g['sub_tareas'][] = [
+                'orden'            => (string)($p['orden'] ?? ''),
+                'tarea'            => (string)($p['tarea'] ?? ''),
+                'periodicidad'     => $per,
+                'desc_tarea'       => (string)($p['desc_tarea'] ?? ''),
+                'ultima_revision'  => $p['ultima_revision']  ?? null,
+                'proxima_revision' => $p['proxima_revision'] ?? null,
+            ];
+            // Próxima del grupo = la más temprana de las sub-tareas
+            $pxNew = $p['proxima_revision'] ?? null;
+            if ($pxNew !== null) {
+                if ($g['proxima_revision'] === null || $pxNew < $g['proxima_revision']) {
+                    $g['proxima_revision'] = $pxNew;
+                }
+            }
+            // Última = la más reciente
+            $ulNew = $p['ultima_revision'] ?? null;
+            if ($ulNew !== null) {
+                if ($g['ultima_revision'] === null || $ulNew > $g['ultima_revision']) {
+                    $g['ultima_revision'] = $ulNew;
+                }
+            }
+            // Periodicidad mostrada = la más exigente del grupo
+            if ($per !== '') {
+                $g['_periodicidades'][$per] = true;
+                if (self::periodicidadRank($per) < self::periodicidadRank($g['periodicidad'])) {
+                    $g['periodicidad'] = $per;
+                }
+            }
+            unset($g);
+        }
+
+        $consolRows = [];
+        foreach ($consolGroups as $g) {
+            $n = count($g['sub_tareas']);
+            $pers = array_keys($g['_periodicidades']);
+            unset($g['_periodicidades']);
+            // Texto con cuántas y qué periodicidades incluye
+            $persStr = count($pers) > 1 ? ' · ' . implode(', ', $pers) : '';
+            $g['desc_tarea'] = 'Revisión completa · ' . $n . ' tarea' . ($n === 1 ? '' : 's') . $persStr;
+            $consolRows[] = $g;
+        }
+
+        return array_merge($passThrough, $consolRows);
     }
 }

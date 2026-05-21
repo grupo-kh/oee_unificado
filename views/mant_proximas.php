@@ -46,6 +46,12 @@ include __DIR__ . '/../includes/header.php';
                     </label>
                 </div>
                 <button id="filter-clear" class="machine-selector-clear" type="button" style="display:none">× Quitar filtros</button>
+                <button id="prox-export-xlsx" class="machine-selector-clear" type="button"
+                        title="Descargar el calendario filtrado en XLSX para entregar a los operarios"
+                        style="background:#10b981;color:#fff">&#x2B07; Calendario XLSX</button>
+                <button id="prox-export-pdf" class="machine-selector-clear" type="button"
+                        title="Descargar el calendario filtrado en PDF imprimible para los operarios"
+                        style="background:#c8102e;color:#fff">&#x2B07; Calendario PDF</button>
             </div>
 
             <div class="oee-fab-global-grid">
@@ -57,7 +63,7 @@ include __DIR__ . '/../includes/header.php';
                     <div class="oee-detalle-subtitle">Resumen</div>
                     <div class="mant-stats" id="mant-stats">
                         <div class="mant-stat mant-stat-vencidas"><span class="mant-stat-value" id="stat-vencidas">—</span><span class="mant-stat-label">Vencidas</span></div>
-                        <div class="mant-stat mant-stat-urgentes"><span class="mant-stat-value" id="stat-urgentes">—</span><span class="mant-stat-label">Urgentes (≤7 días)</span></div>
+                        <div class="mant-stat mant-stat-urgentes"><span class="mant-stat-value" id="stat-urgentes">—</span><span class="mant-stat-label">Pendientes (≤7 días)</span></div>
                         <div class="mant-stat mant-stat-en-plazo"><span class="mant-stat-value" id="stat-en-plazo">—</span><span class="mant-stat-label">En plazo</span></div>
                         <div class="mant-stat mant-stat-total"><span class="mant-stat-value" id="stat-total">—</span><span class="mant-stat-label">Total</span></div>
                     </div>
@@ -65,7 +71,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
 
             <div class="mant-chart-box mant-chart-fullwidth">
-                <div class="oee-detalle-subtitle">Top Máquinas con tareas vencidas/urgentes <small class="mant-hint">(clic para filtrar)</small></div>
+                <div class="oee-detalle-subtitle">Top Máquinas con tareas vencidas/pendientes <small class="mant-hint">(clic para filtrar)</small></div>
                 <div id="chart-top-maquinas-prox"></div>
                 <div id="chart-top-maquinas-prox-empty" class="drill-down-empty" style="display:none">Sin máquinas con tareas en este rango</div>
             </div>
@@ -93,7 +99,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <div class="view-card-footer metric-legend metric-legend-compact">
             <div class="metric-legend-text">
-                <p><strong>Próximas Revisiones</strong> · datos del fichero <code>Z:\Mantenimiento\…</code> (hoja <em>PROXIMAS REV.</em>). Una tarea se considera <strong>vencida</strong> si su fecha de "Próxima revisión" es anterior a hoy, <strong>urgente</strong> si vence en los próximos 7 días, y <strong>en plazo</strong> en caso contrario. El gauge muestra el % no vencido sobre el total filtrado.</p>
+                <p><strong>Próximas Revisiones</strong> · datos del fichero <code>Z:\Mantenimiento\…</code> (hoja <em>PROXIMAS REV.</em>). Una tarea se considera <strong>vencida</strong> si su fecha de "Próxima revisión" es anterior a hoy, <strong>pendiente</strong> si vence en los próximos 7 días, y <strong>en plazo</strong> en caso contrario. El gauge muestra el % no vencido sobre el total filtrado.</p>
                 <p class="metric-legend-note" id="footer-actualizado">Fichero actualizado: —</p>
             </div>
         </div>
@@ -112,9 +118,56 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <div class="mant-modal-body">
             <div class="mant-modal-summary" id="mark-modal-summary">—</div>
+
+            <!-- Lista de subtareas (solo visible si la fila es consolidada).
+                 El operario puede desmarcar las que NO ha hecho — esas quedan
+                 pendientes en el plan y reaparecerán en la próxima visita. -->
+            <div class="mant-modal-field" id="mark-subtareas-wrap" style="display:none">
+                <label>Sub-tareas incluidas (desmarca las que no hayas hecho)</label>
+                <div id="mark-subtareas-list" class="mant-subtareas-checklist"></div>
+                <small style="color:var(--blue-mid);font-style:italic">
+                    Por defecto todas están marcadas (la visita las hace todas). Desmarca las que dejes pendientes para la próxima vez.
+                </small>
+                <div class="mant-subtareas-toolbar">
+                    <button type="button" class="machine-selector-clear" id="mark-subtareas-all" style="background:#3a6aa3;color:#fff">Marcar todas</button>
+                    <button type="button" class="machine-selector-clear" id="mark-subtareas-none" style="background:#a3b8d1">Desmarcar todas</button>
+                </div>
+            </div>
+
+            <!-- Selector de tipo: realizada / no realizada -->
+            <div class="mant-modal-field mant-modal-tipo">
+                <label>Estado de la intervención</label>
+                <div class="mant-tipo-row">
+                    <label class="mant-tipo-opt">
+                        <input type="radio" name="mark-tipo" value="completada" checked>
+                        <span>✓ Realizada</span>
+                    </label>
+                    <label class="mant-tipo-opt">
+                        <input type="radio" name="mark-tipo" value="no_realizada">
+                        <span>✕ No realizada</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Motivo (solo si no_realizada): 3 valores fijos -->
+            <div class="mant-modal-field" id="mark-motivo-wrap" style="display:none">
+                <label for="mark-motivo">Motivo de no realización</label>
+                <select id="mark-motivo" class="machine-selector">
+                    <option value="">— Selecciona el motivo —</option>
+                    <option value="disponibilidad_maquina">Falta de disponibilidad de máquina</option>
+                    <option value="disponibilidad_operario">Falta de disponibilidad de operario</option>
+                    <option value="falta_material">Falta de material</option>
+                </select>
+            </div>
+
             <div class="mant-modal-field">
                 <label for="mark-fecha">Fecha de la intervención</label>
                 <input type="date" id="mark-fecha" class="machine-selector">
+            </div>
+            <!-- Hora a la que el operario inicia la intervención -->
+            <div class="mant-modal-field" id="mark-hora-wrap">
+                <label for="mark-hora-inicio">Hora de inicio</label>
+                <input type="time" id="mark-hora-inicio" class="machine-selector" step="60">
             </div>
             <div class="mant-modal-field">
                 <label for="mark-operario">Operario</label>
@@ -123,8 +176,11 @@ include __DIR__ . '/../includes/header.php';
                 </select>
             </div>
             <div class="mant-modal-field" id="mark-operario-otro-wrap" style="display:none">
-                <label for="mark-operario-otro">Nombre del operario</label>
-                <input type="text" id="mark-operario-otro" class="machine-selector" placeholder="Escribe el nombre…">
+                <label for="mark-operario-otro">Número de operario</label>
+                <input type="text" inputmode="numeric" pattern="[0-9]+" id="mark-operario-otro" class="machine-selector" placeholder="Ej. 1004">
+                <small style="color:var(--blue-mid);font-style:italic">
+                    Introduce solo el número de operario (sin nombre).
+                </small>
             </div>
             <div class="mant-modal-field">
                 <label for="mark-observaciones">Observaciones</label>
@@ -138,7 +194,13 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<script src="../assets/js/common.js"></script>
-<script src="../assets/js/view_mant_proximas.js"></script>
+<?php
+$_jsCommon    = __DIR__ . '/../assets/js/common.js';
+$_jsView      = __DIR__ . '/../assets/js/view_mant_proximas.js';
+$_jsCommonVer = file_exists($_jsCommon) ? filemtime($_jsCommon) : time();
+$_jsViewVer   = file_exists($_jsView)   ? filemtime($_jsView)   : time();
+?>
+<script src="../assets/js/common.js?v=<?= $_jsCommonVer ?>"></script>
+<script src="../assets/js/view_mant_proximas.js?v=<?= $_jsViewVer ?>"></script>
 </body>
 </html>

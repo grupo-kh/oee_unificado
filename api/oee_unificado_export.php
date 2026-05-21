@@ -61,25 +61,44 @@ function autoWidth($ws, int $colCount): void {
 /**
  * Filas 1-2 con título y filtros aplicados. Devuelve la primera fila libre
  * (= 4) para que el caller continúe escribiendo headers + datos.
+ *
+ * Refleja TODO el estado visible en pantalla: rango efectivo + rango base si
+ * había filtro de período transitorio, turnos, exclusiones, sección, métrica,
+ * modo (Máquina/Referencia), drill por máquina/referencia + sub-drills.
  */
 function writeFilterHeader($ws, array $ctx, string $sheetTitle, int $cols): int {
     $rightCol = Coordinate::stringFromColumnIndex(max($cols, 4));
 
-    // Fila 1: título de la hoja + estampa
+    // Fila 1: título de la hoja
     $ws->setCellValue('A1', "OEE Unificado · $sheetTitle");
     $ws->mergeCells("A1:{$rightCol}1");
     $ws->getStyle('A1')->getFont()->setBold(true)->setSize(13)->getColor()->setRGB('8C181A');
     $ws->getStyle('A1')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
     $ws->getRowDimension(1)->setRowHeight(22);
 
-    // Fila 2: filtros aplicados (texto continuo)
+    // Fila 2: filtros aplicados (texto continuo, bien estructurado)
     $parts   = [];
-    $parts[] = 'Rango: ' . $ctx['fdesde'] . ' → ' . $ctx['fhasta'];
+    // Si había filtro de período transitorio, lo destacamos primero
+    if (!empty($ctx['periodoLabel'])) {
+        $parts[] = '⚠ Filtrado por ' . $ctx['periodoLabel'];
+        if (!empty($ctx['rangoBaseDesde'])) {
+            $parts[] = 'Rango principal de pantalla: ' . $ctx['rangoBaseDesde'] . ' → ' . $ctx['rangoBaseHasta'];
+        }
+    } else {
+        $parts[] = 'Rango: ' . $ctx['fdesde'] . ' → ' . $ctx['fhasta'];
+    }
     $parts[] = 'Turnos: ' . $ctx['turnosLabel'];
     if (!empty($ctx['seccion'])) $parts[] = 'Sección: ' . $ctx['seccion'];
     if (!empty($ctx['metrica'])) $parts[] = 'Métrica: ' . $ctx['metricaLabel'];
+    if (!empty($ctx['porLabel'])) $parts[] = 'Segmentación: ' . $ctx['porLabel'];
+    if (!empty($ctx['maqDrillLabel'])) $parts[] = $ctx['maqDrillTipo'] . ': ' . $ctx['maqDrillLabel'];
+    if (!empty($ctx['maqMotivo']))    $parts[] = 'Motivo (drill máquina): ' . $ctx['maqMotivo'];
+    if (!empty($ctx['maqMotivoDia'])) $parts[] = 'Día (drill máquina): ' . $ctx['maqMotivoDia'];
+    if ($ctx['maqMotivoHora'] !== null && $ctx['maqMotivoHora'] !== '') {
+        $parts[] = 'Hora (drill máquina): ' . str_pad((string)$ctx['maqMotivoHora'], 2, '0', STR_PAD_LEFT) . ':00';
+    }
     if (!empty($ctx['maqDetalleLabel'])) $parts[] = 'Máquina detalle: ' . $ctx['maqDetalleLabel'];
-    if (!empty($ctx['motivo']))  $parts[] = 'Motivo: ' . $ctx['motivo'];
+    if (!empty($ctx['motivo']))  $parts[] = 'Motivo (drill métrica): ' . $ctx['motivo'];
     if (!empty($ctx['motivoMaqLabel'])) $parts[] = 'Filtro máquina motivo: ' . $ctx['motivoMaqLabel'];
     if (!empty($ctx['exclLabel']))      $parts[] = 'Máquinas excluidas: ' . $ctx['exclLabel'];
     $parts[] = 'Exportado: ' . date('d/m/Y H:i');
@@ -87,11 +106,151 @@ function writeFilterHeader($ws, array $ctx, string $sheetTitle, int $cols): int 
     $ws->setCellValue('A2', implode('  ·  ', $parts));
     $ws->mergeCells("A2:{$rightCol}2");
     $ws->getStyle('A2')->getFont()->setSize(10)->getColor()->setRGB('2D4D7A');
-    $ws->getStyle('A2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FDF5F5');
+    $ws->getStyle('A2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()
+        ->setRGB(!empty($ctx['periodoLabel']) ? 'FFF3C4' : 'FDF5F5');
     $ws->getStyle('A2')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER)->setWrapText(true);
-    $ws->getRowDimension(2)->setRowHeight(20);
+    $ws->getRowDimension(2)->setRowHeight(!empty($ctx['periodoLabel']) ? 36 : 22);
 
     return 4;
+}
+
+/**
+ * Genera la "Portada / Resumen del informe" como primera hoja del XLSX.
+ *
+ * Muestra, en bloques visuales, EXACTAMENTE el estado que el usuario tenía
+ * en pantalla en el momento de exportar: filtros principales, filtro
+ * transitorio si lo había, drill de sección/métrica/modo, drill por
+ * máquina/referencia con sus sub-niveles, y la lista de hojas incluidas.
+ */
+function _renderPortada($ws, array $ctx): void {
+    // Anchos generosos para que sea legible sin ajustar columnas
+    $ws->getColumnDimension('A')->setWidth(28);
+    $ws->getColumnDimension('B')->setWidth(70);
+
+    // Título grande y vistoso
+    $ws->setCellValue('A1', 'INFORME OEE UNIFICADO');
+    $ws->mergeCells('A1:B1');
+    $ws->getStyle('A1')->getFont()->setBold(true)->setSize(20)->getColor()->setRGB('FFFFFF');
+    $ws->getStyle('A1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('8C181A');
+    $ws->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)
+        ->setVertical(Alignment::VERTICAL_CENTER);
+    $ws->getRowDimension(1)->setRowHeight(36);
+
+    $ws->setCellValue('A2', 'Exportado: ' . date('d/m/Y H:i'));
+    $ws->mergeCells('A2:B2');
+    $ws->getStyle('A2')->getFont()->setItalic(true)->setSize(10)->getColor()->setRGB('5A6B80');
+    $ws->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+    $ws->getRowDimension(2)->setRowHeight(18);
+
+    $row = 4;
+
+    // ─── Bloque "Filtros principales" ───
+    _portadaSeccion($ws, $row, 'FILTROS PRINCIPALES', '2D4D7A');
+    $row++;
+    if (!empty($ctx['periodoLabel'])) {
+        _portadaFila($ws, $row++, 'Rango efectivo', $ctx['fdesde'] . ' → ' . $ctx['fhasta'] . ' (filtro transitorio)');
+        _portadaFila($ws, $row++, 'Filtrando por', $ctx['periodoLabel'], 'C45A2C');
+        if (!empty($ctx['rangoBaseDesde'])) {
+            _portadaFila($ws, $row++, 'Rango principal de pantalla',
+                $ctx['rangoBaseDesde'] . ' → ' . $ctx['rangoBaseHasta']);
+        }
+    } else {
+        _portadaFila($ws, $row++, 'Rango', $ctx['fdesde'] . ' → ' . $ctx['fhasta']);
+    }
+    _portadaFila($ws, $row++, 'Turnos', $ctx['turnosLabel']);
+    if (!empty($ctx['exclLabel'])) {
+        _portadaFila($ws, $row++, 'Máquinas excluidas', $ctx['exclLabel']);
+    }
+    $row++;
+
+    // ─── Bloque "Drill activo en pantalla" ───
+    $hayDrill = !empty($ctx['seccion']) || !empty($ctx['metrica']) || !empty($ctx['maqDrillLabel']);
+    if ($hayDrill) {
+        _portadaSeccion($ws, $row, 'DRILL ACTIVO EN PANTALLA', '2D4D7A');
+        $row++;
+        if (!empty($ctx['seccion'])) {
+            _portadaFila($ws, $row++, 'Sección', $ctx['seccion']);
+        }
+        if (!empty($ctx['metrica'])) {
+            _portadaFila($ws, $row++, 'Métrica', $ctx['metricaLabel']);
+            _portadaFila($ws, $row++, 'Segmentación', $ctx['porLabel'] ?: 'Por Máquina');
+        }
+        if (!empty($ctx['maqDrillLabel'])) {
+            _portadaFila($ws, $row++, $ctx['maqDrillTipo'] . ' seleccionada', $ctx['maqDrillLabel']);
+        }
+        if (!empty($ctx['maqMotivo'])) {
+            _portadaFila($ws, $row++, 'Motivo (drill ' . strtolower($ctx['maqDrillTipo'] ?: 'máquina') . ')', $ctx['maqMotivo']);
+        }
+        if (!empty($ctx['maqMotivoDia'])) {
+            _portadaFila($ws, $row++, 'Día seleccionado', $ctx['maqMotivoDia']);
+        }
+        if ($ctx['maqMotivoHora'] !== null && $ctx['maqMotivoHora'] !== '') {
+            _portadaFila($ws, $row++, 'Hora seleccionada',
+                str_pad((string)$ctx['maqMotivoHora'], 2, '0', STR_PAD_LEFT) . ':00');
+        }
+        if (!empty($ctx['motivo'])) {
+            _portadaFila($ws, $row++, 'Motivo (drill métrica)', $ctx['motivo']);
+        }
+        if (!empty($ctx['motivoMaqLabel'])) {
+            _portadaFila($ws, $row++, 'Filtro máquina en motivo', $ctx['motivoMaqLabel']);
+        }
+        $row++;
+    } else {
+        _portadaSeccion($ws, $row, 'DRILL ACTIVO EN PANTALLA', '2D4D7A');
+        $row++;
+        _portadaFila($ws, $row++, '—', 'Vista general (sin drill abierto)');
+        $row++;
+    }
+
+    // ─── Bloque "Contenido del informe" ───
+    _portadaSeccion($ws, $row, 'CONTENIDO DEL INFORME', '2D4D7A');
+    $row++;
+    $hojas = ['OEE por Sección', 'Evolución OEE'];
+    if (!empty($ctx['maqDetalleLabel'])) $hojas[] = 'Detalle máquina';
+    if (!empty($ctx['seccion'])) {
+        $hojas[] = $ctx['seccion'] . ' D-R-C-OEE';
+        if (!empty($ctx['metrica'])) {
+            $hojas[] = $ctx['seccion'] . ' - ' . ($ctx['por'] === 'referencia' ? 'Referencias' : 'Máquinas');
+            $hojas[] = 'Motivos ' . $ctx['metricaLabel'];
+            if (!empty($ctx['motivo'])) $hojas[] = 'Motivo ' . $ctx['motivo'];
+        }
+    }
+    if (!empty($ctx['maqDrillLabel'])) {
+        $hojas[] = 'Drill ' . strtolower($ctx['maqDrillTipo']);
+    }
+    foreach ($hojas as $i => $h) {
+        _portadaFila($ws, $row++, 'Hoja ' . ($i + 2), $h);
+    }
+}
+
+/** Encabezado de bloque dentro de la portada. */
+function _portadaSeccion($ws, int $row, string $titulo, string $rgb): void {
+    $ws->setCellValue("A$row", $titulo);
+    $ws->mergeCells("A$row:B$row");
+    $ws->getStyle("A$row")->getFont()->setBold(true)->setSize(11)->getColor()->setRGB('FFFFFF');
+    $ws->getStyle("A$row")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB($rgb);
+    $ws->getStyle("A$row")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER)
+        ->setIndent(1);
+    $ws->getRowDimension($row)->setRowHeight(22);
+}
+
+/** Fila clave/valor dentro de un bloque. */
+function _portadaFila($ws, int $row, string $key, string $value, string $accentRgb = ''): void {
+    $ws->setCellValue("A$row", $key);
+    $ws->setCellValue("B$row", $value);
+    $ws->getStyle("A$row")->getFont()->setBold(true)->getColor()->setRGB('2D4D7A');
+    $ws->getStyle("A$row")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F4F7FB');
+    $ws->getStyle("A$row")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER)->setIndent(1);
+    $ws->getStyle("B$row")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER)
+        ->setWrapText(true)->setIndent(1);
+    if ($accentRgb !== '') {
+        $ws->getStyle("B$row")->getFont()->setBold(true)->getColor()->setRGB($accentRgb);
+    } else {
+        $ws->getStyle("B$row")->getFont()->getColor()->setRGB('1A2D4A');
+    }
+    $ws->getStyle("A$row:B$row")->getBorders()->getBottom()
+        ->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('E0E8F0');
+    $ws->getRowDimension($row)->setRowHeight(20);
 }
 
 try {
@@ -101,10 +260,19 @@ try {
     $fhasta         = (string) getParam('fecha_hasta');
     $seccion        = getParam('seccion');
     $metrica        = getParam('metrica');
-    $codMaq         = getParam('cod_maquina');             // filtro de máquinas en motivos
+    $codMaq         = getParam('cod_maquina');             // filtro de máquinas en motivos (drill métrica)
+    $codRef         = getParam('cod_referencia');          // drill por referencia (modo Referencia)
+    $por            = (string) (getParam('por') ?: 'maquina'); // 'maquina' | 'referencia'
+    $maqNombre      = getParam('maq_nombre');              // nombre legible drill máquina/ref
+    $maqMotivo      = getParam('maq_motivo');              // motivo activo dentro del drill máquina
+    $maqMotivoDia   = getParam('maq_motivo_dia');          // día clicado dentro de motivo drill máquina
+    $maqMotivoHora  = getParam('maq_motivo_hora');         // hora clicada
     $motivo         = getParam('motivo');
     $motivoCodMaq   = getParam('motivo_cod_maquina');      // filtro hora-por-máquina
     $detalleCodMaq  = getParam('detalle_cod_maquina');     // detalle por máquina (OFs/Refs)
+    $periodoLabel   = getParam('periodo_label');           // texto legible del período transitorio
+    $rangoBaseDesde = getParam('rango_base_desde');        // rango original cuando hay filtro transitorio
+    $rangoBaseHasta = getParam('rango_base_hasta');
 
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fdesde)) jsonError('fecha_desde inválida');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fhasta)) jsonError('fecha_hasta inválida');
@@ -116,6 +284,7 @@ try {
     $metricaLabel = $metrica
         ? (['disponibilidad'=>'Disponibilidad','rendimiento'=>'Rendimiento','calidad'=>'Calidad','oee'=>'OEE'][$metrica] ?? $metrica)
         : '';
+    $porLabel = $por === 'referencia' ? 'Por Referencia' : 'Por Máquina';
 
     // Resolver descripción de máquinas para etiquetas de filtros
     $maqDetalleLabel = '';
@@ -127,6 +296,31 @@ try {
     if ($motivoCodMaq) {
         $r = fetchAll('mapex', "SELECT TOP 1 Desc_maquina FROM cfg_maquina WHERE Cod_maquina = ?", [$motivoCodMaq]);
         $motivoMaqLabel = $r[0]['Desc_maquina'] ?? $motivoCodMaq;
+    }
+
+    // Drill por máquina/referencia (la entidad en la que el usuario ha
+    // profundizado tras clicar una barra del drill métrica)
+    $maqDrillLabel = '';
+    $maqDrillTipo  = '';
+    $maqDrillCod   = '';
+    if ($por === 'referencia' && $codRef) {
+        $maqDrillTipo = 'Referencia';
+        $maqDrillCod  = (string)$codRef;
+        if ($maqNombre) {
+            $maqDrillLabel = (string)$maqNombre;
+        } else {
+            $r = fetchAll('mapex', "SELECT TOP 1 Desc_producto FROM cfg_producto WHERE Cod_producto = ?", [(string)$codRef]);
+            $maqDrillLabel = $r[0]['Desc_producto'] ?? (string)$codRef;
+        }
+    } elseif ($por !== 'referencia' && $codMaq) {
+        $maqDrillTipo = 'Máquina';
+        $maqDrillCod  = (string)$codMaq;
+        if ($maqNombre) {
+            $maqDrillLabel = (string)$maqNombre;
+        } else {
+            $r = fetchAll('mapex', "SELECT TOP 1 Desc_maquina FROM cfg_maquina WHERE Cod_maquina = ?", [(string)$codMaq]);
+            $maqDrillLabel = $r[0]['Desc_maquina'] ?? (string)$codMaq;
+        }
     }
 
     // Etiqueta legible de máquinas excluidas (para cabecera del export)
@@ -149,10 +343,21 @@ try {
         'seccion'          => $seccion,
         'metrica'          => $metrica,
         'metricaLabel'     => $metricaLabel,
+        'por'              => $por,
+        'porLabel'         => $metrica ? $porLabel : '',
         'maqDetalleLabel'  => $maqDetalleLabel,
+        'maqDrillTipo'     => $maqDrillTipo,
+        'maqDrillLabel'    => $maqDrillLabel,
+        'maqDrillCod'      => $maqDrillCod,
+        'maqMotivo'        => $maqMotivo,
+        'maqMotivoDia'     => $maqMotivoDia,
+        'maqMotivoHora'    => $maqMotivoHora,
         'motivo'           => $motivo,
         'motivoMaqLabel'   => $motivoMaqLabel,
         'exclLabel'        => $exclLabel,
+        'periodoLabel'     => $periodoLabel,
+        'rangoBaseDesde'   => $rangoBaseDesde,
+        'rangoBaseHasta'   => $rangoBaseHasta,
     ];
 
     // ───── Fetch base data (mismo SQL que oee_unificado.php) ─────
@@ -220,8 +425,15 @@ try {
         ->setTitle('OEE Unificado')
         ->setDescription("Exportación OEE $fdesde a $fhasta");
 
-    // === Hoja 1: OEE por Sección ===
-    $ws = $book->getActiveSheet();
+    // === Hoja 1: PORTADA / RESUMEN DEL INFORME ===
+    // Indica al usuario, de un vistazo, exactamente qué información contiene
+    // el archivo: filtros, secciones/drills activos en pantalla y lista de hojas.
+    $wsCover = $book->getActiveSheet();
+    $wsCover->setTitle('Portada');
+    _renderPortada($wsCover, $ctx);
+
+    // === Hoja 2: OEE por Sección ===
+    $ws = $book->createSheet();
     $ws->setTitle('OEE por Sección');
 
     $row = writeFilterHeader($ws, $ctx, 'OEE por Sección', 6);

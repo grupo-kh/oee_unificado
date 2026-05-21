@@ -321,6 +321,15 @@ async function cargarVista() {
         renderGauge(parseFloat(d.global.cumplimiento), labelGauge);
         renderMeses(d.meses_data || []);
 
+        // Título dinámico del gauge según el rango filtrado:
+        //   - si abarca un único mes (caso por defecto, mes en curso)
+        //     → "Cumplimiento mes (Mayo 2026)"
+        //   - si abarca varios meses → "Cumplimiento del rango (DD/MM/AAAA → DD/MM/AAAA)"
+        actualizarTituloGauge(d.global, d.meses_data || []);
+
+        // Leyenda explicativa debajo del gauge.
+        actualizarLeyendaGauge(d.global, d.meses_data || []);
+
     } catch (e) {
         showToast('Error: ' + e.message, 'error');
     } finally {
@@ -427,6 +436,7 @@ async function cargarMesDetalle() {
             <span class="mant-stat-pill"><b>${t.total ?? 0}</b> tareas</span>
             <span class="mant-stat-pill mant-stat-pill-ok"><b>${t.realizadas ?? 0}</b> realizadas</span>
             <span class="mant-stat-pill mant-stat-pill-ko"><b>${t.no_realizadas ?? 0}</b> no realizadas</span>
+            <span class="mant-stat-pill mant-stat-pill-ko"><b>${t.vencidas_sin_marcar ?? 0}</b> vencidas sin marcar</span>
             <span class="mant-stat-pill mant-stat-pill-rec"><b>${t.recuperaciones ?? 0}</b> recuperadas</span>
             <span class="mant-stat-pill mant-stat-pill-cumpl">cumplimiento <b>${cumpl}</b></span>
         `;
@@ -447,12 +457,14 @@ function renderMesDetalleTabla(rows) {
     }
     tb.innerHTML = rows.map(r => {
         let badge;
-        if      (r.tipo === 'no_realizada')  badge = '<span class="mant-source-badge mant-source-missed">NO REALIZADA</span>';
-        else if (r.tipo === 'recuperacion')  badge = '<span class="mant-source-badge mant-source-catchup">RECUPERACIÓN</span>';
-        else                                 badge = '<span class="mant-source-badge mant-source-web">REALIZADA</span>';
+        if      (r.tipo === 'no_realizada')        badge = '<span class="mant-source-badge mant-source-missed">NO REALIZADA</span>';
+        else if (r.tipo === 'recuperacion')        badge = '<span class="mant-source-badge mant-source-catchup">RECUPERACIÓN</span>';
+        else if (r.tipo === 'vencida_sin_marcar') badge = '<span class="mant-source-badge mant-source-missed">VENCIDA SIN MARCAR</span>';
+        else                                       badge = '<span class="mant-source-badge mant-source-web">REALIZADA</span>';
 
         // Resumimos a "Realizada / Pendiente / Recuperada":
         //   - Si la tarea no se hizo, mostramos "Pendiente" (con motivo si lo hay).
+        //   - Vencida sin marcar = "Pendiente · sin imputar" (ni siquiera se marcó como no_realizada).
         //   - Para realizadas/recuperadas mostramos "Realizada" salvo que haya
         //     observaciones del operario que no sean el seed automático del import.
         const obsTxt    = String(r.observaciones || '').trim();
@@ -463,13 +475,15 @@ function renderMesDetalleTabla(rows) {
             obs = motivo
                 ? `<span class="mant-pill-status mant-pill-pendiente">Pendiente</span> <span class="mant-cod">· ${escHtml(motivo)}</span>`
                 : `<span class="mant-pill-status mant-pill-pendiente">Pendiente</span>`;
+        } else if (r.tipo === 'vencida_sin_marcar') {
+            obs = `<span class="mant-pill-status mant-pill-pendiente">Pendiente</span> <span class="mant-cod">· sin imputar</span>`;
         } else if (obsTxt && !obsIsSeed) {
             obs = `<span class="mant-pill-status mant-pill-realizada">Realizada</span> <span class="mant-cod">· ${escHtml(obsTxt)}</span>`;
         } else {
             obs = `<span class="mant-pill-status mant-pill-realizada">Realizada</span>`;
         }
 
-        const rowClass = r.tipo === 'no_realizada' ? 'mant-row-missed'
+        const rowClass = (r.tipo === 'no_realizada' || r.tipo === 'vencida_sin_marcar') ? 'mant-row-missed'
                        : r.tipo === 'recuperacion' ? 'mant-row-catchup'
                        : '';
         return `
@@ -677,6 +691,99 @@ function onClearFilters() {
     cargarVista();
 }
 
+// ─── Título dinámico del gauge según el rango filtrado ────────────────────
+function actualizarTituloGauge(g, mesesData) {
+    const el = document.getElementById('gauge-title');
+    if (!el) return;
+    const fd = g && g.fecha_desde, fh = g && g.fecha_hasta;
+    if (!fd || !fh) { el.textContent = 'Cumplimiento mes'; return; }
+    const mesD = fd.substring(0, 7), mesH = fh.substring(0, 7);
+    if (mesD === mesH) {
+        // Un solo mes — mostramos su nombre.
+        el.textContent = 'Cumplimiento mes (' + nombreMesLargo(mesD) + ')';
+    } else {
+        const fmt = iso => {
+            const [y, m, dd] = iso.split('-');
+            return dd + '/' + m + '/' + y;
+        };
+        el.textContent = 'Cumplimiento del rango (' + fmt(fd) + ' → ' + fmt(fh) + ')';
+    }
+}
+
+// ─── Leyenda explicativa debajo del gauge ─────────────────────────────────
+// El gauge muestra el cumplimiento AGREGADO del rango filtrado. Cada barra
+// del gráfico inferior muestra el cumplimiento de UN mes concreto. Cuando el
+// rango abarca varios meses, el gauge ≠ cada barra individual; es la media
+// ponderada por tareas. Cuando el rango es un solo mes, coinciden.
+function actualizarLeyendaGauge(g, mesesData) {
+    const el = document.getElementById('gauge-legend');
+    if (!el) return;
+    if (!g || !g.fecha_desde) { el.textContent = '—'; return; }
+    const mesD = g.fecha_desde.substring(0, 7);
+    const mesH = g.fecha_hasta.substring(0, 7);
+    const unSoloMes = (mesD === mesH);
+
+    const realizadas        = g.numer ?? g.realizadas ?? 0;
+    const completadas       = g.completadas ?? 0;
+    const recuperaciones    = g.recuperaciones ?? 0;
+    const noRealizadas      = g.no_realizadas ?? 0;
+    const vencSinMarcar     = g.vencidas_sin_marcar ?? 0;
+    const denom             = g.denom ?? (realizadas + noRealizadas + vencSinMarcar);
+    const pct               = g.cumplimiento ?? 0;
+
+    const formulaLine = `<strong>Cómo se calcula:</strong> realizadas ${realizadas} `
+        + `/ (realizadas ${realizadas} + no realizadas ${noRealizadas} + vencidas sin marcar ${vencSinMarcar})`
+        + ` = <strong>${Number(pct).toFixed(2)} %</strong>.`;
+
+    let porQue;
+    if (unSoloMes) {
+        porQue = `Como el rango filtrado es un único mes (<strong>${nombreMesLargo(mesD)}</strong>), `
+               + `este valor coincide exactamente con la barra de ese mes en el gráfico inferior.`;
+    } else {
+        const nMeses = (mesesData || []).length;
+        porQue = `El rango filtrado abarca <strong>${nMeses || 'varios'} meses</strong>, así que este `
+               + `valor es la media ponderada por tareas: suma de todas las realizadas dividida por la `
+               + `suma de todos los denominadores. Por eso <strong>puede no coincidir con una barra `
+               + `concreta</strong> del gráfico inferior, que muestra solo un mes. Para ver el `
+               + `cumplimiento de un único mes, filtra desde el día 1 al último día de ese mes.`;
+    }
+
+    const detalleBreakdown = recuperaciones > 0
+        ? ` Las recuperaciones (${recuperaciones}) cuentan en el mes en que se hicieron, no en el mes original.`
+        : '';
+
+    el.innerHTML = formulaLine + '<br>' + porQue + detalleBreakdown;
+}
+
+function nombreMesLargo(ym) {
+    const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const [y, m] = ym.split('-');
+    const idx = parseInt(m, 10) - 1;
+    return (meses[idx] || m) + ' ' + y;
+}
+
+// Descarga el informe de cumplimiento respetando los filtros vivos
+// (fecha_desde, fecha_hasta, cod_maquina_mant). Abrimos en pestaña nueva
+// para que cualquier error PHP del endpoint sea visible.
+function descargarInforme(fmt) {
+    console.log('[cumpl] descargarInforme invocado', fmt);
+    const params = new URLSearchParams();
+    params.set('fmt', fmt === 'pdf' ? 'pdf' : 'xlsx');
+    if (_fDesde)         params.set('fecha_desde',     _fDesde);
+    if (_fHasta)         params.set('fecha_hasta',     _fHasta);
+    if (_mantCodMaquina) params.set('cod_maquina_mant', _mantCodMaquina);
+    const url = '../api/mant_cumplimiento_export.php?' + params.toString();
+    console.log('[cumpl] descargando ->', url);
+    const a = document.createElement('a');
+    a.href   = url;
+    a.target = '_blank';
+    a.rel    = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     _mantCodMaquina = getQueryParam('cod_maquina_mant') || '';
     _fDesde         = getQueryParam('fecha_desde') || '';
@@ -700,6 +807,12 @@ document.addEventListener('DOMContentLoaded', () => {
     $('#f-hasta').addEventListener('change', onHastaChange);
     $('#machine-selector').addEventListener('change', onMachineChange);
     const c = $('#filter-clear'); if (c) c.addEventListener('click', onClearFilters);
+
+    // Descarga del informe de cumplimiento (respeta filtros activos)
+    const xlsxBtn = $('#cumpl-export-xlsx');
+    if (xlsxBtn) xlsxBtn.addEventListener('click', () => descargarInforme('xlsx'));
+    const pdfBtn  = $('#cumpl-export-pdf');
+    if (pdfBtn)  pdfBtn.addEventListener('click', () => descargarInforme('pdf'));
 
     // Drill-down + modal edición periodicidad
     const closeBtn = $('#tareas-close'); if (closeBtn) closeBtn.addEventListener('click', cerrarDrillDown);

@@ -56,7 +56,7 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
 
-            <div class="mant-stats mant-stats-3">
+            <div class="mant-stats">
                 <div class="mant-stat mant-stat-total">
                     <span class="mant-stat-value" id="stat-total">—</span>
                     <span class="mant-stat-label">Intervenciones</span>
@@ -64,10 +64,6 @@ include __DIR__ . '/../includes/header.php';
                 <div class="mant-stat mant-stat-en-plazo">
                     <span class="mant-stat-value" id="stat-maquinas">—</span>
                     <span class="mant-stat-label">Máquinas distintas</span>
-                </div>
-                <div class="mant-stat mant-stat-urgentes">
-                    <span class="mant-stat-value" id="stat-operarios">—</span>
-                    <span class="mant-stat-label">Operarios distintos</span>
                 </div>
             </div>
 
@@ -91,6 +87,75 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="loader" id="loader"><div class="spinner"></div></div>
 <div class="toast" id="toast"></div>
+
+<!-- Modal · edición de intervención (solo técnico) -->
+<div id="hist-edit-modal" class="mant-modal role-tecnico-only" style="display:none" aria-hidden="true">
+    <div class="mant-modal-backdrop" id="hist-edit-backdrop"></div>
+    <div class="mant-modal-dialog" role="dialog" aria-modal="true">
+        <div class="mant-modal-header">
+            <span>Editar intervención</span>
+            <button type="button" class="mant-modal-close" id="hist-edit-close" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="mant-modal-body">
+            <div class="mant-modal-summary" id="hist-edit-summary">&mdash;</div>
+
+            <div class="mant-modal-field" id="hist-edit-fecha-wrap">
+                <label for="hist-edit-fecha">Fecha de la intervención</label>
+                <input type="date" id="hist-edit-fecha" class="machine-selector">
+            </div>
+
+            <div class="mant-modal-field" id="hist-edit-hora-wrap">
+                <label for="hist-edit-hora">Hora de inicio</label>
+                <input type="time" id="hist-edit-hora" class="machine-selector" step="60">
+            </div>
+
+            <div class="mant-modal-field">
+                <label for="hist-edit-tiempo-min">Tiempo de ejecución</label>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <input type="number" id="hist-edit-tiempo-min" class="machine-selector" min="0" max="600" step="1" style="width:90px" placeholder="min">
+                    <span>min</span>
+                </div>
+                <small style="color:var(--blue-mid);font-style:italic">
+                    Valor real en minutos. Internamente se guardan segundos con variación ±5..10 sobre tiempo_estimado.
+                </small>
+                <!-- Input de segundos eliminado del UI; el seg se preserva al guardar
+                     (si el usuario cambia el min, se redondea con jitter aleatorio ±5s). -->
+                <input type="hidden" id="hist-edit-tiempo-seg" value="">
+            </div>
+
+            <div class="mant-modal-field" id="hist-edit-motivo-wrap" style="display:none">
+                <label for="hist-edit-motivo">Motivo de no realización</label>
+                <select id="hist-edit-motivo" class="machine-selector">
+                    <option value="">— Selecciona —</option>
+                    <option value="disponibilidad_maquina">Falta de disponibilidad de máquina</option>
+                    <option value="disponibilidad_operario">Falta de disponibilidad de operario</option>
+                    <option value="falta_material">Falta de material</option>
+                </select>
+            </div>
+
+            <div class="mant-modal-field">
+                <label for="hist-edit-operario">Número de operario</label>
+                <input type="text" inputmode="numeric" pattern="[0-9]+" id="hist-edit-operario" class="machine-selector" placeholder="Ej. 1004">
+            </div>
+
+            <div class="mant-modal-field">
+                <label for="hist-edit-obs">Comentario / observaciones</label>
+                <textarea id="hist-edit-obs" class="machine-selector mant-textarea" rows="4" placeholder="Notas sobre la intervención…"></textarea>
+            </div>
+
+            <div class="mant-modal-field">
+                <label class="mant-tipo-opt" style="display:inline-flex;align-items:center;gap:8px">
+                    <input type="checkbox" id="hist-edit-incompleta">
+                    <span>Visita incompleta (se quedaron sub-tareas pendientes)</span>
+                </label>
+            </div>
+        </div>
+        <div class="mant-modal-footer">
+            <button type="button" class="machine-selector-clear" id="hist-edit-cancel" style="background:#a3b8d1">Cancelar</button>
+            <button type="button" class="machine-selector-clear" id="hist-edit-save" style="background:#10b981;color:#fff">Guardar</button>
+        </div>
+    </div>
+</div>
 
 <?php
 $_jsCommon = __DIR__ . '/../assets/js/common.js';

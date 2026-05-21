@@ -34,12 +34,19 @@ include __DIR__ . '/../includes/header.php';
                     </select>
                 </div>
                 <button id="filter-clear" class="machine-selector-clear" type="button" style="display:none">× Quitar filtros</button>
+                <button id="cumpl-export-xlsx" class="machine-selector-clear" type="button"
+                        title="Descargar el informe de cumplimiento en XLSX con los filtros actuales"
+                        style="background:#10b981;color:#fff">&#x2B07; Informe XLSX</button>
+                <button id="cumpl-export-pdf" class="machine-selector-clear" type="button"
+                        title="Descargar el informe de cumplimiento en PDF imprimible"
+                        style="background:#c8102e;color:#fff">&#x2B07; Informe PDF</button>
             </div>
 
             <div class="cumpl-gauge-wrap">
                 <div class="cumpl-gauge-card">
-                    <div class="oee-detalle-subtitle">Cumplimiento</div>
+                    <div class="oee-detalle-subtitle" id="gauge-title">Cumplimiento mes</div>
                     <div id="gauge-cumpl"></div>
+                    <div class="gauge-legend" id="gauge-legend">—</div>
                 </div>
             </div>
 

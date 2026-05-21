@@ -1,0 +1,13 @@
+-- ============================================================
+--  007 - OBSOLETA. Creada por error.
+--  La numero 007 real es 007_unify_turbobender.sql.
+--  El contenido que aqui iba (tiempo_estimado + fecha_pausa) se
+--  trasladó a:
+--    - migrations/008_mant_plan_pause.sql (pausa, ya existente)
+--    - migrations/011_mant_plan_tiempo_estimado.sql (tiempo estimado)
+--
+--  Este fichero se conserva como NOOP para no descolocar el orden
+--  de aplicacion: como version='007' ya esta en schema_migrations,
+--  install_postgres.php lo marca como "ya aplicada" y no se ejecuta.
+-- ============================================================
+SELECT 1;

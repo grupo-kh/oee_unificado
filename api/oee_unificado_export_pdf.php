@@ -43,9 +43,18 @@ try {
     $seccion        = getParam('seccion');
     $metrica        = getParam('metrica');
     $codMaq         = getParam('cod_maquina');
+    $codRef         = getParam('cod_referencia');
+    $por            = (string) (getParam('por') ?: 'maquina');
+    $maqNombre      = getParam('maq_nombre');
+    $maqMotivo      = getParam('maq_motivo');
+    $maqMotivoDia   = getParam('maq_motivo_dia');
+    $maqMotivoHora  = getParam('maq_motivo_hora');
     $motivo         = getParam('motivo');
     $motivoCodMaq   = getParam('motivo_cod_maquina');
     $detalleCodMaq  = getParam('detalle_cod_maquina');
+    $periodoLabel   = getParam('periodo_label');
+    $rangoBaseDesde = getParam('rango_base_desde');
+    $rangoBaseHasta = getParam('rango_base_hasta');
 
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fdesde)) jsonError('fecha_desde inválida');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fhasta)) jsonError('fecha_hasta inválida');
@@ -57,6 +66,7 @@ try {
     $metricaLabel = $metrica
         ? (['disponibilidad'=>'Disponibilidad','rendimiento'=>'Rendimiento','calidad'=>'Calidad','oee'=>'OEE'][$metrica] ?? $metrica)
         : '';
+    $porLabel = $por === 'referencia' ? 'Por Referencia' : 'Por Máquina';
 
     $maqDetalleLabel = '';
     if ($detalleCodMaq) {
@@ -67,6 +77,27 @@ try {
     if ($motivoCodMaq) {
         $r = fetchAll('mapex', "SELECT TOP 1 Desc_maquina FROM cfg_maquina WHERE Cod_maquina = ?", [$motivoCodMaq]);
         $motivoMaqLabel = $r[0]['Desc_maquina'] ?? $motivoCodMaq;
+    }
+    // Drill por máquina/referencia activo en pantalla (entidad sobre la que
+    // el usuario ha profundizado tras clicar una barra del drill métrica)
+    $maqDrillLabel = '';
+    $maqDrillTipo  = '';
+    if ($por === 'referencia' && $codRef) {
+        $maqDrillTipo = 'Referencia';
+        if ($maqNombre) {
+            $maqDrillLabel = (string)$maqNombre;
+        } else {
+            $r = fetchAll('mapex', "SELECT TOP 1 Desc_producto FROM cfg_producto WHERE Cod_producto = ?", [(string)$codRef]);
+            $maqDrillLabel = $r[0]['Desc_producto'] ?? (string)$codRef;
+        }
+    } elseif ($por !== 'referencia' && $codMaq) {
+        $maqDrillTipo = 'Máquina';
+        if ($maqNombre) {
+            $maqDrillLabel = (string)$maqNombre;
+        } else {
+            $r = fetchAll('mapex', "SELECT TOP 1 Desc_maquina FROM cfg_maquina WHERE Cod_maquina = ?", [(string)$codMaq]);
+            $maqDrillLabel = $r[0]['Desc_maquina'] ?? (string)$codMaq;
+        }
     }
 
     // Etiqueta legible de máquinas excluidas
@@ -163,15 +194,103 @@ try {
     .meses-grid th { font-size: 8pt; padding: 3pt 2pt; }
     .meses-grid td { font-size: 8pt; padding: 2pt 3pt; }
     .seccion-info { font-size: 8pt; color: #2d4d7a; margin: -2pt 0 4pt; font-style: italic; }
+    /* Portada / resumen visual */
+    .portada { border: 2pt solid #8c181a; border-radius: 4pt; padding: 12pt 14pt; margin: 6pt 0 14pt; }
+    .portada h1 { font-size: 20pt; text-align: center; margin: 0 0 8pt; }
+    .portada .stamp { text-align: center; color: #5a6b80; font-style: italic; font-size: 9pt; margin-bottom: 12pt; }
+    .portada .block { margin-bottom: 10pt; }
+    .portada .block-title { background: #2d4d7a; color: #fff; padding: 4pt 8pt; font-size: 10pt; font-weight: bold; border-radius: 3pt 3pt 0 0; letter-spacing: 0.5pt; }
+    .portada .block table { width: 100%; border-collapse: collapse; }
+    .portada .block td { border-bottom: 1px solid #e0e8f0; padding: 4pt 8pt; font-size: 9pt; vertical-align: top; }
+    .portada .block td.k { background: #f4f7fb; color: #2d4d7a; font-weight: bold; width: 32%; }
+    .portada .block td.v { color: #1a2d4a; }
+    .portada .block td.warn { background: #fff8e1; color: #c45a2c; font-weight: bold; }
+    .portada ul.toc { margin: 0; padding-left: 18pt; font-size: 9pt; }
+    .portada ul.toc li { margin: 2pt 0; }
 </style></head>
 <body>
 
+<!-- ─── PORTADA / RESUMEN DEL INFORME ─── -->
+<div class="portada">
+    <h1>INFORME OEE UNIFICADO</h1>
+    <div class="stamp">Exportado el <?= date('d/m/Y H:i') ?></div>
+
+    <div class="block">
+        <div class="block-title">FILTROS PRINCIPALES</div>
+        <table>
+            <?php if ($periodoLabel): ?>
+            <tr><td class="k">Rango efectivo</td><td class="v"><?= _h($fdesde) ?> → <?= _h($fhasta) ?> <em class="small">(filtro transitorio)</em></td></tr>
+            <tr><td class="k">Filtrando por</td><td class="v warn"><?= _h($periodoLabel) ?></td></tr>
+            <?php if ($rangoBaseDesde): ?>
+            <tr><td class="k">Rango principal de pantalla</td><td class="v"><?= _h($rangoBaseDesde) ?> → <?= _h($rangoBaseHasta) ?></td></tr>
+            <?php endif; ?>
+            <?php else: ?>
+            <tr><td class="k">Rango</td><td class="v"><?= _h($fdesde) ?> → <?= _h($fhasta) ?></td></tr>
+            <?php endif; ?>
+            <tr><td class="k">Turnos</td><td class="v"><?= _h($turnosLabel) ?></td></tr>
+            <?php if ($exclLabel): ?>
+            <tr><td class="k">Máquinas excluidas</td><td class="v"><?= _h($exclLabel) ?></td></tr>
+            <?php endif; ?>
+        </table>
+    </div>
+
+    <div class="block">
+        <div class="block-title">DRILL ACTIVO EN PANTALLA</div>
+        <table>
+            <?php if ($seccion || $metrica || $maqDrillLabel): ?>
+            <?php if ($seccion): ?><tr><td class="k">Sección</td><td class="v"><?= _h($seccion) ?></td></tr><?php endif; ?>
+            <?php if ($metrica): ?>
+            <tr><td class="k">Métrica</td><td class="v"><?= _h($metricaLabel) ?></td></tr>
+            <tr><td class="k">Segmentación</td><td class="v"><?= _h($porLabel) ?></td></tr>
+            <?php endif; ?>
+            <?php if ($maqDrillLabel): ?>
+            <tr><td class="k"><?= _h($maqDrillTipo) ?> seleccionada</td><td class="v"><?= _h($maqDrillLabel) ?></td></tr>
+            <?php endif; ?>
+            <?php if ($maqMotivo): ?><tr><td class="k">Motivo (drill <?= _h(strtolower($maqDrillTipo ?: 'máquina')) ?>)</td><td class="v"><?= _h($maqMotivo) ?></td></tr><?php endif; ?>
+            <?php if ($maqMotivoDia): ?><tr><td class="k">Día seleccionado</td><td class="v"><?= _h($maqMotivoDia) ?></td></tr><?php endif; ?>
+            <?php if ($maqMotivoHora !== null && $maqMotivoHora !== ''): ?>
+            <tr><td class="k">Hora seleccionada</td><td class="v"><?= _h(str_pad((string)$maqMotivoHora, 2, '0', STR_PAD_LEFT)) ?>:00</td></tr>
+            <?php endif; ?>
+            <?php if ($motivo): ?><tr><td class="k">Motivo (drill métrica)</td><td class="v"><?= _h($motivo) ?></td></tr><?php endif; ?>
+            <?php if ($motivoMaqLabel): ?><tr><td class="k">Filtro máquina en motivo</td><td class="v"><?= _h($motivoMaqLabel) ?></td></tr><?php endif; ?>
+            <?php else: ?>
+            <tr><td class="k">—</td><td class="v"><em>Vista general (sin drill abierto)</em></td></tr>
+            <?php endif; ?>
+        </table>
+    </div>
+
+    <div class="block">
+        <div class="block-title">CONTENIDO DEL INFORME</div>
+        <ul class="toc">
+            <li>OEE por Sección (global + VARILLAS + TROQUELADOS)</li>
+            <li>Evolución OEE en el rango</li>
+            <?php if ($maqDetalleLabel): ?><li>Detalle por máquina: <?= _h($maqDetalleLabel) ?></li><?php endif; ?>
+            <?php if ($seccion): ?>
+            <li>Desglose D/R/C/OEE de la sección <?= _h($seccion) ?></li>
+            <?php if ($metrica): ?>
+            <li>D/R/C/OEE por <?= _h($por === 'referencia' ? 'referencia' : 'máquina') ?> en <?= _h($seccion) ?></li>
+            <li>Motivos Pareto de <?= _h($metricaLabel) ?></li>
+            <?php if ($motivo): ?><li>Motivo seleccionado: <?= _h($motivo) ?> (por máquina + por hora)</li><?php endif; ?>
+            <?php endif; ?>
+            <?php endif; ?>
+            <?php if ($maqDrillLabel): ?>
+            <li>Drill <?= _h(strtolower($maqDrillTipo)) ?>: <?= _h($maqDrillLabel) ?></li>
+            <?php endif; ?>
+        </ul>
+    </div>
+</div>
+
 <h1>OEE Unificado</h1>
 <div class="filter-bar">
+    <?php if ($periodoLabel): ?>
+    <b>⚠ Filtrando por:</b> <?= _h($periodoLabel) ?>  ·
+    <?php endif; ?>
     <b>Rango:</b> <?= _h($fdesde) ?> → <?= _h($fhasta) ?>  ·
     <b>Turnos:</b> <?= _h($turnosLabel) ?>
     <?php if ($seccion): ?> · <b>Sección:</b> <?= _h($seccion) ?><?php endif; ?>
-    <?php if ($metrica): ?> · <b>Métrica:</b> <?= _h($metricaLabel) ?><?php endif; ?>
+    <?php if ($metrica): ?> · <b>Métrica:</b> <?= _h($metricaLabel) ?> · <b>Segmentación:</b> <?= _h($porLabel) ?><?php endif; ?>
+    <?php if ($maqDrillLabel): ?> · <b><?= _h($maqDrillTipo) ?>:</b> <?= _h($maqDrillLabel) ?><?php endif; ?>
+    <?php if ($maqMotivo): ?> · <b>Motivo drill:</b> <?= _h($maqMotivo) ?><?php endif; ?>
     <?php if ($maqDetalleLabel): ?> · <b>Máquina detalle:</b> <?= _h($maqDetalleLabel) ?><?php endif; ?>
     <?php if ($motivo): ?> · <b>Motivo:</b> <?= _h($motivo) ?><?php endif; ?>
     <?php if ($motivoMaqLabel): ?> · <b>Filtro máquina motivo:</b> <?= _h($motivoMaqLabel) ?><?php endif; ?>

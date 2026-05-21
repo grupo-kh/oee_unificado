@@ -62,13 +62,22 @@ function saveState(s) {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch (e) {}
 }
 
+// Filtro de período transitorio: cuando el usuario clica un día/semana/mes en
+// el chart de evolución (global o por máquina), guardamos el rango aquí en
+// lugar de pisar los inputs #f-desde/#f-hasta. `getFiltros()` lo aplica de
+// forma transparente, pero el filtro principal de pantalla queda intacto
+// para que el usuario pueda "volver atrás" con un botón.
+let _periodoFiltro = null; // { desde:'YYYY-MM-DD', hasta:'YYYY-MM-DD', label:'…' } | null
+
 // ───── Estado actual del formulario ─────
 function getFiltros() {
-    const desde  = $('#f-desde').value;
-    const hasta  = $('#f-hasta').value;
+    const baseDesde = $('#f-desde').value;
+    const baseHasta = $('#f-hasta').value;
+    const desde = _periodoFiltro ? _periodoFiltro.desde : baseDesde;
+    const hasta = _periodoFiltro ? _periodoFiltro.hasta : baseHasta;
     const turnos = Array.from(document.querySelectorAll('.turno-cb:checked')).map(c => c.value);
     const excl   = Array.from(_maqExcl);
-    return { desde, hasta, turnos, excl };
+    return { desde, hasta, turnos, excl, baseDesde, baseHasta };
 }
 
 // Añade params comunes (turnos, excl) al objeto si están activos
@@ -474,6 +483,10 @@ function renderChartMotivos(data, metrica) {
     const valLabel = isHoras ? 'h' : 'uds';
     const barVals = data.map(d => d[valKey] ?? d.pct);
     const lineVals = data.map(d => d.pct_acum);
+    // Acumulado en horas/unidades (mismo eje que las barras) — se usa en las
+    // etiquetas de la línea para reemplazar el "XX%" por la suma real.
+    let _accBar = 0;
+    const cumBar = barVals.map(v => (_accBar += (+v || 0)));
 
     if (!data.length) {
         if (chartMetricaMot) { chartMetricaMot.destroy(); chartMetricaMot = null; }
@@ -535,13 +548,17 @@ function renderChartMotivos(data, metrica) {
         colors: [METRICA_COLORS[metrica] || '#3a6aa3', '#ef4444'],
         stroke: { width: [0, 2], curve: 'smooth' },
         markers: { size: [0, 4], colors: ['#ef4444'], strokeWidth: 0 },
-        // Etiquetas SOLO sobre la línea de % Acumulado (índice 1). El bar chart
-        // queda sin etiquetas para no saturar visualmente, y la línea muestra el
-        // valor en cada punto de ruptura.
+        // Etiquetas SOLO sobre la línea de % Acumulado (índice 1). La etiqueta
+        // muestra la SUMA ACUMULADA en horas (o unidades, según métrica), no el %:
+        // así el usuario ve el total real acumulado en cada punto de ruptura.
         dataLabels: {
             enabled: true,
             enabledOnSeries: [1],
-            formatter: (v) => (v == null ? '' : v.toFixed(0) + '%'),
+            formatter: (_v, opts) => {
+                const i = opts.dataPointIndex;
+                const acc = cumBar[i] ?? 0;
+                return isHoras ? acc.toFixed(1) + 'h' : Math.round(acc) + ' uds';
+            },
             style: { fontSize: '10px', fontWeight: 700, colors: ['#ef4444'] },
             background: { enabled: true, foreColor: '#fff', borderRadius: 3, padding: 2, borderWidth: 0, opacity: 0.92 },
             offsetY: -8,
@@ -823,6 +840,14 @@ function renderChartMaqEvolucion(periodos, granularidad, nombreMaq) {
             events: {
                 mounted: () => syncEvoMaqVisibility(),
                 updated: () => syncEvoMaqVisibility(),
+                // Clic en un marcador → filtra el rango al período clicado y recarga.
+                // El drill por máquina se cerrará (cargar() solo preserva sección/métrica)
+                // pero el dashboard quedará centrado en esa fecha.
+                markerClick: (_e, _ctx, opts) => {
+                    if (_renderingCharts) return;
+                    const p = periodos[opts.dataPointIndex];
+                    if (p && p.bucket_start) _filtrarPorPeriodoEvolucion(p.bucket_start, granularidad);
+                },
             },
         },
         series,
@@ -874,7 +899,7 @@ function renderChartMaqEvolucion(periodos, granularidad, nombreMaq) {
             intersect: false,
             x: { formatter: (_v, ctx) => {
                 const p = periodos[ctx.dataPointIndex];
-                return p ? p.label : '';
+                return p ? p.label + ' · clic para filtrar a este período' : '';
             }},
             y: { formatter: (v) => (v == null ? '—' : v.toFixed(1) + '%') },
         },
@@ -914,6 +939,9 @@ function renderChartMaqMotivos(data, metrica) {
     const cats = data.map(d => d.motivo);
     const vals = data.map(d => +d.horas);
     const acum = data.map(d => +d.pct_acum);
+    // Acumulado en horas para usar en las etiquetas de la línea
+    let _accH = 0;
+    const cumH = vals.map(v => (_accH += (+v || 0)));
     const color = METRICA_COLORS[metrica] || '#8c181a';
 
     const options = {
@@ -951,11 +979,12 @@ function renderChartMaqMotivos(data, metrica) {
         colors: [color, '#ef4444'],
         stroke: { width: [0, 2], curve: 'smooth' },
         markers: { size: [0, 4], colors: ['#ef4444'], strokeWidth: 0 },
-        // Etiquetas SOLO sobre la línea de % Acumulado (índice 1): valor en cada punto.
+        // Etiquetas SOLO sobre la línea de % Acumulado (índice 1): mostramos la
+        // suma ACUMULADA en horas (no el %) para que el valor sea directamente legible.
         dataLabels: {
             enabled: true,
             enabledOnSeries: [1],
-            formatter: (v) => (v == null ? '' : v.toFixed(0) + '%'),
+            formatter: (_v, opts) => (cumH[opts.dataPointIndex] ?? 0).toFixed(1) + 'h',
             style: { fontSize: '10px', fontWeight: 700, colors: ['#ef4444'] },
             background: { enabled: true, foreColor: '#fff', borderRadius: 3, padding: 2, borderWidth: 0, opacity: 0.92 },
             offsetY: -8,
@@ -1755,8 +1784,18 @@ async function cargar() {
             const sec = _lastSecciones.find(s => s.seccion === _seccionActiva);
             if (sec) {
                 renderSeccionDrc(sec);
-                // Si había un drill de métrica abierto, refrescarlo también
-                if (_metricaActiva) cargarDrillMetrica();
+                // Si había un drill de métrica abierto, refrescarlo también.
+                // Y si había un drill por máquina/referencia abierto (con su evolución
+                // y motivos), capturarlo antes de re-cargar el nivel métrica y
+                // re-abrirlo después para que la información se filtre a las nuevas
+                // fechas (p.ej. al clicar un día en la evolución de la máquina).
+                if (_metricaActiva) {
+                    const maqState = _maqMotivosActivo
+                        ? { esRef: _maqMotivosActivo.esRef, cod: _maqMotivosActivo.cod, nombre: _maqMotivosActivo.nombre }
+                        : null;
+                    await cargarDrillMetrica();
+                    if (maqState) abrirDrillMaqMotivos(maqState.esRef, maqState.cod, maqState.nombre);
+                }
             } else {
                 cerrarDrillSeccion();
             }
@@ -1866,6 +1905,13 @@ function renderChartEvolucion(periodos, granularidad) {
             events: {
                 mounted: () => syncEvoVisibility(),
                 updated: () => syncEvoVisibility(),
+                // Clic en un marcador → filtra el rango de fechas al período clicado
+                // y recarga todo el dashboard centrado en esa fecha/semana/mes.
+                markerClick: (_e, _ctx, opts) => {
+                    if (_renderingCharts) return;
+                    const p = periodos[opts.dataPointIndex];
+                    if (p && p.bucket_start) _filtrarPorPeriodoEvolucion(p.bucket_start, granularidad);
+                },
             },
         },
         series,
@@ -1924,7 +1970,7 @@ function renderChartEvolucion(periodos, granularidad) {
             intersect: false,
             x: { formatter: (_v, ctx) => {
                 const p = periodos[ctx.dataPointIndex];
-                return p ? p.label : '';
+                return p ? p.label + ' · clic para filtrar a este período' : '';
             }},
             y: {
                 formatter: (v) => (v == null ? '—' : v.toFixed(1) + '%'),
@@ -1938,29 +1984,98 @@ function renderChartEvolucion(periodos, granularidad) {
 
 // Construye bandas para fines de semana / festivos en la evolución diaria.
 // En granularidad WEEK / MONTH no aplica.
+//
+// Todos los tipos usan el rojo corporativo #8c181a como base, difuminado en
+// distintas intensidades vía rgba (la alfa va dentro del color para que
+// ApexCharts no la ignore como pasaba con el campo `opacity`). La banda
+// solo se dibuja si hay un período siguiente — así nunca se extiende más
+// allá del último punto del eje:
+//   - sábado  → wash muy suave + "S"
+//   - domingo → wash más intenso + "D"
+//   - festivo → wash más visible + "★"
 function buildEvoXAxisAnnotations(periodos, granularidad) {
     if (granularidad !== 'DAY' || !Array.isArray(periodos)) return [];
     const ann = [];
     periodos.forEach((p, i) => {
         if (p.tipo_dia !== 'weekend' && p.tipo_dia !== 'holiday') return;
-        const isHoliday = p.tipo_dia === 'holiday';
         const next = periodos[i + 1];
-        const x  = p.label;
-        const x2 = next ? next.label : p.label;
+        // Sin siguiente período, ApexCharts puede extender la banda hasta
+        // el borde derecho del chart. Lo evitamos saltando el último punto:
+        // el badge "S"/"D"/"★" sobre la categoría del eje X ya identifica
+        // el día (lo añadimos también para el último punto, sin banda).
+        if (!next) {
+            ann.push(_evoLabelOnlyAnnotation(p));
+            return;
+        }
+
+        const isHoliday = p.tipo_dia === 'holiday';
+        let fillColor, labelText;
+        if (isHoliday) {
+            // Festivo: el wash más visible
+            fillColor = 'rgba(140, 24, 26, 0.22)';
+            labelText = '★';
+        } else {
+            let dow = 6;
+            if (p.bucket_start) {
+                dow = new Date(p.bucket_start + 'T00:00:00').getDay(); // 0=Dom, 6=Sáb
+            }
+            if (dow === 0) { fillColor = 'rgba(140, 24, 26, 0.14)'; labelText = 'D'; }
+            else           { fillColor = 'rgba(140, 24, 26, 0.07)'; labelText = 'S'; }
+        }
+
         ann.push({
-            x, x2,
-            fillColor: isHoliday ? '#fdf5f5' : '#eef2f7',
-            opacity: isHoliday ? 0.55 : 0.55,
+            x: p.label,
+            x2: next.label,
+            fillColor,
             borderColor: 'transparent',
-            label: isHoliday ? {
-                text: '★',
-                style: { background: '#8c181a', color: '#fff', fontSize: '9px', fontWeight: 700 },
-                position: 'top',
-                offsetY: 4,
-            } : undefined,
+            label: {
+                text: labelText,
+                position: 'bottom',
+                orientation: 'horizontal',
+                offsetY: -4,
+                style: {
+                    background: '#8c181a',
+                    color: '#fff',
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    padding: { left: 4, right: 4, top: 1, bottom: 1 },
+                },
+            },
         });
     });
     return ann;
+}
+
+// Anotación sin banda — solo el badge S/D/★ ancla en la categoría del último
+// período cuando es weekend/festivo (sin banda porque no hay siguiente punto
+// que delimite el rango).
+function _evoLabelOnlyAnnotation(p) {
+    const isHoliday = p.tipo_dia === 'holiday';
+    let labelText = '★';
+    if (!isHoliday) {
+        let dow = 6;
+        if (p.bucket_start) dow = new Date(p.bucket_start + 'T00:00:00').getDay();
+        labelText = dow === 0 ? 'D' : 'S';
+    }
+    return {
+        x: p.label,
+        x2: p.label,
+        fillColor: 'rgba(0,0,0,0)',
+        borderColor: 'transparent',
+        label: {
+            text: labelText,
+            position: 'bottom',
+            orientation: 'horizontal',
+            offsetY: -4,
+            style: {
+                background: '#8c181a',
+                color: '#fff',
+                fontSize: '9px',
+                fontWeight: 700,
+                padding: { left: 4, right: 4, top: 1, bottom: 1 },
+            },
+        },
+    };
 }
 
 // Mostrar/ocultar series sin destruir el chart
@@ -2006,6 +2121,92 @@ function escapeHtml(s) {
     return String(s ?? '')
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Devuelve [fechaIni, fechaFin] en YYYY-MM-DD para el período de la evolución
+// clicado, según la granularidad (DAY → mismo día; WEEK → lunes a domingo;
+// MONTH → primer/último día del mes).
+function _rangoPeriodoEvolucion(bucketStart, granularidad) {
+    if (!bucketStart) return null;
+    const ini = bucketStart.slice(0, 10);
+    if (granularidad === 'DAY') return [ini, ini];
+    const d = new Date(ini + 'T00:00:00');
+    if (granularidad === 'WEEK') {
+        d.setDate(d.getDate() + 6);
+    } else if (granularidad === 'MONTH') {
+        d.setMonth(d.getMonth() + 1);
+        d.setDate(0); // último día del mes anterior al avance = último día del mes inicial
+    } else {
+        return [ini, ini];
+    }
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return [ini, `${yyyy}-${mm}-${dd}`];
+}
+
+// Construye la etiqueta legible del período seleccionado para mostrar en el badge.
+function _labelPeriodoEvolucion(ini, fin, granularidad) {
+    if (ini === fin) return 'el día ' + fmtFechaCorta(ini);
+    if (granularidad === 'WEEK') {
+        const d = new Date(ini + 'T00:00:00');
+        return 'la semana S' + String(_isoWeek(d)).padStart(2, '0') +
+               ' (' + fmtFechaCorta(ini) + ' → ' + fmtFechaCorta(fin) + ')';
+    }
+    if (granularidad === 'MONTH') {
+        const meses = ['enero','febrero','marzo','abril','mayo','junio',
+                       'julio','agosto','septiembre','octubre','noviembre','diciembre'];
+        const d = new Date(ini + 'T00:00:00');
+        return 'el mes de ' + meses[d.getMonth()] + ' ' + d.getFullYear();
+    }
+    return 'el rango ' + fmtFechaCorta(ini) + ' → ' + fmtFechaCorta(fin);
+}
+function _isoWeek(d) {
+    const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dn = t.getUTCDay() || 7;
+    t.setUTCDate(t.getUTCDate() + 4 - dn);
+    const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    return Math.ceil(((t - y0) / 86400000 + 1) / 7);
+}
+
+// Activa el filtro transitorio de período (sin tocar los inputs principales)
+// y recarga todo el dashboard restringido a ese período.
+function _filtrarPorPeriodoEvolucion(bucketStart, granularidad) {
+    const rng = _rangoPeriodoEvolucion(bucketStart, granularidad);
+    if (!rng) return;
+    const [ini, fin] = rng;
+    _periodoFiltro = {
+        desde: ini,
+        hasta: fin,
+        label: _labelPeriodoEvolucion(ini, fin, granularidad),
+    };
+    _actualizarPeriodoFiltroBar();
+    cargar();
+}
+
+// Refresca el badge superior con el período activo y el rango principal de
+// referencia. Si no hay filtro transitorio, el badge queda oculto.
+function _actualizarPeriodoFiltroBar() {
+    const bar = $('#periodo-filtro-bar');
+    if (!bar) return;
+    if (!_periodoFiltro) { bar.hidden = true; return; }
+    bar.hidden = false;
+    $('#periodo-filtro-text').textContent = _periodoFiltro.label;
+    const baseDesde = $('#f-desde').value;
+    const baseHasta = $('#f-hasta').value;
+    $('#periodo-filtro-rango-orig-text').textContent =
+        baseDesde === baseHasta
+            ? fmtFechaCorta(baseDesde)
+            : fmtFechaCorta(baseDesde) + ' → ' + fmtFechaCorta(baseHasta);
+}
+
+// Limpia el filtro transitorio y vuelve al rango principal especificado en
+// los inputs Desde/Hasta. Recarga todo el dashboard.
+function _limpiarPeriodoFiltro() {
+    if (!_periodoFiltro) return;
+    _periodoFiltro = null;
+    _actualizarPeriodoFiltroBar();
+    cargar();
 }
 
 // ============================================================
@@ -2532,8 +2733,14 @@ document.addEventListener('DOMContentLoaded', () => {
     renderExclBadge();
     updateMaqExclToggleCount();
 
-    $('#f-desde').addEventListener('change', cargar);
-    $('#f-hasta').addEventListener('change', cargar);
+    // Si el usuario cambia el rango principal manualmente, el filtro de
+    // período transitorio deja de tener sentido → se limpia silenciosamente.
+    const _onMainFilterChange = () => {
+        if (_periodoFiltro) { _periodoFiltro = null; _actualizarPeriodoFiltroBar(); }
+        cargar();
+    };
+    $('#f-desde').addEventListener('change', _onMainFilterChange);
+    $('#f-hasta').addEventListener('change', _onMainFilterChange);
 
     document.querySelectorAll('.turno-cb').forEach(cb => {
         cb.addEventListener('change', cargar);
@@ -2547,9 +2754,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.range-quick').forEach(btn => {
         btn.addEventListener('click', () => {
             setRange(btn.dataset.range);
-            cargar();
+            _onMainFilterChange();
         });
     });
+
+    // Botón "Volver al rango principal" del badge de filtro transitorio
+    const btnPeriodoClear = $('#periodo-filtro-clear');
+    if (btnPeriodoClear) btnPeriodoClear.addEventListener('click', _limpiarPeriodoFiltro);
 
     $('#seccion-drill-close').addEventListener('click', cerrarDrillSeccion);
     $('#metrica-drill-close').addEventListener('click', cerrarDrillMetrica);
@@ -2629,33 +2840,52 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Escape' && !$('#maq-excl-panel').hidden) closeMaqExclPanel();
     });
 
-    // Export buttons
+    // Export buttons — exportan SIEMPRE lo que está actualmente visible en pantalla
     $('#btn-export-xlsx').addEventListener('click', exportarXlsx);
     $('#btn-export-pdf').addEventListener('click', exportarPdf);
-
-    // Informe completo (popover de selección de sección)
-    _wireCompletoBtn('#btn-export-completo-xlsx', '#export-completo-menu-xlsx');
-    _wireCompletoBtn('#btn-export-completo-pdf',  '#export-completo-menu-pdf');
-    document.addEventListener('click', (e) => {
-        const inside = e.target.closest('.oee-export-compl-wrap');
-        if (!inside) _cerrarCompletoMenus(null);
-    });
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') _cerrarCompletoMenus(null);
-    });
 
     cargar();
 });
 
 // ───── Export ─────
 
+// Construye TODOS los parámetros que reflejan el estado actualmente visible en
+// pantalla. El backend usa esto para generar exactamente las hojas/secciones
+// que el usuario está viendo (filtros, sección, métrica, modo Máq/Ref, drill
+// por máquina/referencia, motivo abierto, día seleccionado dentro del motivo,
+// y filtro transitorio de período si lo hay).
 function _buildExportParams(f) {
     const params = new URLSearchParams({ fecha_desde: f.desde, fecha_hasta: f.hasta });
     if (f.turnos.length) params.set('turnos', f.turnos.join(','));
     if (f.excl.length)   params.set('excl',   f.excl.join(','));
-    if (_seccionActiva)        params.set('seccion', _seccionActiva);
-    if (_metricaActiva)        params.set('metrica', _metricaActiva);
-    if (_motivoActivo?.nombre) params.set('motivo',  _motivoActivo.nombre);
+
+    // Contexto del filtro de período transitorio (badge "Filtrando por …")
+    if (_periodoFiltro) {
+        params.set('periodo_label',     _periodoFiltro.label || '');
+        params.set('rango_base_desde',  f.baseDesde || '');
+        params.set('rango_base_hasta',  f.baseHasta || '');
+    }
+
+    // Drill de sección + métrica + modo (Máquina/Referencia)
+    if (_seccionActiva)  params.set('seccion', _seccionActiva);
+    if (_metricaActiva)  params.set('metrica', _metricaActiva);
+    if (_metricaPor)     params.set('por',     _metricaPor);
+
+    // Drill intermedio: máquina/referencia clicada (con motivos pareto + evolución)
+    if (_maqMotivosActivo) {
+        if (_maqMotivosActivo.esRef) params.set('cod_referencia', _maqMotivosActivo.cod);
+        else                          params.set('cod_maquina',    _maqMotivosActivo.cod);
+        if (_maqMotivosActivo.nombre) params.set('maq_nombre', _maqMotivosActivo.nombre);
+        if (_maqMotivosActivo.motivo) params.set('maq_motivo', _maqMotivosActivo.motivo);
+        if (_maqMotivosActivo.dia)    params.set('maq_motivo_dia',  _maqMotivosActivo.dia);
+        if (_maqMotivosActivo.hora != null) params.set('maq_motivo_hora', _maqMotivosActivo.hora);
+    }
+
+    // Motivo abierto en el drill métrica (motivo · por máquina/hora)
+    if (_motivoActivo?.nombre) {
+        params.set('motivo', _motivoActivo.nombre);
+        if (_motivoActivo.codFiltroHora) params.set('motivo_cod_maquina', _motivoActivo.codFiltroHora);
+    }
     return params;
 }
 
@@ -2669,74 +2899,4 @@ function exportarPdf() {
     const f = getFiltros();
     if (!f.desde || !f.hasta) { showToast('Selecciona un rango de fechas', 'error'); return; }
     window.location.href = `${API_BASE}/oee_unificado_export_pdf.php?${_buildExportParams(f)}`;
-}
-
-// ───── Informe completo (XLSX/PDF) por sección ─────
-
-// Construye los parámetros del informe completo añadiendo todo el contexto activo
-// (sección, métrica, motivo, modo Máquina/Referencia) para que el informe refleje
-// lo que el usuario tiene en pantalla.
-function _buildCompletoParams(f, seccion) {
-    const p = new URLSearchParams({
-        fecha_desde: f.desde,
-        fecha_hasta: f.hasta,
-        seccion,
-    });
-    if (f.turnos.length) p.set('turnos', f.turnos.join(','));
-    if (f.excl.length)   p.set('excl',   f.excl.join(','));
-    if (_metricaActiva)         p.set('metrica', _metricaActiva);
-    if (_motivoActivo?.nombre)  p.set('motivo',  _motivoActivo.nombre);
-    if (_metricaPor)            p.set('por',     _metricaPor);
-    return p;
-}
-
-function descargarCompleto(fmt, seccion) {
-    const f = getFiltros();
-    if (!f.desde || !f.hasta) { showToast('Selecciona un rango de fechas', 'error'); return; }
-    if (!['VARILLAS', 'TROQUELADOS'].includes(seccion)) return;
-    const endpoint = fmt === 'pdf'
-        ? 'oee_unificado_export_completo_pdf.php'
-        : 'oee_unificado_export_completo.php';
-    window.location.href = `${API_BASE}/${endpoint}?${_buildCompletoParams(f, seccion)}`;
-}
-
-function _cerrarCompletoMenus(exceptId) {
-    ['#export-completo-menu-xlsx', '#export-completo-menu-pdf'].forEach(sel => {
-        if (sel === exceptId) return;
-        const m = document.querySelector(sel);
-        if (m) m.hidden = true;
-    });
-    ['#btn-export-completo-xlsx', '#btn-export-completo-pdf'].forEach(sel => {
-        const b = document.querySelector(sel);
-        if (b) b.classList.remove('open');
-    });
-}
-
-function _wireCompletoBtn(btnSel, menuSel) {
-    const btn  = document.querySelector(btnSel);
-    const menu = document.querySelector(menuSel);
-    if (!btn || !menu) return;
-    const fmt = btnSel.endsWith('pdf') ? 'pdf' : 'xlsx';
-    btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // Si el usuario tiene una sección abierta en pantalla → descarga directa.
-        // Si no, abre el desplegable para que elija sección.
-        if (_seccionActiva && ['VARILLAS', 'TROQUELADOS'].includes(_seccionActiva)) {
-            _cerrarCompletoMenus(null);
-            descargarCompleto(fmt, _seccionActiva);
-            return;
-        }
-        const willOpen = menu.hidden;
-        _cerrarCompletoMenus(menuSel);
-        menu.hidden = !willOpen;
-        btn.classList.toggle('open', !menu.hidden);
-    });
-    menu.addEventListener('click', (e) => {
-        const b = e.target.closest('button[data-sec]');
-        if (!b) return;
-        e.stopPropagation();
-        menu.hidden = true;
-        btn.classList.remove('open');
-        descargarCompleto(b.dataset.fmt, b.dataset.sec);
-    });
 }

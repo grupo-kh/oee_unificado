@@ -14,26 +14,8 @@ include __DIR__ . '/../includes/header.php';
                 <span class="view-card-kpi" id="kpi-num-ofs" title="OFs distintas con actividad productiva en el rango (respeta filtro de turno)">— OFs</span>
                 <span class="view-card-kpi" id="kpi-num-refs" title="Referencias distintas con actividad productiva en el rango (respeta filtro de turno)">— Refs</span>
                 <div class="oee-export-row">
-                    <button type="button" id="btn-export-xlsx" class="oee-export-btn" title="Exportar datos filtrados a Excel">&#x2B07; Excel</button>
-                    <button type="button" id="btn-export-pdf" class="oee-export-btn" title="Exportar vista filtrada a PDF">&#x2B07; PDF</button>
-
-                    <div class="oee-export-compl-wrap">
-                        <button type="button" id="btn-export-completo-xlsx" class="oee-export-btn oee-export-btn-alt" title="Informe completo: motivos × máquinas × franjas horarias por sección">&#x1F4CB; Completo XLSX &#x25BE;</button>
-                        <div id="export-completo-menu-xlsx" class="oee-export-compl-menu" hidden>
-                            <div class="oee-export-compl-menu-title">Elige sección</div>
-                            <button type="button" data-sec="VARILLAS"    data-fmt="xlsx">VARILLAS</button>
-                            <button type="button" data-sec="TROQUELADOS" data-fmt="xlsx">TROQUELADOS</button>
-                        </div>
-                    </div>
-
-                    <div class="oee-export-compl-wrap">
-                        <button type="button" id="btn-export-completo-pdf" class="oee-export-btn oee-export-btn-alt" title="Informe completo PDF: motivos × máquinas × franjas horarias por sección">&#x1F4CB; Completo PDF &#x25BE;</button>
-                        <div id="export-completo-menu-pdf" class="oee-export-compl-menu" hidden>
-                            <div class="oee-export-compl-menu-title">Elige sección</div>
-                            <button type="button" data-sec="VARILLAS"    data-fmt="pdf">VARILLAS</button>
-                            <button type="button" data-sec="TROQUELADOS" data-fmt="pdf">TROQUELADOS</button>
-                        </div>
-                    </div>
+                    <button type="button" id="btn-export-xlsx" class="oee-export-btn" title="Exportar a Excel TODO lo que tienes en pantalla (filtros, drills y selecciones activas)">&#x2B07; Excel</button>
+                    <button type="button" id="btn-export-pdf" class="oee-export-btn" title="Exportar a PDF TODO lo que tienes en pantalla (filtros, drills y selecciones activas)">&#x2B07; PDF</button>
                 </div>
             </div>
         </div>
@@ -88,6 +70,21 @@ include __DIR__ . '/../includes/header.php';
                 <span class="maq-excl-label">Excluidas del análisis:</span>
                 <div id="maq-excl-chips" class="maq-excl-chips"></div>
                 <button type="button" id="maq-excl-clear-all" class="maq-excl-clear-all" title="Quitar todas las exclusiones">× Quitar todas</button>
+            </div>
+
+            <!-- ───── Filtro de período (activado al clicar un día/semana/mes en la evolución) ───── -->
+            <div id="periodo-filtro-bar" class="periodo-filtro-bar" hidden>
+                <span class="periodo-filtro-icon">&#x1F50E;</span>
+                <span class="periodo-filtro-label">
+                    Filtrando por
+                    <strong id="periodo-filtro-text">—</strong>
+                </span>
+                <span class="periodo-filtro-rango-orig">
+                    (rango principal: <span id="periodo-filtro-rango-orig-text">—</span>)
+                </span>
+                <button type="button" id="periodo-filtro-clear" class="periodo-filtro-clear" title="Volver al rango principal y poder seleccionar otro día">
+                    &#x21A9; Volver al rango principal
+                </button>
             </div>
 
             <!-- ───── Paso 1: barras horizontales OEE por sección ───── -->

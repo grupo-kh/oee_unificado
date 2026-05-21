@@ -34,6 +34,14 @@ include __DIR__ . '/../includes/header.php';
                 <button type="button" id="acc-new-machine-btn" class="acc-btn acc-btn-primary">
                     <span class="acc-btn-plus">+</span> Crear nueva máquina
                 </button>
+                <button type="button" id="acc-export-list-xlsx" class="acc-btn acc-btn-secondary"
+                        title="Exportar a Excel TODAS las máquinas (excluye SECUENCIA: E66, RACKS, PLATAFORMAS) con el detalle de sus tareas">
+                    &#x2B07; Listado XLSX
+                </button>
+                <button type="button" id="acc-export-list-pdf" class="acc-btn acc-btn-secondary"
+                        title="Exportar a PDF TODAS las máquinas (excluye SECUENCIA: E66, RACKS, PLATAFORMAS) con el detalle de sus tareas">
+                    &#x2B07; Listado PDF
+                </button>
                 <span class="acc-counter" id="acc-counter">— máquinas</span>
             </div>
 
@@ -87,14 +95,12 @@ include __DIR__ . '/../includes/header.php';
                             <th style="width:140px">Tarea</th>
                             <th style="width:130px">Periodicidad</th>
                             <th>Descripción</th>
-                            <th style="width:115px">Última</th>
-                            <th style="width:115px">Próxima</th>
-                            <th style="width:70px">Inter.</th>
+                            <th style="width:110px">Estado</th>
                             <th style="width:180px">Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="acc-tareas-tbody">
-                        <tr><td colspan="7" class="acc-empty">—</td></tr>
+                        <tr><td colspan="5" class="acc-empty">—</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -125,6 +131,7 @@ include __DIR__ . '/../includes/header.php';
                     <select id="acc-f-periodicidad">
                         <option value="">— Selecciona —</option>
                     </select>
+                    <small class="acc-hint">El cambio de cadencia se aplica <strong>desde hoy en adelante</strong>. Las intervenciones ya registradas no se modifican.</small>
                 </div>
             </div>
 
@@ -168,6 +175,16 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
 
+            <!-- Migracion 011: tiempo estimado -->
+            <div class="acc-form-row">
+                <div class="acc-form-field">
+                    <label for="acc-f-tiempo">Tiempo estimado (min)</label>
+                    <input type="number" id="acc-f-tiempo" min="0" max="10000" step="1" placeholder="ej. 30">
+                    <small class="acc-hint">Duración prevista en minutos. Déjalo vacío si no se conoce.</small>
+                </div>
+                <div class="acc-form-field"><!-- hueco para mantener el grid 2-col --></div>
+            </div>
+
             <!-- Alta: fecha de primera revisión (full width) -->
             <div class="acc-form-field" id="acc-f-primera-wrap">
                 <label for="acc-f-primera">Fecha de la primera revisión <span class="acc-required">*</span></label>
@@ -175,23 +192,28 @@ include __DIR__ . '/../includes/header.php';
                 <small class="acc-hint">A partir de aquí se calculan las próximas revisiones según la periodicidad.</small>
             </div>
 
-            <!-- Edición: última + próxima en 2 columnas -->
-            <div class="acc-form-row" id="acc-f-fechas-row" style="display:none">
-                <div class="acc-form-field" id="acc-f-ultima-wrap">
-                    <label for="acc-f-ultima">Última revisión</label>
-                    <input type="date" id="acc-f-ultima">
-                </div>
-                <div class="acc-form-field" id="acc-f-proxima-wrap">
-                    <label for="acc-f-proxima">Próxima revisión</label>
-                    <input type="date" id="acc-f-proxima">
-                </div>
-            </div>
-
             <!-- Edición: pausa de la tarea -->
             <div class="acc-form-field" id="acc-f-pausado-wrap" style="display:none">
                 <label for="acc-f-pausado">Fecha de pausado</label>
                 <input type="date" id="acc-f-pausado">
                 <small class="acc-hint">Si se rellena, la tarea queda <strong>pausada</strong> desde esa fecha — no se planifica ni computa cumplimiento. Vacíalo para reanudar.</small>
+            </div>
+
+            <!-- Edición: bloqueo temporal con rango de fechas -->
+            <div id="acc-f-bloqueo-wrap" style="display:none">
+                <div class="acc-form-row">
+                    <div class="acc-form-field">
+                        <label for="acc-f-bloqueo-ini">Bloqueo · desde</label>
+                        <input type="date" id="acc-f-bloqueo-ini">
+                    </div>
+                    <div class="acc-form-field">
+                        <label for="acc-f-bloqueo-fin">Bloqueo · hasta</label>
+                        <input type="date" id="acc-f-bloqueo-fin">
+                    </div>
+                </div>
+                <small class="acc-hint">
+                    Mientras la fecha de hoy esté dentro del rango, la tarea <strong>no se planifica ni cuenta como no realizada</strong>. Útil para máquinas fuera de producción o racks en stand-by. Deja ambos vacíos para mantener la tarea activa.
+                </small>
             </div>
         </div>
         <div class="acc-modal-footer">

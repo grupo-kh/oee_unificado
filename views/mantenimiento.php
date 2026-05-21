@@ -69,30 +69,9 @@ include __DIR__ . '/../includes/header.php';
             <div class="tile-arrow">→</div>
         </a>
 
-        <a href="mant_semana.php" class="tile tile-mant-semana">
-            <div class="tile-icon">
-                <svg viewBox="0 0 100 60" fill="none">
-                    <rect x="8" y="10" width="84" height="44" rx="3" fill="#3a6aa3" stroke="#5b8cc7" stroke-width="1.5"/>
-                    <line x1="8" y1="22" x2="92" y2="22" stroke="#ffffff" stroke-width="1.2"/>
-                    <line x1="20" y1="22" x2="20" y2="54" stroke="#ffffff" stroke-width="0.7"/>
-                    <line x1="32" y1="22" x2="32" y2="54" stroke="#ffffff" stroke-width="0.7"/>
-                    <line x1="44" y1="22" x2="44" y2="54" stroke="#ffffff" stroke-width="0.7"/>
-                    <line x1="56" y1="22" x2="56" y2="54" stroke="#ffffff" stroke-width="0.7"/>
-                    <line x1="68" y1="22" x2="68" y2="54" stroke="#ffffff" stroke-width="0.7"/>
-                    <line x1="80" y1="22" x2="80" y2="54" stroke="#ffffff" stroke-width="0.7"/>
-                    <rect x="34" y="28" width="10" height="10" fill="#f4c430"/>
-                    <rect x="46" y="28" width="10" height="10" fill="#f4c430"/>
-                    <rect x="58" y="28" width="10" height="10" fill="#f4c430"/>
-                    <rect x="22" y="42" width="10" height="10" fill="#10b981"/>
-                    <rect x="70" y="42" width="10" height="10" fill="#c8102e"/>
-                </svg>
-            </div>
-            <div class="tile-body">
-                <h2>Planificador de Tareas <span class="tile-badge">nuevo</span></h2>
-                <p>Vista del plan en un rango de fechas (por defecto, semana en curso) agrupado por máquina · imprimible y exportable a CSV</p>
-            </div>
-            <div class="tile-arrow">→</div>
-        </a>
+        <?php /* Tile "Planificador de Tareas" (mant_semana.php) retirado:
+                  las tareas se imputan únicamente desde Próximas Revisiones
+                  para evitar duplicidad de entrada. */ ?>
 
         <a href="mant_proximas.php" class="tile tile-mant-proximas">
             <div class="tile-icon">

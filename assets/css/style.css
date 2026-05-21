@@ -1915,6 +1915,7 @@ a { text-decoration: none; color: inherit; }
 .mant-source-web   { background: #dbeafe; color: #1e40af; }
 .mant-source-missed { background: #fee2e2; color: #991b1b; }
 .mant-source-catchup { background: #fef3c7; color: #92400e; }
+.mant-source-incomp  { background: #fde68a; color: #92400e; border: 1px solid #f59e0b; }
 .mant-pill-status {
     display: inline-block;
     padding: 2px 8px;
@@ -2024,6 +2025,71 @@ a { text-decoration: none; color: inherit; }
 /* Operario: ocultar elementos restringidos al técnico */
 body[data-role="operario"] .role-tecnico-only { display: none !important; }
 
+/* Próximas Revisiones — checklist de sub-tareas en modal de marcar como hecha */
+.mant-subtareas-checklist {
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid #c8d2dd;
+    border-radius: 4px;
+    background: #f8fafc;
+    padding: 6px 8px;
+    margin-top: 4px;
+}
+.mant-subtarea-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 6px 4px;
+    border-bottom: 1px solid #e2e8f0;
+    cursor: pointer;
+}
+.mant-subtarea-check:last-child { border-bottom: none; }
+.mant-subtarea-check input[type="checkbox"] {
+    margin-top: 2px;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+.mant-subtarea-check:hover { background: #eef3f8; }
+.mant-subtareas-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+.mant-subtareas-toolbar button {
+    font-size: 11px;
+    padding: 4px 10px;
+}
+
+/* Histórico — fila de intervención editable (solo técnico) */
+.mant-task-table tr.mant-row-edit {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+.mant-task-table tr.mant-row-edit:hover {
+    background-color: #eef3f8 !important;
+    box-shadow: inset 3px 0 0 #3a6aa3;
+}
+.mant-task-table .mant-tiempo {
+    font-variant-numeric: tabular-nums;
+    color: #2d4d7a;
+    font-weight: 600;
+}
+/* Badge de tiempo estimado junto al número de tarea en el histórico */
+.mant-tiempo-est-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 8px;
+    background: #eef3f8;
+    border: 1px solid #c8d2dd;
+    border-radius: 11px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #2d4d7a;
+    font-variant-numeric: tabular-nums;
+    vertical-align: middle;
+}
+
 /* Cumplimiento — gauge centrado */
 .cumpl-gauge-wrap {
     display: flex;
@@ -2035,6 +2101,18 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     text-align: center;
 }
 .cumpl-gauge-card .oee-detalle-subtitle { text-align: center; }
+.cumpl-gauge-card .gauge-legend {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #eef3f8;
+    border: 1px solid #c8d2dd;
+    border-radius: 4px;
+    color: #2d4d7a;
+    font-size: 12px;
+    line-height: 1.5;
+    text-align: left;
+}
+.cumpl-gauge-card .gauge-legend strong { color: #1a2d4a; }
 
 /* Histórico — acordeón máquina → tarea → intervenciones */
 .mant-machines-wrap { display: flex; flex-direction: column; gap: 8px; }
@@ -2807,14 +2885,140 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 .acc-cell-meta .acc-tag { font-size: 10px; padding: 2px 7px; border-radius: 3px; font-weight: 700; letter-spacing: 0.3px; }
 .acc-tag-baja       { background: #c8102e; color: #fff; }
 .acc-tag-pausada    { background: #f59e0b; color: #1a2d4a; }
+.acc-tag-activa     { background: #166534; color: #ecfccb; }
 .acc-row-pausada    { background: #fffbeb; }
 .acc-row-pausada td { opacity: 0.85; }
+/* Celda Estado (columna del modal de tareas) */
+.acc-cell-estado    { text-align: center; }
+.acc-cell-estado .acc-tag {
+    font-size: 11px; padding: 3px 8px; border-radius: 3px;
+    font-weight: 700; letter-spacing: 0.3px; display: inline-block;
+}
+/* Bloqueo temporal: vigente (rojo), pendiente futuro (gris azulado), terminado (verde apagado) */
+.acc-tag-bloqueada    { background: #8c181a; color: #fff; }
+.acc-tag-bloqueo-pend { background: #475569; color: #e2e8f0; }
+.acc-tag-bloqueo-end  { background: #166534; color: #ecfccb; opacity: 0.75; }
+
+/* Filas consolidadas (rack/plataforma) en el modal de tareas */
+.acc-row-consol td { border-top: 3px solid #6366f1; }
+.acc-tag-consol { background: #6366f1; color: #fff; }
+.acc-desc-consol {
+    white-space: pre-line;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #1a2d4a;
+    background: #f5f3ff;
+    border-left: 3px solid #6366f1;
+    padding: 8px 10px;
+    border-radius: 3px;
+    max-height: 320px;
+    overflow: auto;
+}
+
+/* Selector "Realizada / No realizada" en el modal de marcado */
+.mant-modal-tipo .mant-tipo-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+.mant-tipo-opt {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border: 1px solid #c8d2dd;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    color: #1a2d4a;
+    background: #fff;
+    transition: background .12s, border-color .12s, color .12s;
+}
+.mant-tipo-opt:has(input:checked) {
+    background: #eef3f8;
+    border-color: #2d4d7a;
+    color: #2d4d7a;
+}
+.mant-tipo-opt input[type="radio"] { accent-color: #2d4d7a; }
+.mant-tipo-opt:has(input[value="no_realizada"]:checked) {
+    background: #fdf5f5;
+    border-color: #8c181a;
+    color: #8c181a;
+}
+
+/* Filas consolidadas (rack / plataforma) en el planificador */
+.mant-row-consolidada { background: #f5f3ff; }
+.mant-row-consolidada td { border-top: 2px solid #6366f1; }
+.mant-consol-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    background: #6366f1;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 3px;
+    letter-spacing: 0.3px;
+}
+.mant-subtareas { margin-top: 4px; font-size: 12px; }
+.mant-subtareas summary {
+    cursor: pointer;
+    color: #4f46e5;
+    font-weight: 600;
+    user-select: none;
+    padding: 2px 0;
+}
+.mant-subtareas summary:hover { color: #312e81; text-decoration: underline; }
+.mant-subtareas ul {
+    margin: 4px 0 0 16px;
+    padding: 4px 0 0 10px;
+    border-left: 2px solid #c7d2fe;
+    list-style: disc;
+}
+.mant-subtareas li { margin: 2px 0; color: #1a2d4a; }
+
+/* Histórico — tarjetas de familia de racks (agrupación por prefijo común) */
+.mant-family-card > .mant-machine-header {
+    background: linear-gradient(90deg, #eef2ff 0%, #f5f3ff 100%);
+    border-left: 4px solid #6366f1;
+}
+.mant-family-card > .mant-machine-header:hover {
+    background: linear-gradient(90deg, #e0e7ff 0%, #ede9fe 100%);
+}
+.mant-family-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    margin-right: 4px;
+    background: #6366f1;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    border-radius: 3px;
+}
+.mant-family-card > .mant-machine-body {
+    padding: 8px 10px 10px 28px;
+    background: #fafafe;
+    border-left: 4px solid #c7d2fe;
+}
+.mant-machine-card-child {
+    margin-top: 6px;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    background: #fff;
+}
+.mant-machine-card-child > .mant-machine-header {
+    background: #f8fafc;
+    padding-left: 10px;
+}
 .acc-tag-ip         { background: #1e293b; color: #cbd5e1; font-family: ui-monospace, Consolas, monospace; }
 .acc-tag-interno    { background: #14532d; color: #fff; }
 .acc-tag-externo    { background: #c2410c; color: #fff; }
 .acc-tag-preventivo { background: #1d4ed8; color: #fff; }
 .acc-tag-predictivo { background: #7c3aed; color: #fff; }
 .acc-tag-nopen      { background: #f59e0b; color: #1a2d4a; }
+.acc-tag-tiempo     { background: #475569; color: #fff; font-variant-numeric: tabular-nums; }
 .acc-form-field label {
     font-size: 12px;
     font-weight: 700;
@@ -2852,6 +3056,12 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     padding: 6px 10px; background: #fef3c7;
     border-left: 3px solid #f59e0b; border-radius: 4px;
     color: #92400e; font-weight: 600; font-size: 13px;
+}
+.acc-info  {
+    display: block; margin-top: 8px;
+    padding: 6px 10px; background: #eef3f8;
+    border-left: 3px solid #3a6aa3; border-radius: 4px;
+    color: #1a2d4a; font-weight: 500; font-size: 13px;
 }
 
 /* Tile en menú */
@@ -4132,6 +4342,67 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     font-size: 12px;
     color: #2d4d7a;
 }
+
+/* Filtro de período (activado al clicar un día/semana/mes en la evolución) */
+.periodo-filtro-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 9px 14px;
+    margin: 8px 0 6px;
+    background: linear-gradient(135deg, #fff8e1 0%, #fff3c4 100%);
+    border: 1px solid #e6c97a;
+    border-left: 4px solid #c45a2c;
+    border-radius: 6px;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    color: #1a2d4a;
+    box-shadow: 0 1px 3px rgba(196, 90, 44, 0.12);
+}
+.periodo-filtro-icon {
+    font-size: 16px;
+    line-height: 1;
+}
+.periodo-filtro-label {
+    font-weight: 600;
+}
+.periodo-filtro-label strong {
+    color: #c45a2c;
+    font-weight: 800;
+    margin-left: 4px;
+    letter-spacing: 0.2px;
+}
+.periodo-filtro-rango-orig {
+    color: #5a6b80;
+    font-size: 12px;
+    font-style: italic;
+}
+.periodo-filtro-rango-orig span {
+    color: #2d4d7a;
+    font-weight: 600;
+    font-style: normal;
+}
+.periodo-filtro-clear {
+    margin-left: auto;
+    padding: 6px 12px;
+    background: #fff;
+    border: 1px solid #c45a2c;
+    border-radius: 14px;
+    color: #c45a2c;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s, color .15s, transform .1s;
+    font-family: Arial, sans-serif;
+}
+.periodo-filtro-clear:hover {
+    background: #c45a2c;
+    color: #fff;
+}
+.periodo-filtro-clear:active {
+    transform: scale(0.97);
+}
 .maq-excl-label {
     font-weight: 700;
     color: #8c181a;
@@ -4325,70 +4596,4 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     .maq-excl-panel { display: none !important; }
 }
 
-/* ─── Botones "Informe completo" (XLSX + PDF) con mini-popover de sección ─── */
-.oee-export-compl-wrap {
-    position: relative;
-    display: inline-flex;
-}
-.oee-export-btn-alt {
-    background: #1a2d4a !important;
-    border-color: #1a2d4a !important;
-    color: #fff !important;
-}
-.oee-export-btn-alt:hover {
-    background: #2d4d7a !important;
-    border-color: #2d4d7a !important;
-}
-.oee-export-btn-alt.open {
-    background: #8c181a !important;
-    border-color: #8c181a !important;
-}
-.oee-export-compl-menu {
-    position: absolute;
-    top: calc(100% + 4px);
-    right: 0;
-    z-index: 60;
-    min-width: 170px;
-    background: #fff;
-    border: 1px solid #c8d2dd;
-    border-top: 3px solid #8c181a;
-    border-radius: 6px;
-    box-shadow: 0 8px 20px rgba(26, 45, 74, .18);
-    padding: 4px;
-    font-family: Arial, sans-serif;
-}
-.oee-export-compl-menu[hidden] { display: none; }
-.oee-export-compl-menu-title {
-    padding: 4px 10px 6px;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    color: #8c181a;
-    letter-spacing: 0.4px;
-    border-bottom: 1px solid #eef2f7;
-    margin-bottom: 3px;
-}
-.oee-export-compl-menu button {
-    display: block;
-    width: 100%;
-    padding: 7px 12px;
-    background: transparent;
-    border: none;
-    text-align: left;
-    color: #1a2d4a;
-    font-family: Arial, sans-serif;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: background .12s, color .12s;
-}
-.oee-export-compl-menu button:hover {
-    background: #fdf5f5;
-    color: #8c181a;
-}
-
-@media print {
-    .oee-export-compl-wrap { display: none !important; }
-}
 

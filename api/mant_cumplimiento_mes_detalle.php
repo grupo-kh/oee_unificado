@@ -3,6 +3,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/helpers.php';
 require_once __DIR__ . '/../lib/Auth.php';
 require_once __DIR__ . '/../lib/MaintenanceCompletionStore.php';
+require_once __DIR__ . '/../lib/MaintenancePlanStore.php';
 
 Auth::requireLoginApi();
 
@@ -36,7 +37,8 @@ try {
 
     $items = MaintenanceCompletionStore::loadAll();
     $rows = [];
-    $tot = ['total'=>0,'realizadas'=>0,'no_realizadas'=>0,'recuperaciones'=>0,'denom'=>0,'numer'=>0];
+    $tot = ['total'=>0,'realizadas'=>0,'no_realizadas'=>0,'recuperaciones'=>0,
+            'vencidas_sin_marcar'=>0,'denom'=>0,'numer'=>0];
 
     // SECUENCIA (E66, RACKS, PLATAFORMAS) no se computa como atrasada ni
     // recuperada — ni siquiera aparece en el detalle del mes para esos casos.
@@ -46,6 +48,9 @@ try {
             || preg_match('/^RACK[\s\-]/i', $s)
             || preg_match('/^PLATAFORMA/i', $s);
     };
+
+    // Set de marcas (orden|tarea|fpo) para evitar duplicación con vencidas sin marcar
+    $marcasClaves = [];
 
     foreach ($items as $rec) {
         $cmRec = (string)($rec['cod_maquina_mant'] ?? '');
@@ -96,11 +101,58 @@ try {
         if ($tipo === 'completada')      { $tot['realizadas']++;   $tot['denom']++; $tot['numer']++; }
         elseif ($tipo === 'no_realizada'){ $tot['no_realizadas']++; $tot['denom']++; }
         elseif ($tipo === 'recuperacion'){ $tot['recuperaciones']++; $tot['numer']++; }
+
+        // Registrar la clave para evitar duplicados con vencidas-sin-marcar
+        if ($tipo !== 'recuperacion' && $fpo !== '') {
+            $marcasClaves[(string)($rec['orden'] ?? '') . '||' . (string)($rec['tarea'] ?? '') . '||' . $fpo] = true;
+        }
     }
 
-    // Orden: no realizadas primero, luego recuperaciones, luego completadas;
-    // dentro de cada grupo por máquina y fecha.
-    $rank = ['no_realizada'=>0, 'recuperacion'=>1, 'completada'=>2];
+    // ── Añadir las "vencidas sin marcar" del mes (para coherencia con el
+    //    cálculo del gauge y de la barra). Una tarea cuya próxima revisión
+    //    cae en el mes, ya ha pasado (< hoy) y nadie la ha marcado todavía
+    //    cuenta como pendiente, igual que una no_realizada. SECUENCIA fuera.
+    $hoy = date('Y-m-d');
+    $planData = MaintenancePlanStore::load();
+    foreach ($planData['proximas'] as $p) {
+        $px = (string)($p['proxima_revision'] ?? '');
+        if ($px === '' || substr($px, 0, 7) !== $mes) continue;
+        if ($px >= $hoy) continue;
+        $cmP = (string)($p['cod_maquina_mant'] ?? '');
+        $peP = (string)($p['periodicidad'] ?? '');
+        if ($cm && $cmP !== $cm) continue;
+        if ($pe && $peP !== $pe) continue;
+        if ($isSecuencia((string)($p['desc_maquina'] ?? ''))) continue;
+
+        $clave = (string)($p['orden'] ?? '') . '||' . (string)($p['tarea'] ?? '') . '||' . $px;
+        if (isset($marcasClaves[$clave])) continue;  // ya cubierta por una marca
+
+        $rows[] = [
+            'id'                     => null,
+            'tipo'                   => 'vencida_sin_marcar',
+            'orden'                  => $p['orden']            ?? '',
+            'cod_maquina_mant'       => $p['cod_maquina_mant'] ?? '',
+            'desc_maquina'           => $p['desc_maquina']     ?? '',
+            'desc_grupo'             => $p['desc_grupo']       ?? '',
+            'periodicidad'           => $p['periodicidad']     ?? '',
+            'tarea'                  => $p['tarea']            ?? '',
+            'desc_tarea'             => $p['desc_tarea']       ?? '',
+            'fecha_proxima_original' => $px,
+            'fecha_intervencion'     => '',
+            'operario'               => '',
+            'observaciones'          => '',
+            'motivo_no_realizada'    => '',
+            'recuperada'             => false,
+            'recuperada_fecha'       => null,
+        ];
+        $tot['total']++;
+        $tot['vencidas_sin_marcar']++;
+        $tot['denom']++;
+    }
+
+    // Orden: vencidas sin marcar y no realizadas primero (urgencia visual),
+    // luego recuperaciones, luego completadas; dentro de cada grupo por fecha.
+    $rank = ['vencida_sin_marcar'=>0, 'no_realizada'=>1, 'recuperacion'=>2, 'completada'=>3];
     usort($rows, function($a, $b) use ($rank) {
         $ra = $rank[$a['tipo']] ?? 9;
         $rb = $rank[$b['tipo']] ?? 9;

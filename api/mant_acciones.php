@@ -61,7 +61,9 @@ try {
         case 'tareas': {
             $cod = (string)getParam('cod', '');
             if ($cod === '') jsonError('Falta parámetro cod (cod_maquina_mant)');
-            $rows = MaintenancePlanStore::listTareasByMaquina($cod);
+            // consolidar=0 fuerza vista detallada incluso para racks/plataformas
+            $consolidar = (string)getParam('consolidar', '1') !== '0';
+            $rows = MaintenancePlanStore::listTareasByMaquina($cod, $consolidar);
             $descMaq = $rows ? (string)$rows[0]['desc_maquina'] : '';
             jsonOk([
                 'cod_maquina_mant' => $cod,

@@ -381,7 +381,7 @@ async function abrirModalTareas(cod, desc) {
     _accMaquinaActiva = { cod, desc };
     document.getElementById('acc-modal-title').textContent = desc;
     document.getElementById('acc-modal-cod').textContent   = '(' + cod + ')';
-    document.getElementById('acc-tareas-tbody').innerHTML  = '<tr><td colspan="7" class="acc-empty">Cargando…</td></tr>';
+    document.getElementById('acc-tareas-tbody').innerHTML  = '<tr><td colspan="5" class="acc-empty">Cargando…</td></tr>';
     document.getElementById('acc-tareas-count').textContent = '— tareas';
     showModal('acc-modal');
 
@@ -394,14 +394,14 @@ async function abrirModalTareas(cod, desc) {
     } catch (e) {
         showToast('Error: ' + e.message, 'error');
         document.getElementById('acc-tareas-tbody').innerHTML =
-            '<tr><td colspan="7" class="acc-empty">Error: ' + escHtml(e.message) + '</td></tr>';
+            '<tr><td colspan="5" class="acc-empty">Error: ' + escHtml(e.message) + '</td></tr>';
     }
 }
 
 function renderTareas() {
     const tb = document.getElementById('acc-tareas-tbody');
     if (!_accTareas.length) {
-        tb.innerHTML = '<tr><td colspan="7" class="acc-empty">Sin tareas. Añade la primera con el botón <strong>+ Añadir tarea</strong>.</td></tr>';
+        tb.innerHTML = '<tr><td colspan="5" class="acc-empty">Sin tareas. Añade la primera con el botón <strong>+ Añadir tarea</strong>.</td></tr>';
         return;
     }
     tb.innerHTML = _accTareas.map(t => {
@@ -429,24 +429,74 @@ function renderTareas() {
         const pausadaPill = t.fecha_pausado
             ? `<span class="acc-tag acc-tag-pausada" title="Tarea pausada desde ${escHtml(fmtFecha(t.fecha_pausado))}">PAUSADA · ${escHtml(fmtFecha(t.fecha_pausado))}</span>`
             : '';
-        const meta = [pausadaPill, altaPill, ipPill, tMantPill, tRealPill].filter(Boolean).join(' ');
-        const descCell = `${escHtml(t.desc_tarea || '—')}${meta ? '<div class="acc-cell-meta">' + meta + '</div>' : ''}`;
-        const rowCls = t.fecha_pausado ? 'acc-row-pausada' : '';
+        // Tiempo estimado (migracion 011) - solo lo mostramos si está definido.
+        const tiempoPill = (t.tiempo_estimado !== null && t.tiempo_estimado !== undefined && t.tiempo_estimado !== '')
+            ? `<span class="acc-tag acc-tag-tiempo" title="Tiempo estimado">⏱ ${escHtml(String(t.tiempo_estimado))} min</span>`
+            : '';
+        // Badge de bloqueo temporal con rango. Distinguimos si el bloqueo está
+        // vigente (hoy dentro del rango), pendiente (futuro) o terminado (pasado).
+        let bloqueoPill = '';
+        if (t.fecha_bloqueo_ini && t.fecha_bloqueo_fin) {
+            const hoyIso = new Date().toISOString().substring(0, 10);
+            const ini = t.fecha_bloqueo_ini, fin = t.fecha_bloqueo_fin;
+            const rngTxt = `${escHtml(fmtFecha(ini))} → ${escHtml(fmtFecha(fin))}`;
+            if (hoyIso >= ini && hoyIso <= fin) {
+                bloqueoPill = `<span class="acc-tag acc-tag-bloqueada" title="Bloqueada (vigente): ${rngTxt}">🔒 BLOQUEADA · ${rngTxt}</span>`;
+            } else if (hoyIso < ini) {
+                bloqueoPill = `<span class="acc-tag acc-tag-bloqueo-pend" title="Bloqueo programado: ${rngTxt}">🕒 BLOQUEO · ${rngTxt}</span>`;
+            } else {
+                bloqueoPill = `<span class="acc-tag acc-tag-bloqueo-end" title="Bloqueo finalizado: ${rngTxt}">✓ BLOQUEO PASADO · ${rngTxt}</span>`;
+            }
+        }
+        const meta = [pausadaPill, bloqueoPill, altaPill, tiempoPill, ipPill, tMantPill, tRealPill].filter(Boolean).join(' ');
+        // Para filas consolidadas (racks/plataformas) la descripción es
+        // multi-línea; preservamos saltos con white-space:pre-line.
+        const isConsol = !!t.consolidada;
+        const descBody = isConsol
+            ? `<div class="acc-desc-consol">${escHtml(t.desc_tarea || '')}</div>`
+            : escHtml(t.desc_tarea || '—');
+        const consolPill = isConsol
+            ? `<span class="acc-tag acc-tag-consol" title="Esta fila agrupa todas las tareas preventivas del rack/plataforma. Las acciones (pausar/borrar) afectan a todas a la vez.">⛓ CONSOLIDADA · ${t.sub_tareas ? t.sub_tareas.length : 0} tareas</span>`
+            : '';
+        const descCell = `${descBody}${(meta || consolPill) ? '<div class="acc-cell-meta">' + [consolPill, meta].filter(Boolean).join(' ') + '</div>' : ''}`;
+        const rowCls = (t.fecha_pausado ? 'acc-row-pausada' : '') + (isConsol ? ' acc-row-consol' : '');
         const pauseBtn = t.fecha_pausado
             ? `<button type="button" class="acc-btn-mini acc-btn-resume" data-action="resume" title="Reanudar tarea (limpia fecha de pausado)">▶ Reanudar</button>`
-            : `<button type="button" class="acc-btn-mini acc-btn-pause"  data-action="pause"  title="Pausar tarea (introduces fecha)">⏸ Pausar</button>`;
+            : `<button type="button" class="acc-btn-mini acc-btn-pause"  data-action="pause"  title="${isConsol ? 'Pausar TODAS las sub-tareas del rack/plataforma' : 'Pausar tarea (introduces fecha)'}">⏸ Pausar${isConsol ? ' todas' : ''}</button>`;
+        const editBtn = isConsol
+            ? `<button type="button" class="acc-btn-mini acc-btn-edit" data-action="edit-consol" title="Ver y editar individualmente las sub-tareas del rack/plataforma">✎ Ver sub-tareas</button>`
+            : `<button type="button" class="acc-btn-mini acc-btn-edit" data-action="edit" title="Editar tarea">✎ Editar</button>`;
+        const deleteBtn = isConsol
+            ? `<button type="button" class="acc-btn-mini acc-btn-delete" data-action="delete-consol" title="Borrar TODAS las sub-tareas del rack/plataforma">× Borrar todas</button>`
+            : `<button type="button" class="acc-btn-mini acc-btn-delete" data-action="delete" title="Borrar tarea">× Borrar</button>`;
+        // Celda Estado: resume el estado de la acción sin exponer histórico.
+        //   BAJA  → no se planifica
+        //   BLOQUEADA (vigente) → tiene prioridad visual
+        //   PAUSADA → fecha_pausado activa
+        //   ACTIVA  → por defecto
+        let estadoPill;
+        const hoyIsoEstado = new Date().toISOString().substring(0, 10);
+        const bloqueadaVig = t.fecha_bloqueo_ini && t.fecha_bloqueo_fin
+            && hoyIsoEstado >= t.fecha_bloqueo_ini && hoyIsoEstado <= t.fecha_bloqueo_fin;
+        if (altaBaja === 'BAJA') {
+            estadoPill = '<span class="acc-tag acc-tag-baja" title="No se planifica">BAJA</span>';
+        } else if (bloqueadaVig) {
+            estadoPill = '<span class="acc-tag acc-tag-bloqueada" title="Bloqueada (rango vigente)">🔒 BLOQUEADA</span>';
+        } else if (t.fecha_pausado) {
+            estadoPill = `<span class="acc-tag acc-tag-pausada" title="Pausada desde ${escHtml(fmtFecha(t.fecha_pausado))}">PAUSADA</span>`;
+        } else {
+            estadoPill = '<span class="acc-tag acc-tag-activa" title="Acción activa">ACTIVA</span>';
+        }
         return `
-            <tr data-id="${t.id}" class="${rowCls}">
+            <tr data-id="${t.id}" data-consol="${isConsol ? '1' : '0'}" class="${rowCls.trim()}">
                 <td><strong>${escHtml(t.tarea)}</strong>${originBadge}</td>
                 <td>${perPill}</td>
                 <td class="acc-cell-desc">${descCell}</td>
-                <td class="acc-cell-fecha">${fmtFecha(t.ultima_revision)}</td>
-                <td class="acc-cell-fecha">${fmtFecha(t.proxima_revision)}</td>
-                <td class="acc-cell-num">${t.intervenciones || 0}</td>
+                <td class="acc-cell-estado">${estadoPill}</td>
                 <td>
-                    <button type="button" class="acc-btn-mini acc-btn-edit"   data-action="edit">✎ Editar</button>
+                    ${editBtn}
                     ${pauseBtn}
-                    <button type="button" class="acc-btn-mini acc-btn-delete" data-action="delete">× Borrar</button>
+                    ${deleteBtn}
                 </td>
             </tr>
         `;
@@ -458,7 +508,21 @@ document.addEventListener('click', e => {
     const btn = e.target.closest('.acc-btn-mini');
     if (!btn) return;
     const tr = btn.closest('tr');
-    if (!tr || !tr.dataset.id) return;
+    if (!tr) return;
+    const isConsol = tr.dataset.consol === '1';
+    if (isConsol) {
+        // Para filas consolidadas, t.id = 0; localizamos la fila virtual
+        // por marca "consolidada" en _accTareas y aplicamos bulk.
+        const tConsol = _accTareas.find(x => x.consolidada);
+        if (!tConsol) return;
+        const sub = Array.isArray(tConsol.sub_tareas) ? tConsol.sub_tareas : [];
+        if (btn.dataset.action === 'edit-consol')   abrirVistaSubTareas();
+        if (btn.dataset.action === 'delete-consol') borrarTareasBulk(sub);
+        if (btn.dataset.action === 'pause')         pausarTareasBulk(sub);
+        if (btn.dataset.action === 'resume')        reanudarTareasBulk(sub);
+        return;
+    }
+    if (!tr.dataset.id) return;
     const t = _accTareas.find(x => x.id === parseInt(tr.dataset.id, 10));
     if (!t) return;
     if (btn.dataset.action === 'edit')   abrirFormularioEdicionTarea(t);
@@ -466,6 +530,104 @@ document.addEventListener('click', e => {
     if (btn.dataset.action === 'pause')  pausarTarea(t);
     if (btn.dataset.action === 'resume') reanudarTarea(t);
 });
+
+// ─── Acciones bulk para filas consolidadas (racks / plataformas) ───
+// "Ver sub-tareas": carga el listado individual sin consolidar y lo muestra
+// en el mismo modal. El usuario puede editar cada sub-tarea una a una desde
+// ahí. Se respeta volviendo a abrir el modal de la máquina.
+async function abrirVistaSubTareas() {
+    if (!_accMaquinaActiva) return;
+    showLoader(true);
+    try {
+        // Pedimos las sub-tareas como filas reales (no consolidadas)
+        const url = ACC_API + '?action=tareas&cod=' + encodeURIComponent(_accMaquinaActiva.cod) + '&consolidar=0';
+        const r = await fetch(url);
+        const j = await r.json();
+        if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+        _accTareas = j.data.tareas || [];
+        _accPeriodicidades = j.data.periodicidades || _accPeriodicidades;
+        document.getElementById('acc-tareas-count').textContent = _accTareas.length + ' sub-tareas (vista detallada)';
+        renderTareas();
+        showToast('Mostrando las ' + _accTareas.length + ' sub-tareas individuales', 'success');
+    } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+    } finally {
+        showLoader(false);
+    }
+}
+
+async function borrarTareasBulk(sub) {
+    if (!sub.length) return;
+    const conf = confirm(
+        'Vas a borrar ' + sub.length + ' tareas preventivas del rack/plataforma "' +
+        (_accMaquinaActiva?.desc || '') + '".\n\nEsta operación NO se puede deshacer. ¿Continuar?'
+    );
+    if (!conf) return;
+    showLoader(true);
+    try {
+        const results = await Promise.allSettled(sub.map(s =>
+            apiCall('delete', { method: 'POST', body: { id: s.id } })
+        ));
+        const ok = results.filter(r => r.status === 'fulfilled').length;
+        const ko = results.length - ok;
+        if (ko > 0) {
+            const errMsg = results.find(r => r.status === 'rejected')?.reason?.message || 'error';
+            throw new Error(ok + '/' + results.length + ' borradas. Errores: ' + errMsg);
+        }
+        showToast(ok + ' tareas borradas', 'success');
+        await abrirModalTareas(_accMaquinaActiva.cod, _accMaquinaActiva.desc);
+        cargarMaquinas();
+    } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+    } finally {
+        showLoader(false);
+    }
+}
+
+async function pausarTareasBulk(sub) {
+    if (!sub.length) return;
+    const hoy = new Date().toISOString().substring(0, 10);
+    const f = prompt(
+        'Pausar las ' + sub.length + ' tareas del rack/plataforma. Introduce la fecha de pausado (YYYY-MM-DD).',
+        hoy
+    );
+    if (f === null) return;
+    const fechaPausado = f.trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaPausado)) {
+        showToast('Fecha inválida (formato YYYY-MM-DD)', 'error');
+        return;
+    }
+    showLoader(true);
+    try {
+        const results = await Promise.allSettled(sub.map(s =>
+            apiCall('update', { method: 'POST', body: { id: s.id, fecha_pausado: fechaPausado } })
+        ));
+        const ok = results.filter(r => r.status === 'fulfilled').length;
+        showToast(ok + '/' + sub.length + ' tareas pausadas desde ' + fechaPausado, 'success');
+        await abrirModalTareas(_accMaquinaActiva.cod, _accMaquinaActiva.desc);
+    } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+    } finally {
+        showLoader(false);
+    }
+}
+
+async function reanudarTareasBulk(sub) {
+    if (!sub.length) return;
+    showLoader(true);
+    try {
+        const results = await Promise.allSettled(sub.map(s =>
+            apiCall('update', { method: 'POST', body: { id: s.id, fecha_pausado: null } })
+        ));
+        const ok = results.filter(r => r.status === 'fulfilled').length;
+        showToast(ok + '/' + sub.length + ' tareas reanudadas', 'success');
+        await abrirModalTareas(_accMaquinaActiva.cod, _accMaquinaActiva.desc);
+    } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+    } finally {
+        showLoader(false);
+    }
+}
 
 function cerrarModalTareas() {
     hideModal('acc-modal');
@@ -496,15 +658,24 @@ function abrirFormularioAltaTarea() {
     document.getElementById('acc-f-ip-interna').value = '';
     document.getElementById('acc-f-tipo-mant').value  = 'Preventivo';
     document.getElementById('acc-f-tipo-real').value  = '';
+    // Tiempo estimado (migracion 011)
+    const tInputA = document.getElementById('acc-f-tiempo');
+    if (tInputA) tInputA.value = '';
 
     document.getElementById('acc-f-primera-wrap').style.display = '';
-    const fr1 = document.getElementById('acc-f-fechas-row');
-    if (fr1) fr1.style.display = 'none';
+    // (Bloque histórico Última/Próxima eliminado — el catálogo no edita histórico.)
     // Campo pausa no aplica en alta de nueva tarea — se oculta y se vacía.
     const pwrap = document.getElementById('acc-f-pausado-wrap');
     if (pwrap) pwrap.style.display = 'none';
     const pInput = document.getElementById('acc-f-pausado');
     if (pInput) pInput.value = '';
+    // Bloqueo tampoco aplica en alta; se oculta y se vacía.
+    const bwrap = document.getElementById('acc-f-bloqueo-wrap');
+    if (bwrap) bwrap.style.display = 'none';
+    const bIni = document.getElementById('acc-f-bloqueo-ini');
+    const bFin = document.getElementById('acc-f-bloqueo-fin');
+    if (bIni) bIni.value = '';
+    if (bFin) bFin.value = '';
     showModal('acc-form-modal');
     setTimeout(() => document.getElementById('acc-f-tarea').focus(), 50);
 }
@@ -515,7 +686,7 @@ function abrirFormularioEdicionTarea(t) {
     document.getElementById('acc-form-summary').innerHTML =
         `<strong>${escHtml(_accMaquinaActiva.desc)}</strong> <span class="acc-modal-cod">(${escHtml(_accMaquinaActiva.cod)})</span>` +
         `<br><span class="acc-modal-cod">id ${t.id} · orden ${escHtml(t.orden)}</span>` +
-        (t.intervenciones ? `<br><span class="acc-warning">⚠ Esta tarea tiene ${t.intervenciones} intervenciones registradas. Editar la periodicidad o las fechas no afecta al histórico.</span>` : '');
+        `<br><span class="acc-info">ℹ Los cambios de periodicidad o cadencia se aplican <strong>desde hoy en adelante</strong>; no modifican intervenciones ya registradas.</span>`;
     document.getElementById('acc-f-tarea').value = t.tarea || '';
     document.getElementById('acc-f-desc').value  = t.desc_tarea || '';
     poblarPeriodicidades(t.periodicidad || '');
@@ -524,18 +695,26 @@ function abrirFormularioEdicionTarea(t) {
     document.getElementById('acc-f-ip-interna').value = t.ip_interna || '';
     document.getElementById('acc-f-tipo-mant').value  = t.tipo_mantenimiento || '';
     document.getElementById('acc-f-tipo-real').value  = t.tipo_realizacion || '';
+    // Tiempo estimado (migracion 011)
+    const tInputE = document.getElementById('acc-f-tiempo');
+    if (tInputE) tInputE.value = (t.tiempo_estimado !== null && t.tiempo_estimado !== undefined) ? t.tiempo_estimado : '';
 
     document.getElementById('acc-f-primera-wrap').style.display = 'none';
-    const fr2 = document.getElementById('acc-f-fechas-row');
-    if (fr2) fr2.style.display = '';
-    document.getElementById('acc-f-ultima').value  = t.ultima_revision  || '';
-    document.getElementById('acc-f-proxima').value = t.proxima_revision || '';
+    // (Bloque histórico Última/Próxima eliminado — el catálogo no edita histórico.)
 
     // Pausa: visible solo en edición; vacío = activa.
     const pwrap = document.getElementById('acc-f-pausado-wrap');
     if (pwrap) pwrap.style.display = '';
     const pInput = document.getElementById('acc-f-pausado');
     if (pInput) pInput.value = t.fecha_pausado || '';
+
+    // Bloqueo temporal con rango: visible solo en edición; vacío = no bloqueada.
+    const bwrap = document.getElementById('acc-f-bloqueo-wrap');
+    if (bwrap) bwrap.style.display = '';
+    const bIni = document.getElementById('acc-f-bloqueo-ini');
+    const bFin = document.getElementById('acc-f-bloqueo-fin');
+    if (bIni) bIni.value = t.fecha_bloqueo_ini || '';
+    if (bFin) bFin.value = t.fecha_bloqueo_fin || '';
 
     showModal('acc-form-modal');
     setTimeout(() => document.getElementById('acc-f-tarea').focus(), 50);
@@ -550,6 +729,18 @@ async function guardarTarea() {
     const ip       = document.getElementById('acc-f-ip-interna').value.trim();
     const tMant    = document.getElementById('acc-f-tipo-mant').value;
     const tReal    = document.getElementById('acc-f-tipo-real').value;
+    // Tiempo estimado (migracion 011) - opcional, en minutos.
+    const tInputG  = document.getElementById('acc-f-tiempo');
+    const tiempoRaw= tInputG ? tInputG.value.trim() : '';
+    let tiempoVal  = null;
+    if (tiempoRaw !== '') {
+        const n = parseInt(tiempoRaw, 10);
+        if (isNaN(n) || n < 0 || n > 10000) {
+            showToast('Tiempo estimado: introduce un entero entre 0 y 10000 minutos', 'error');
+            return;
+        }
+        tiempoVal = n;
+    }
 
     if (!tarea) { showToast('Falta el campo Tarea', 'error'); return; }
     if (!per)   { showToast('Selecciona una periodicidad', 'error'); return; }
@@ -560,6 +751,19 @@ async function guardarTarea() {
         if (_accEditingTarea) {
             const fechaPausadoInput = document.getElementById('acc-f-pausado');
             const fechaPausadoVal   = fechaPausadoInput ? (fechaPausadoInput.value || null) : null;
+            const bloqIniEl = document.getElementById('acc-f-bloqueo-ini');
+            const bloqFinEl = document.getElementById('acc-f-bloqueo-fin');
+            const bloqIniVal = bloqIniEl ? (bloqIniEl.value || null) : null;
+            const bloqFinVal = bloqFinEl ? (bloqFinEl.value || null) : null;
+            // Validación cliente: rango coherente (el backend lo vuelve a validar)
+            if ((bloqIniVal && !bloqFinVal) || (!bloqIniVal && bloqFinVal)) {
+                showToast('Bloqueo: indica fecha de inicio y de fin', 'error');
+                showLoader(false); return;
+            }
+            if (bloqIniVal && bloqFinVal && bloqIniVal > bloqFinVal) {
+                showToast('Bloqueo: la fecha de inicio no puede ser posterior a la de fin', 'error');
+                showLoader(false); return;
+            }
             await apiCall('update', {
                 method: 'POST',
                 body: {
@@ -567,13 +771,17 @@ async function guardarTarea() {
                     tarea:              tarea,
                     desc_tarea:         desc,
                     periodicidad:       per,
-                    ultima_revision:    document.getElementById('acc-f-ultima').value || null,
-                    proxima_revision:   document.getElementById('acc-f-proxima').value || null,
+                    // ultima_revision / proxima_revision no se envían desde esta pantalla:
+                    // los cambios de cadencia se aplican desde hoy en adelante y el backend
+                    // recalcula la próxima a partir de la última intervención registrada.
                     alta_baja:          altaBaja,
                     ip_interna:         ip,
                     tipo_realizacion:   tReal,
                     tipo_mantenimiento: tMant,
+                    tiempo_estimado:    tiempoVal,
                     fecha_pausado:      fechaPausadoVal,
+                    fecha_bloqueo_ini:  bloqIniVal,
+                    fecha_bloqueo_fin:  bloqFinVal,
                 }
             });
             showToast('Tarea actualizada', 'success');
@@ -592,6 +800,7 @@ async function guardarTarea() {
                     ip_interna:             ip,
                     tipo_realizacion:       tReal,
                     tipo_mantenimiento:     tMant,
+                    tiempo_estimado:        tiempoVal,
                 }
             });
             showToast('Tarea creada', 'success');
@@ -784,6 +993,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Botón "+ Crear nueva máquina"
     document.getElementById('acc-new-machine-btn').addEventListener('click', abrirFormularioAltaMaquina);
+
+    // Botones export del listado completo (excluye máquinas de SECUENCIA)
+    const expXlsx = document.getElementById('acc-export-list-xlsx');
+    if (expXlsx) expXlsx.addEventListener('click', () => {
+        window.location.href = '../api/mant_acciones_export_listado.php?fmt=xlsx';
+    });
+    const expPdf = document.getElementById('acc-export-list-pdf');
+    if (expPdf) expPdf.addEventListener('click', () => {
+        window.location.href = '../api/mant_acciones_export_listado.php?fmt=pdf';
+    });
 
     // Botón "← Volver" para subir un nivel en el breadcrumb de agrupaciones
     const backBtn = document.getElementById('acc-back-btn');
