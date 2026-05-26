@@ -114,9 +114,11 @@ include __DIR__ . '/../includes/header.php';
 
     <!-- ════════════════════════════════════════════════════════════════
          MÓDULO 5 · DETALLE PLAN vs PRODUCIDO POR ARTÍCULO
-         (solo visible cuando hay una máquina seleccionada)
+         Siempre visible. Sin filtro → agregado global por artículo.
+         Con sección → solo artículos de esa sección.
+         Con máquina → solo artículos de esa máquina.
          ════════════════════════════════════════════════════════════════ -->
-    <div class="view-card pa-module pa-module-5" id="pa-module-5" style="display:none">
+    <div class="view-card pa-module pa-module-5" id="pa-module-5">
         <div class="view-card-header">
             <h2>Detalle Plan vs Producido
                 <span class="pa-hint" id="m5-subtitle">· por artículo</span>

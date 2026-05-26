@@ -405,6 +405,57 @@ class PlanAttainmentAgg
     }
 
     /**
+     * Desglose Plan vs Producido agregado por artículo (suma todas las máquinas
+     * de MAQUINA_TO_SECCION_EXT). Opcionalmente filtra por sección.
+     *
+     * @return array<int, array{cod_articulo:string, plan:float, prod:float, attain:float, plan_attainment:float}>
+     */
+    public static function rangeByArticulo(
+        string $fechaDesde,
+        string $fechaHasta,
+        array $turnos,
+        string $seccion = ''
+    ): array {
+        $byArt = [];
+        $d  = new DateTime($fechaDesde);
+        $fh = new DateTime($fechaHasta);
+        while ($d <= $fh) {
+            $ymd = $d->format('Y-m-d');
+            foreach ($turnos as $t) {
+                $r = self::dayShiftDetailExt($ymd, $t);
+                $plan = $r['plan']; $prod = $r['prod'];
+                $attain = self::attainWithFuzzyMatch($plan, $prod);
+                $keys = array_unique(array_merge(array_keys($plan), array_keys($prod)));
+                foreach ($keys as $k) {
+                    [$maq, $art] = explode('|', $k, 2);
+                    $sec = self::MAQUINA_TO_SECCION_EXT[$maq] ?? null;
+                    if ($sec === null) continue;
+                    if ($seccion !== '' && $sec !== $seccion) continue;
+                    if (!isset($byArt[$art])) $byArt[$art] = ['plan'=>0,'prod'=>0,'attain'=>0];
+                    $byArt[$art]['plan']   += (float)($plan[$k]   ?? 0);
+                    $byArt[$art]['prod']   += (float)($prod[$k]   ?? 0);
+                    $byArt[$art]['attain'] += (float)($attain[$k] ?? 0);
+                }
+            }
+            $d->modify('+1 day');
+        }
+        $out = [];
+        foreach ($byArt as $art => $v) {
+            if ($v['plan'] == 0 && $v['prod'] == 0) continue;
+            $pa = $v['plan'] > 0 ? ($v['attain'] / $v['plan']) * 100 : 0;
+            $out[] = [
+                'cod_articulo'    => $art,
+                'plan'            => round($v['plan'], 0),
+                'prod'            => round($v['prod'], 0),
+                'attain'          => round($v['attain'], 0),
+                'plan_attainment' => round($pa, 2),
+            ];
+        }
+        usort($out, fn($a, $b) => $b['plan'] <=> $a['plan']);
+        return $out;
+    }
+
+    /**
      * Variante extendida de dayShiftDetail: no filtra por Map_FiltroMaquina,
      * devuelve todas las máquinas en MAQUINA_TO_SECCION_EXT. Cachea por separado
      * en {fecha}_{turno}_ext.json para no colisionar con dayShiftDetail.

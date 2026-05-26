@@ -371,7 +371,6 @@ function onClearFilter() {
     _selFecha   = '';
     _selMaquina = '';
     refreshActiveFilterBar();
-    ocultarDetalle();
     cargarTodo();
 }
 
@@ -434,10 +433,11 @@ async function cargarMaquinas() {
     _maquinasRows = rows;
     // Auto-descarte ANTES de renderizar: si la máquina seleccionada ya no
     // aparece, limpiamos para que renderMaquinas no atenúe todas las barras.
+    // Módulo 5 no se oculta — cargarDetalle (llamado después en cargarTodo)
+    // lo refresca con el scope global/sección.
     if (_selMaquina && !rows.some(r => r.maquina === _selMaquina)) {
         _selMaquina = '';
         refreshActiveFilterBar();
-        ocultarDetalle();
     }
     renderMaquinas(rows);
     const info = $('#m4-info');
@@ -448,11 +448,6 @@ async function cargarMaquinas() {
 // (Si common.js ya define escapeHTML, este bloque puede eliminarse.)
 function escapeHTML(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-function ocultarDetalle() {
-    const m5 = document.getElementById('pa-module-5');
-    if (m5) m5.style.display = 'none';
 }
 
 function renderDetalle(rows, totales, maquina) {
@@ -505,37 +500,41 @@ function renderDetalle(rows, totales, maquina) {
 }
 
 async function cargarDetalle() {
-    if (!_selMaquina) {
-        ocultarDetalle();
-        return;
-    }
     const f = getFiltrosActuales();
     const { fechaDia, turno } = efectivaFiltroFechas(f);
+    // Scope: máquina > sección > global
+    const params = { fecha: fechaDia, turno };
+    let scope;
+    if (_selMaquina) {
+        params.maquina = _selMaquina;
+        scope = _selMaquina;
+    } else if (_selSeccion) {
+        params.seccion = _selSeccion;
+        scope = _selSeccion;
+    } else {
+        scope = 'GLOBAL';
+    }
     try {
-        const data = await apiFetch('por_articulo_maquina.php', {
-            fecha: fechaDia, turno, maquina: _selMaquina
-        });
-        renderDetalle(data.rows || [], data.totales || {}, _selMaquina);
-        const m5 = document.getElementById('pa-module-5');
+        const data = await apiFetch('por_articulo_maquina.php', params);
+        renderDetalle(data.rows || [], data.totales || {}, scope);
         const m5info = $('#m5-info');
-        if (m5info) m5info.textContent = _selMaquina;
-        if (m5) {
-            m5.style.display = '';
-            m5.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+        if (m5info) m5info.textContent = scope;
     } catch (e) {
         const cont = $('#detalle-articulos');
         if (cont) cont.innerHTML = '<div class="pa-detalle-empty">Sin detalle disponible: ' + escapeHTML(e.message || '') + '</div>';
-        const m5 = document.getElementById('pa-module-5');
-        if (m5) m5.style.display = '';
+        const m5info = $('#m5-info');
+        if (m5info) m5info.textContent = scope;
     }
 }
 
 async function cargarTodo() {
     showLoader(true);
     try {
-        // Carga en paralelo
+        // Paralelo para los 4 módulos superiores
         await Promise.all([cargarGauge(), cargarSeccion(), cargarEvolucion(), cargarMaquinas()]);
+        // El detalle (módulo 5) corre después porque cargarMaquinas puede haber
+        // hecho auto-descarte sobre _selMaquina y cargarDetalle depende de él.
+        await cargarDetalle();
     } catch (e) {
         showToast('Error: ' + e.message, 'error');
     } finally {
@@ -551,7 +550,6 @@ document.addEventListener('DOMContentLoaded', () => {
         _selSeccion = '';
         _selFecha   = '';
         _selMaquina = '';
-        ocultarDetalle();
         refreshActiveFilterBar();
         cargarTodo();
     });

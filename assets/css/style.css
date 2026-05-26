@@ -939,8 +939,8 @@ a { text-decoration: none; color: inherit; }
 }
 /* Body de los módulos 2 y 3: altura fija para los gráficos */
 .pa-module-body { padding: 20px 24px; min-height: 0; }
-#chart-seccion-big   { width: 100%; height: 540px; }
-#chart-evolucion-big { width: 100%; height: 540px; }
+#chart-seccion-big   { width: 100%; height: 720px; }
+#chart-evolucion-big { width: 100%; height: 720px; }
 
 /* Hint del header ("clic en una barra...") */
 .pa-hint {
