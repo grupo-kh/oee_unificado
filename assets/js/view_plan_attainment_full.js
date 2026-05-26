@@ -271,15 +271,19 @@ function renderMaquinas(rows) {
         },
         colors: colors,
         xaxis: {
+            categories: categorias,
             max: 100, min: 0,
             labels: {
                 style: { colors: '#2d4d7a', fontSize: '12px', fontWeight: 600 },
-                formatter: v => v.toFixed(0) + '%'
+                formatter: v => (typeof v === 'number' ? v.toFixed(0) + '%' : v)
             },
             axisBorder: { color: '#a3b8d1' }, axisTicks: { color: '#a3b8d1' }
         },
         yaxis: {
-            labels: { style: { colors: '#1a2d4a', fontSize: '12px', fontWeight: 700 } }
+            labels: {
+                style: { colors: '#1a2d4a', fontSize: '12px', fontWeight: 700 },
+                maxWidth: 220
+            }
         },
         dataLabels: {
             enabled: true,
@@ -542,7 +546,9 @@ async function cargarTodo() {
 // ───── Init ──────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     initFiltros(() => {
-        // Al cambiar fecha/turno del header se limpian los drill-downs.
+        // Al cambiar fecha/turno del header se limpian TODOS los drill-downs.
+        // El cross-filter es opcional desde ese estado base.
+        _selSeccion = '';
         _selFecha   = '';
         _selMaquina = '';
         ocultarDetalle();
