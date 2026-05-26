@@ -219,12 +219,14 @@ function renderEvolucion(data) {
     chartEvolucion.render();
 }
 
-// Stub temporal — la implementación real llega en Task 7
 function onMaquinaClick(maq) {
-    _selMaquina = (_selMaquina === maq) ? '' : maq;
+    if (_selMaquina === maq) _selMaquina = '';
+    else _selMaquina = maq;
     refreshActiveFilterBar();
+    // Solo re-renderizamos máquinas (para destacar/atenuar) y detalle.
+    // El gauge, sección y evolución no se filtran por máquina.
     renderMaquinas(_maquinasRows);
-    // ocultarDetalle / cargarDetalle vienen en Tasks 6-7
+    cargarDetalle();
 }
 
 // ───── Render máquinas (horizontal bars) ─────────────────────────────
@@ -342,6 +344,7 @@ function refreshActiveFilterBar() {
         const [y, m, d] = _selFecha.split('-');
         partes.push(`<span class="pa-active-filter-chip">FECHA · ${d}/${m}/${y}</span>`);
     }
+    if (_selMaquina) partes.push(`<span class="pa-active-filter-chip">MÁQUINA · ${_selMaquina}</span>`);
     if (partes.length) {
         chips.innerHTML = partes.join('');
         bar.style.display = '';
@@ -362,7 +365,9 @@ function refreshActiveFilterBar() {
 function onClearFilter() {
     _selSeccion = '';
     _selFecha   = '';
+    _selMaquina = '';
     refreshActiveFilterBar();
+    ocultarDetalle();
     cargarTodo();
 }
 
@@ -537,9 +542,10 @@ async function cargarTodo() {
 // ───── Init ──────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     initFiltros(() => {
-        // Al cambiar fecha/turno del header se limpia el drill-down de fecha
-        // (no tiene sentido mantener una fecha clicada de otro día).
-        _selFecha = '';
+        // Al cambiar fecha/turno del header se limpian los drill-downs.
+        _selFecha   = '';
+        _selMaquina = '';
+        ocultarDetalle();
         refreshActiveFilterBar();
         cargarTodo();
     });
