@@ -386,6 +386,42 @@ function onClearFilter() {
 // ───── Filtros propios de plan_attainment (rango fechas + multi-turno) ─
 const PA_FILTROS_KEY = 'pa_filtros_v2';
 
+// Formateo local YYYY-MM-DD (evita el shift de timezone de toISOString)
+function _paFmtDate(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+// Calcula desde/hasta para un atajo: 'ayer' | 'semana' | 'mes'
+function paPresetRange(name) {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    if (name === 'ayer') {
+        const d = new Date(hoy); d.setDate(d.getDate() - 1);
+        const s = _paFmtDate(d);
+        return { desde: s, hasta: s };
+    }
+    if (name === 'semana') {
+        // Semana anterior completa, lunes→domingo (week starts Monday).
+        const dow = hoy.getDay();                         // 0 = domingo
+        const diasDesdeLunes = (dow === 0) ? 6 : dow - 1; // lunes de ESTA semana
+        const lunesEsta = new Date(hoy);
+        lunesEsta.setDate(hoy.getDate() - diasDesdeLunes);
+        const lunesAnt = new Date(lunesEsta); lunesAnt.setDate(lunesEsta.getDate() - 7);
+        const domAnt   = new Date(lunesEsta); domAnt.setDate(lunesEsta.getDate() - 1);
+        return { desde: _paFmtDate(lunesAnt), hasta: _paFmtDate(domAnt) };
+    }
+    if (name === 'mes') {
+        // Día 1 → último día del mes natural anterior.
+        const primero = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+        const ultimo  = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+        return { desde: _paFmtDate(primero), hasta: _paFmtDate(ultimo) };
+    }
+    return null;
+}
+
 function paSavedFiltros() {
     try {
         const raw = localStorage.getItem(PA_FILTROS_KEY);
@@ -425,8 +461,7 @@ function paApiParams() {
 function initPaFiltros(onChange) {
     const ayer = new Date();
     ayer.setDate(ayer.getDate() - 1);
-    const fmt = d => d.toISOString().slice(0, 10);
-    const ayerStr = fmt(ayer);
+    const ayerStr = _paFmtDate(ayer);
 
     const saved = paSavedFiltros();
     const desde = saved?.fecha_desde || ayerStr;
@@ -462,6 +497,16 @@ function initPaFiltros(onChange) {
             // No permitir dejar 0 turnos activos
             if (b.classList.contains('active') && others.length <= 1) return;
             b.classList.toggle('active');
+            onAnyChange();
+        });
+    });
+    // Atajos rápidos: ayer / semana ant. / mes ant.
+    document.querySelectorAll('.pa-preset-btn').forEach(b => {
+        b.addEventListener('click', () => {
+            const r = paPresetRange(b.dataset.preset);
+            if (!r) return;
+            if (fDesde) fDesde.value = r.desde;
+            if (fHasta) fHasta.value = r.hasta;
             onAnyChange();
         });
     });

@@ -16,6 +16,12 @@ include __DIR__ . '/../includes/header.php';
             <input type="date" id="pa-f-hasta" class="filter-field filter-green">
         </div>
         <div class="pa-filterbar-group">
+            <span class="pa-filterbar-label">Atajos</span>
+            <button type="button" class="pa-preset-btn" data-preset="ayer" title="Día anterior al actual">Ayer</button>
+            <button type="button" class="pa-preset-btn" data-preset="semana" title="Lunes a domingo de la semana anterior">Semana ant.</button>
+            <button type="button" class="pa-preset-btn" data-preset="mes" title="Mes natural completo anterior">Mes ant.</button>
+        </div>
+        <div class="pa-filterbar-group">
             <span class="pa-filterbar-label">Turnos</span>
             <button type="button" class="pa-turno-btn" data-turno="M" title="Mañana (06:00–14:15)">M</button>
             <button type="button" class="pa-turno-btn" data-turno="T" title="Tarde (14:15–22:30)">T</button>

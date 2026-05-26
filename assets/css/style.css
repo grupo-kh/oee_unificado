@@ -957,6 +957,28 @@ a { text-decoration: none; color: inherit; }
     color: #ffffff;
     box-shadow: 0 2px 4px rgba(47, 125, 76, 0.25);
 }
+.pa-preset-btn {
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid #a3b8d1;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #1a2d4a;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+.pa-preset-btn:hover {
+    border-color: #5b8cc7;
+    background: #f4f8fc;
+    color: #1a2d4a;
+}
+.pa-preset-btn:active {
+    background: #5b8cc7;
+    color: #ffffff;
+}
 .pa-filterbar-chips-group {
     flex: 1;
     justify-content: flex-end;
