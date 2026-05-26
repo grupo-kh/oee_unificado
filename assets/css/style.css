@@ -184,6 +184,31 @@ a { text-decoration: none; color: inherit; }
     border: 1px solid rgba(255,255,255,0.2);
 }
 
+/* Botón "Manual" en la topbar — abre la guía de usuario en pestaña nueva. */
+.btn-manual {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 14px;
+    height: 44px;
+    background: #8c181a;
+    color: #fff !important;
+    border-radius: var(--radius);
+    margin-left: 12px;
+    transition: all 0.15s ease;
+    border: 1px solid rgba(255,255,255,0.15);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-decoration: none;
+}
+.btn-manual:hover {
+    background: #a52125;
+    transform: scale(1.04);
+    box-shadow: 0 2px 8px rgba(140, 24, 26, 0.30);
+}
+.btn-manual svg { display: block; }
+
 .btn-back:hover {
     background: var(--kh-red);
     transform: scale(1.05);
@@ -831,6 +856,175 @@ a { text-decoration: none; color: inherit; }
     justify-content: center;
 }
 
+/* ─── PLAN ATTAINMENT · vista unificada (3 módulos apilados) ────────────
+   Cada módulo (gauge / por sección / evolución) tiene una tonalidad suave
+   distinta para diferenciarlos visualmente sin romper el look corporativo. */
+.view-main.pa-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-height: 0;
+    flex: 1;
+}
+.pa-stack .view-card.pa-module {
+    flex: 0 0 auto;        /* anular flex:1 heredado para que cada módulo crezca solo lo necesario */
+}
+.pa-stack .view-card.pa-module .view-card-body {
+    flex: 0 0 auto;
+}
+/* Módulo 1 — gauge global, tono azul muy suave */
+.pa-module-1 .view-card-body { background: #f4f8fc; }
+/* Módulo 2 — por sección, tono verde muy suave */
+.pa-module-2 .view-card-body { background: #f1faf3; }
+.pa-module-2 .view-card-header { background: linear-gradient(180deg, #2f7d4c 0%, #4ca56e 100%); }
+/* Módulo 3 — evolución, tono ámbar muy suave */
+.pa-module-3 .view-card-body { background: #fdf8ec; }
+.pa-module-3 .view-card-header { background: linear-gradient(180deg, #b87a14 0%, #d8a04a 100%); }
+/* Módulo 4 — ranking por máquina, tono lila suave */
+.pa-module-4 .view-card-body { background: #f4f1fa; }
+.pa-module-4 .view-card-header { background: linear-gradient(180deg, #4a3b87 0%, #6e5cad 100%); }
+#chart-maquina-big { width: 100%; min-height: 540px; }
+
+/* Módulo 5 — detalle plan vs producido, tono rosa suave */
+.pa-module-5 .view-card-body { background: #fbf4f4; }
+.pa-module-5 .view-card-header { background: linear-gradient(180deg, #87413b 0%, #ad6e5c 100%); }
+
+/* Tabla del módulo 5 */
+.pa-detalle-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+}
+.pa-detalle-table th {
+    background: #f0e6e6;
+    color: #5a2a25;
+    font-weight: 700;
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 2px solid #c8a098;
+}
+.pa-detalle-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #ead4d0;
+    color: #1a2d4a;
+}
+.pa-detalle-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.pa-detalle-table tfoot td {
+    font-weight: 700;
+    background: #f7eaea;
+    border-top: 2px solid #c8a098;
+    border-bottom: none;
+}
+.pa-detalle-table .pa-bar {
+    display: inline-block;
+    width: 80px;
+    height: 8px;
+    background: #e8eef5;
+    border-radius: 4px;
+    overflow: hidden;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+.pa-detalle-table .pa-bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: 4px;
+}
+.pa-detalle-empty {
+    text-align: center;
+    color: #5b8cc7;
+    padding: 40px;
+    font-size: 14px;
+}
+/* Body de los módulos 2 y 3: altura fija para los gráficos */
+.pa-module-body { padding: 20px 24px; min-height: 0; }
+#chart-seccion-big   { width: 100%; height: 540px; }
+#chart-evolucion-big { width: 100%; height: 540px; }
+
+/* Hint del header ("clic en una barra...") */
+.pa-hint {
+    margin-left: 10px;
+    font-size: 12px;
+    font-weight: 400;
+    font-style: italic;
+    color: rgba(255,255,255,0.85);
+    letter-spacing: 0.2px;
+}
+
+/* Barra con filtros activos (sección/fecha seleccionada) */
+.pa-active-filter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: #fff8e7;
+    border: 1px solid #f3c97b;
+    border-left: 5px solid #d97706;
+    border-radius: var(--radius);
+    color: #6b3f00;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: var(--shadow-md);
+}
+.pa-active-filter-label { color: #8a5500; text-transform: uppercase; letter-spacing: 0.6px; font-size: 11px; }
+.pa-active-filter-chips { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.pa-active-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    background: #d97706;
+    color: #fff;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+}
+.pa-clear-filter-btn {
+    margin-left: auto;
+    padding: 5px 14px;
+    background: #fff;
+    border: 1px solid #d97706;
+    color: #b35a00;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.pa-clear-filter-btn:hover { background: #d97706; color: #fff; }
+
+/* Plan Attainment: layout en 2 filas dentro del view-card-body
+   ─ Fila 1: gauge a la izquierda + leyenda explicativa a la derecha
+   ─ Fila 2: las 4 métricas (Disp / Rend / Cal / OEE) */
+.pa-body {
+    gap: 20px;
+}
+.pa-gauge-row {
+    display: grid;
+    grid-template-columns: minmax(360px, 1fr) minmax(320px, 1fr);
+    gap: 24px;
+    align-items: stretch;
+    width: 100%;
+}
+.pa-gauge-col {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+}
+.pa-legend-col {
+    align-self: stretch;
+    padding: 16px 18px;
+    background: #f7fafd;
+    border: 1px solid #d5dfe8;
+    border-radius: var(--radius);
+    overflow: auto;
+}
+@media (max-width: 980px) {
+    .pa-gauge-row { grid-template-columns: 1fr; }
+}
+
 #gauge-big {
     width: 100%;
     max-width: 540px;
@@ -841,8 +1035,8 @@ a { text-decoration: none; color: inherit; }
     grid-template-columns: repeat(4, 1fr);
     gap: 16px;
     width: 100%;
-    max-width: 800px;
-    margin-top: 20px;
+    max-width: 100%;
+    margin-top: 8px;
     padding-top: 20px;
     border-top: 2px solid var(--off-white);
 }
@@ -1732,7 +1926,46 @@ a { text-decoration: none; color: inherit; }
     background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
 }
 .tile-mant-mobile .tile-icon {
-    background: linear-gradient(135deg, #d5e1ee 0%, #a3b8d1 100%);
+    background: linear-gradient(135deg, #1d1d1d 0%, #0d0d0d 100%);
+    border: 1px solid #8c181a;
+}
+
+/* Icono del tile "Manual de uso" — fondo morado suave que destaca por ser
+   el primer tile y refleja el carácter informativo (no operativo). */
+.tile-mant-manual .tile-icon {
+    background: linear-gradient(135deg, #ece5fa 0%, #c9b9f5 100%);
+}
+
+/* Badge "En proceso de aplicación" para tiles aún no operativos.
+   Ámbar para diferenciarlo claramente del verde "dinámico/editor". */
+.tile-badge-wip {
+    background: #f59e0b !important;
+    color: #fff !important;
+    box-shadow: 0 1px 3px rgba(245, 158, 11, 0.35);
+}
+
+/* Estética sutilmente "WIP" para el propio tile: cinta diagonal en
+   la esquina superior derecha + opacidad ligeramente reducida en
+   el cuerpo para indicar que aún está en desarrollo. */
+.tile-wip {
+    position: relative;
+    overflow: hidden;
+}
+.tile-wip::after {
+    content: 'BETA';
+    position: absolute;
+    top: 14px;
+    right: -34px;
+    transform: rotate(38deg);
+    background: #8c181a;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    padding: 3px 38px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.20);
+    pointer-events: none;
+    z-index: 2;
 }
 
 .mant-stats {
@@ -2641,6 +2874,24 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 .acc-card-badge-user        { background: #fef3c7; color: #92400e; }
 .acc-card-badge-user-tasks  { background: #f4c430; color: #4a3500; }
 .acc-card-badge-excel       { background: #d1fae5; color: #065f46; }
+/* Badge "PAUSADA" naranja con letras blancas, para máquinas con TODAS las
+   tareas pausadas. El icono ⏸ ayuda a leerlo aún sin color. */
+.acc-card-badge-pausada {
+    background: #f59e0b;
+    color: #ffffff;
+    box-shadow: 0 1px 3px rgba(245, 158, 11, 0.35);
+}
+.acc-card-badge-pausada::before { content: '⏸ '; }
+.acc-card-badge-pausada-parcial {
+    background: #fff5e1;
+    color: #c47600;
+    border: 1px solid #f4c430;
+}
+/* Borde lateral naranja para destacar la tarjeta pausada sin saturar. */
+.acc-card-pausada {
+    border-left: 4px solid #f59e0b !important;
+    opacity: 0.92;
+}
 .acc-card-badge-group       { background: #1a2d4a; color: #ffffff; }
 
 /* Tarjeta de agrupación: estilo destacado para que se distinga
@@ -3011,6 +3262,45 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 .mant-machine-card-child > .mant-machine-header {
     background: #f8fafc;
     padding-left: 10px;
+}
+
+/* Histórico — grupos top-level (RACKS / TROLEYS / OTRAS) para no saturar la
+   parrilla. Cada grupo se identifica con un color (variable --top-color) y
+   se despliega al clicar para mostrar las máquinas/familias dentro. */
+.mant-top-group {
+    margin-top: 14px;
+    border: 1px solid #d5dfe8;
+    border-left: 6px solid var(--top-color, #475569);
+    border-radius: 6px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+.mant-top-group > .mant-machine-header {
+    background: linear-gradient(90deg,
+        color-mix(in srgb, var(--top-color, #475569) 12%, #ffffff) 0%,
+        #ffffff 65%);
+    padding: 12px 14px;
+    font-size: 16px;
+    cursor: pointer;
+}
+.mant-top-group > .mant-machine-header:hover {
+    background: linear-gradient(90deg,
+        color-mix(in srgb, var(--top-color, #475569) 22%, #ffffff) 0%,
+        #ffffff 80%);
+}
+.mant-top-group > .mant-machine-header strong {
+    color: var(--top-color, #1a2d4a);
+    font-size: 17px;
+    letter-spacing: 0.3px;
+}
+.mant-top-group > .mant-machine-body {
+    padding: 10px 12px 12px 12px;
+    background: #fbfcfe;
+    border-top: 1px solid #eef2f7;
+}
+.mant-top-group .mant-machine-card,
+.mant-top-group .mant-family-card {
+    margin-top: 6px;
 }
 .acc-tag-ip         { background: #1e293b; color: #cbd5e1; font-family: ui-monospace, Consolas, monospace; }
 .acc-tag-interno    { background: #14532d; color: #fff; }
