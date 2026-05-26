@@ -450,79 +450,136 @@ function escapeHTML(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-function renderDetalle(rows, totales, maquina) {
+// ───── Render detalle horario (grid Plan/Prod estilo grid.php) ──────
+const _TURNO_LABEL_DET = { M: 'MAÑANA', T: 'TARDE', N: 'NOCHE', C: 'CENTRAL' };
+
+function renderDetalle(horas, filas, fecha, turno, scope) {
     const cont = $('#detalle-articulos');
-    if (!rows || !rows.length) {
-        cont.innerHTML = '<div class="pa-detalle-empty">Sin datos para ' + escapeHTML(maquina || '') + ' en este turno.</div>';
+    if (!horas || !horas.length || !filas || !filas.length) {
+        cont.innerHTML = '<div class="pa-detalle-empty">Sin datos para ' + escapeHTML(scope || '') + ' en este turno.</div>';
         return;
     }
-    const fila = r => {
-        const pa = parseFloat(r.plan_attainment);
-        const color = semColor(pa);
-        const pct = Math.min(100, Math.max(0, pa));
-        return `
-            <tr>
-                <td>${escapeHTML(r.cod_articulo)}</td>
-                <td class="num">${Number(r.plan).toLocaleString('es-ES')}</td>
-                <td class="num">${Number(r.prod).toLocaleString('es-ES')}</td>
-                <td class="num">${Number(r.attain).toLocaleString('es-ES')}</td>
-                <td>
-                    <span class="pa-bar"><span class="pa-bar-fill" style="width:${pct}%;background:${color}"></span></span>
-                    ${pa.toFixed(1)}%
-                </td>
-            </tr>`;
+    const fechaLabel = (typeof formatFechaCorta === 'function') ? formatFechaCorta(fecha) : fecha;
+    const turnoLabel = _TURNO_LABEL_DET[turno] || turno;
+    const nHoras = horas.length;
+    const fmt = new Intl.NumberFormat('es-ES');
+
+    const renderCell = (val, pct, extraCls = '') => {
+        if (val === undefined || val === null || val === 0) {
+            return `<td class="cell-data cell-empty ${extraCls}"></td>`;
+        }
+        const sem = pct === null ? 'cell-empty' : semClass3(pct);
+        return `<td class="cell-data ${sem} ${extraCls}">${fmt.format(val)}</td>`;
     };
-    const tot = totales || {};
-    const totPa = parseFloat(tot.plan_attainment || 0);
+
+    // Agrupar por máquina para rowspan
+    const grupos = new Map();
+    filas.forEach(f => {
+        if (!grupos.has(f.maquina)) grupos.set(f.maquina, []);
+        grupos.get(f.maquina).push(f);
+    });
+
+    let thead = `
+        <tr class="header-meta">
+            <th rowspan="3" class="col-maquina"><div class="col-hdr-title">Máquina</div></th>
+            <th rowspan="3" class="col-articulo"><div class="col-hdr-title">Cód. Artículo</div></th>
+            <th rowspan="3" class="col-label">Hor</th>
+            <th colspan="${nHoras}" class="header-fch"><span class="meta-dot"></span> Fch: ${escapeHTML(fechaLabel)}</th>
+            <th rowspan="3" class="col-total">Total</th>
+        </tr>
+        <tr class="header-meta">
+            <th colspan="${nHoras}" class="header-tur">Tur: ${escapeHTML(turnoLabel)}</th>
+        </tr>
+        <tr class="header-hour">`;
+    horas.forEach(h => {
+        thead += `<th><div class="hour-date">${escapeHTML(h.fecha || '')}</div><div class="hour-time">${escapeHTML(h.label)}</div></th>`;
+    });
+    thead += '</tr>';
+
+    let tbody = '';
+    grupos.forEach((items, maquina) => {
+        items.forEach((fila, idx) => {
+            // Fila PLAN
+            let rowPlan = '<tr class="row-plan">';
+            if (idx === 0) {
+                rowPlan += `<td class="col-maquina" rowspan="${items.length * 2}">${escapeHTML(maquina)}</td>`;
+            }
+            rowPlan += `<td class="col-articulo" rowspan="2">${escapeHTML(fila.cod_articulo)}</td>`;
+            rowPlan += `<td class="col-label label-plan">Plan</td>`;
+
+            let totalPlan = 0, totalProd = 0;
+            const cellsPlan = [];
+            const cellsProd = [];
+            horas.forEach(h => {
+                const plan = fila.plan[h.hora];
+                const prod = fila.prod[h.hora];
+                const hasPlan = plan !== undefined && plan !== null;
+                const hasProd = prod !== undefined && prod !== null;
+                const pct = (plan > 0 && hasProd) ? (prod / plan) * 100 : null;
+                cellsPlan.push(renderCell(hasPlan ? plan : null, pct));
+                cellsProd.push(renderCell(hasProd ? prod : null, pct));
+                if (hasPlan) totalPlan += plan;
+                if (hasProd) totalProd += prod;
+            });
+            const totalPct = totalPlan > 0 ? (totalProd / totalPlan) * 100 : null;
+            rowPlan += cellsPlan.join('');
+            rowPlan += renderCell(totalPlan || null, totalPct, 'cell-total');
+            rowPlan += '</tr>';
+
+            // Fila PROD
+            let rowProd = '<tr class="row-prod">';
+            rowProd += `<td class="col-label label-prod">Prod</td>`;
+            rowProd += cellsProd.join('');
+            rowProd += renderCell(totalProd || null, totalPct, 'cell-total');
+            rowProd += '</tr>';
+
+            tbody += rowPlan + rowProd;
+        });
+    });
+
     cont.innerHTML = `
-        <table class="pa-detalle-table">
-            <thead>
-                <tr>
-                    <th>Artículo</th>
-                    <th style="text-align:right">Plan</th>
-                    <th style="text-align:right">Producido</th>
-                    <th style="text-align:right">Attain</th>
-                    <th>% Plan Attainment</th>
-                </tr>
-            </thead>
-            <tbody>${rows.map(fila).join('')}</tbody>
-            <tfoot>
-                <tr>
-                    <td>TOTAL · ${escapeHTML(maquina || '')}</td>
-                    <td class="num">${Number(tot.plan || 0).toLocaleString('es-ES')}</td>
-                    <td class="num">${Number(tot.prod || 0).toLocaleString('es-ES')}</td>
-                    <td class="num">${Number(tot.attain || 0).toLocaleString('es-ES')}</td>
-                    <td>${totPa.toFixed(2)}%</td>
-                </tr>
-            </tfoot>
-        </table>
-    `;
+        <div class="grid-scroll">
+            <table class="grid-table">
+                <thead>${thead}</thead>
+                <tbody>${tbody}</tbody>
+            </table>
+        </div>`;
 }
 
 async function cargarDetalle() {
+    const cont = $('#detalle-articulos');
+    const m5info = $('#m5-info');
     const f = getFiltrosActuales();
     const { fechaDia, turno } = efectivaFiltroFechas(f);
-    // Scope: máquina > sección > global
-    const params = { fecha: fechaDia, turno };
-    let scope;
-    if (_selMaquina) {
-        params.maquina = _selMaquina;
-        scope = _selMaquina;
-    } else if (_selSeccion) {
-        params.seccion = _selSeccion;
-        scope = _selSeccion;
-    } else {
-        scope = 'GLOBAL';
+
+    // Sin turno explícito (M/T/N/C) no podemos pedir el grid horario.
+    if (!turno || !['M','T','N','C'].includes(turno)) {
+        if (cont) cont.innerHTML = '<div class="pa-detalle-empty">Selecciona un turno (Mañana / Tarde / Noche / Central) en la cabecera para ver el desglose horario.</div>';
+        if (m5info) m5info.textContent = '—';
+        return;
     }
+
+    let scope;
+    if (_selMaquina) scope = _selMaquina;
+    else if (_selSeccion) scope = _selSeccion;
+    else scope = 'GLOBAL';
+
     try {
-        const data = await apiFetch('por_articulo_maquina.php', params);
-        renderDetalle(data.rows || [], data.totales || {}, scope);
-        const m5info = $('#m5-info');
+        const data = await apiFetch('grid.php', { fecha: fechaDia, turno });
+        // Filtros cliente: sección (vía _maquinasRows) y máquina.
+        const seccionByMaq = {};
+        _maquinasRows.forEach(r => {
+            if (r.seccion) seccionByMaq[r.maquina] = String(r.seccion).toUpperCase();
+        });
+        const filas = (data.filas || []).filter(fila => {
+            if (_selMaquina && fila.maquina !== _selMaquina) return false;
+            if (_selSeccion && (seccionByMaq[fila.maquina] || '') !== _selSeccion) return false;
+            return true;
+        });
+        renderDetalle(data.horas || [], filas, data.fecha, data.turno, scope);
         if (m5info) m5info.textContent = scope;
     } catch (e) {
-        const cont = $('#detalle-articulos');
         if (cont) cont.innerHTML = '<div class="pa-detalle-empty">Sin detalle disponible: ' + escapeHTML(e.message || '') + '</div>';
-        const m5info = $('#m5-info');
         if (m5info) m5info.textContent = scope;
     }
 }
