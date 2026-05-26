@@ -577,62 +577,10 @@ function escapeHTML(s) {
 // ───── Render detalle horario (grid Plan/Prod estilo grid.php) ──────
 const _TURNO_LABEL_DET = { M: 'MAÑANA', T: 'TARDE', N: 'NOCHE', C: 'CENTRAL' };
 
-// Tabla agregada por artículo (cuando hay rango o multi-turno y no podemos
-// usar el grid horario por hora).
-function renderDetalleAgregado(rows, totales, scope) {
-    const cont = $('#detalle-articulos');
-    if (!rows || !rows.length) {
-        cont.innerHTML = '<div class="pa-detalle-empty">Sin datos para ' + escapeHTML(scope || '') + ' en el periodo seleccionado.</div>';
-        return;
-    }
-    const fila = r => {
-        const pa = parseFloat(r.plan_attainment);
-        const color = semColor(pa);
-        const pct = Math.min(100, Math.max(0, pa));
-        return `
-            <tr>
-                <td>${escapeHTML(r.cod_articulo)}</td>
-                <td class="num">${Number(r.plan).toLocaleString('es-ES')}</td>
-                <td class="num">${Number(r.prod).toLocaleString('es-ES')}</td>
-                <td class="num">${Number(r.attain).toLocaleString('es-ES')}</td>
-                <td>
-                    <span class="pa-bar"><span class="pa-bar-fill" style="width:${pct}%;background:${color}"></span></span>
-                    ${pa.toFixed(1)}%
-                </td>
-            </tr>`;
-    };
-    const tot = totales || {};
-    const totPa = parseFloat(tot.plan_attainment || 0);
-    cont.innerHTML = `
-        <table class="pa-detalle-table">
-            <thead>
-                <tr>
-                    <th>Artículo</th>
-                    <th style="text-align:right">Plan</th>
-                    <th style="text-align:right">Producido</th>
-                    <th style="text-align:right">Attain</th>
-                    <th>% Plan Attainment</th>
-                </tr>
-            </thead>
-            <tbody>${rows.map(fila).join('')}</tbody>
-            <tfoot>
-                <tr>
-                    <td>TOTAL · ${escapeHTML(scope || '')}</td>
-                    <td class="num">${Number(tot.plan || 0).toLocaleString('es-ES')}</td>
-                    <td class="num">${Number(tot.prod || 0).toLocaleString('es-ES')}</td>
-                    <td class="num">${Number(tot.attain || 0).toLocaleString('es-ES')}</td>
-                    <td>${totPa.toFixed(2)}%</td>
-                </tr>
-            </tfoot>
-        </table>`;
-}
-
-function renderDetalle(horas, filas, fecha, turno, scope) {
-    const cont = $('#detalle-articulos');
-    if (!horas || !horas.length || !filas || !filas.length) {
-        cont.innerHTML = '<div class="pa-detalle-empty">Sin datos para ' + escapeHTML(scope || '') + ' en este turno.</div>';
-        return;
-    }
+// Construye el HTML de UN grid horario (una fecha + un turno). Devuelve
+// string vacío si no hay datos relevantes (lo decide el caller filtrando).
+function _buildDetalleHorarioHTML(horas, filas, fecha, turno) {
+    if (!horas || !horas.length || !filas || !filas.length) return '';
     const fechaLabel = (typeof formatFechaCorta === 'function') ? formatFechaCorta(fecha) : fecha;
     const turnoLabel = _TURNO_LABEL_DET[turno] || turno;
     const nHoras = horas.length;
@@ -646,7 +594,6 @@ function renderDetalle(horas, filas, fecha, turno, scope) {
         return `<td class="cell-data ${sem} ${extraCls}">${fmt.format(val)}</td>`;
     };
 
-    // Agrupar por máquina para rowspan
     const grupos = new Map();
     filas.forEach(f => {
         if (!grupos.has(f.maquina)) grupos.set(f.maquina, []);
@@ -673,14 +620,12 @@ function renderDetalle(horas, filas, fecha, turno, scope) {
     let tbody = '';
     grupos.forEach((items, maquina) => {
         items.forEach((fila, idx) => {
-            // Fila PLAN
             let rowPlan = '<tr class="row-plan">';
             if (idx === 0) {
                 rowPlan += `<td class="col-maquina" rowspan="${items.length * 2}">${escapeHTML(maquina)}</td>`;
             }
             rowPlan += `<td class="col-articulo" rowspan="2">${escapeHTML(fila.cod_articulo)}</td>`;
             rowPlan += `<td class="col-label label-plan">Plan</td>`;
-
             let totalPlan = 0, totalProd = 0;
             const cellsPlan = [];
             const cellsProd = [];
@@ -700,7 +645,6 @@ function renderDetalle(horas, filas, fecha, turno, scope) {
             rowPlan += renderCell(totalPlan || null, totalPct, 'cell-total');
             rowPlan += '</tr>';
 
-            // Fila PROD
             let rowProd = '<tr class="row-prod">';
             rowProd += `<td class="col-label label-prod">Prod</td>`;
             rowProd += cellsProd.join('');
@@ -711,13 +655,26 @@ function renderDetalle(horas, filas, fecha, turno, scope) {
         });
     });
 
-    cont.innerHTML = `
-        <div class="grid-scroll">
+    return `
+        <div class="grid-scroll" style="margin-bottom:16px">
             <table class="grid-table">
                 <thead>${thead}</thead>
                 <tbody>${tbody}</tbody>
             </table>
         </div>`;
+}
+
+// Enumera todas las combinaciones (fecha YYYY-MM-DD, turno) dentro de un rango.
+function _enumeraDetalleCombos(fechaDesde, fechaHasta, turnos) {
+    const combos = [];
+    const d  = new Date(fechaDesde + 'T00:00:00');
+    const fh = new Date(fechaHasta + 'T00:00:00');
+    while (d <= fh) {
+        const dStr = _paFmtDate(d);
+        turnos.forEach(t => combos.push({ fecha: dStr, turno: t }));
+        d.setDate(d.getDate() + 1);
+    }
+    return combos;
 }
 
 async function cargarDetalle() {
@@ -731,37 +688,69 @@ async function cargarDetalle() {
     else scope = 'GLOBAL';
     if (m5info) m5info.textContent = scope;
 
-    // Modo grid horario: requiere un día único y un solo turno activo.
-    // El drill-down de evolución impone día único aunque el rango sea mayor.
-    const dia = _selFecha || (f.fecha_desde === f.fecha_hasta ? f.fecha_desde : null);
-    const turno = (f.turnos.length === 1) ? f.turnos[0] : null;
-    const modoHorario = !!(dia && turno);
+    // Si hay drill-down de fecha en evolución, fuerza día único.
+    const fechaDesde = _selFecha || f.fecha_desde;
+    const fechaHasta = _selFecha || f.fecha_hasta;
+
+    const combos = _enumeraDetalleCombos(fechaDesde, fechaHasta, f.turnos);
+
+    // Cap razonable para evitar disparar 100+ fetches con "Mes ant." × 3 turnos.
+    const MAX_COMBOS = 21;   // p.ej. 7 días × 3 turnos
+    let aviso = '';
+    let listaCombos = combos;
+    if (combos.length > MAX_COMBOS) {
+        aviso = `<div class="pa-detalle-empty" style="color:#b45309">El rango × turnos seleccionado genera ${combos.length} grids horarios. Mostrando los ${MAX_COMBOS} primeros (orden cronológico). Reduce el rango o el número de turnos para verlos todos.</div>`;
+        listaCombos = combos.slice(0, MAX_COMBOS);
+    }
+
+    if (!listaCombos.length) {
+        cont.innerHTML = '<div class="pa-detalle-empty">Selecciona al menos un turno y un rango válido.</div>';
+        return;
+    }
+
+    cont.innerHTML = aviso + '<div class="pa-detalle-empty">Cargando desglose horario…</div>';
 
     try {
-        if (modoHorario) {
-            const data = await apiFetch('grid.php', { fecha: dia, turno });
-            const seccionByMaq = {};
-            _maquinasRows.forEach(r => {
-                if (r.seccion) seccionByMaq[r.maquina] = String(r.seccion).toUpperCase();
-            });
-            const filas = (data.filas || []).filter(fila => {
-                if (_selMaquina && fila.maquina !== _selMaquina) return false;
-                if (_selSeccion && (seccionByMaq[fila.maquina] || '') !== _selSeccion) return false;
-                return true;
-            });
-            renderDetalle(data.horas || [], filas, data.fecha, data.turno, scope);
+        const results = await Promise.all(
+            listaCombos.map(c =>
+                apiFetch('grid.php', { fecha: c.fecha, turno: c.turno })
+                    .then(d => ({ combo: c, data: d }))
+                    .catch(e => ({ combo: c, error: e }))
+            )
+        );
+
+        // Filtros cliente: sección (vía _maquinasRows) y máquina (match exacto).
+        const seccionByMaq = {};
+        _maquinasRows.forEach(r => {
+            if (r.seccion) seccionByMaq[r.maquina] = String(r.seccion).toUpperCase();
+        });
+        const filtrarFilas = filas => filas.filter(fila => {
+            if (_selMaquina && fila.maquina !== _selMaquina) return false;
+            if (_selSeccion && (seccionByMaq[fila.maquina] || '') !== _selSeccion) return false;
+            return true;
+        });
+
+        const secciones = [];
+        results.forEach(({ combo, data, error }) => {
+            if (error || !data) return;
+            const filas = filtrarFilas(data.filas || []);
+            // Salta turnos sin filas (típicamente fines de semana sin plan)
+            if (!filas.length) return;
+            secciones.push(_buildDetalleHorarioHTML(
+                data.horas || [],
+                filas,
+                data.fecha || combo.fecha,
+                data.turno || combo.turno
+            ));
+        });
+
+        if (!secciones.length) {
+            cont.innerHTML = aviso + '<div class="pa-detalle-empty">Sin datos para ' + escapeHTML(scope) + ' en el periodo seleccionado.</div>';
         } else {
-            // Modo agregado: rango o multi-turno. Pedimos al endpoint que
-            // ya sabe responder con o sin máquina/sección.
-            const p = paApiParams();
-            const params = { ...p };
-            if (_selMaquina) params.maquina = _selMaquina;
-            else if (_selSeccion) params.seccion = _selSeccion;
-            const data = await apiFetch('por_articulo_maquina.php', params);
-            renderDetalleAgregado(data.rows || [], data.totales || {}, scope);
+            cont.innerHTML = aviso + secciones.join('');
         }
     } catch (e) {
-        if (cont) cont.innerHTML = '<div class="pa-detalle-empty">Sin detalle disponible: ' + escapeHTML(e.message || '') + '</div>';
+        cont.innerHTML = '<div class="pa-detalle-empty">Sin detalle disponible: ' + escapeHTML(e.message || '') + '</div>';
     }
 }
 
