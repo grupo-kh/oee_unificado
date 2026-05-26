@@ -27,9 +27,7 @@ try {
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaHasta)) jsonError('fecha_hasta inválida');
 
     ini_set('memory_limit', '2G');
-    $turnosAgg = $turno && in_array($turno, ['M','T','N','C'], true)
-        ? [$turno]
-        : ['M','T','N'];
+    $turnosAgg = parseTurnos();
 
     $rows = PlanAttainmentAgg::rangeByMaquina($fechaDesde, $fechaHasta, $turnosAgg);
 

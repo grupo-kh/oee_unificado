@@ -336,25 +336,26 @@ function onFechaClick(fecha) {
 }
 
 function refreshActiveFilterBar() {
-    const bar   = $('#pa-active-filter');
     const chips = $('#pa-active-filter-chips');
+    const clearBtn = $('#pa-clear-filter');
     const m2Info = $('#m2-info');
     const m1Title = $('#m1-title');
-    if (!bar) return;
+    if (!chips) return;
+
+    const chip = (kind, label, data) =>
+        `<span class="pa-active-filter-chip">${kind} · ${escapeHTML(label)}<button type="button" class="pa-chip-x" data-clear="${data}" aria-label="Quitar filtro">×</button></span>`;
 
     const partes = [];
-    if (_selSeccion) partes.push(`<span class="pa-active-filter-chip">SECCIÓN · ${_selSeccion}</span>`);
+    if (_selSeccion) partes.push(chip('SECCIÓN', _selSeccion, 'seccion'));
     if (_selFecha) {
         const [y, m, d] = _selFecha.split('-');
-        partes.push(`<span class="pa-active-filter-chip">FECHA · ${d}/${m}/${y}</span>`);
+        partes.push(chip('FECHA', `${d}/${m}/${y}`, 'fecha'));
     }
-    if (_selMaquina) partes.push(`<span class="pa-active-filter-chip">MÁQUINA · ${_selMaquina}</span>`);
-    if (partes.length) {
-        chips.innerHTML = partes.join('');
-        bar.style.display = '';
-    } else {
-        bar.style.display = 'none';
-    }
+    if (_selMaquina) partes.push(chip('MÁQUINA', _selMaquina, 'maquina'));
+
+    chips.innerHTML = partes.join('');
+    if (clearBtn) clearBtn.style.display = partes.length ? '' : 'none';
+
     // Reflejar selección en cabeceras
     if (m1Title) {
         const txtBase = 'Plan Attainment Global';
@@ -366,6 +367,14 @@ function refreshActiveFilterBar() {
     }
 }
 
+function onChipClear(kind) {
+    if (kind === 'seccion') _selSeccion = '';
+    else if (kind === 'fecha') _selFecha = '';
+    else if (kind === 'maquina') _selMaquina = '';
+    refreshActiveFilterBar();
+    cargarTodo();
+}
+
 function onClearFilter() {
     _selSeccion = '';
     _selFecha   = '';
@@ -374,20 +383,95 @@ function onClearFilter() {
     cargarTodo();
 }
 
-// ───── Loaders ───────────────────────────────────────────────────────
-function efectivaFiltroFechas(f) {
-    // Si hay fecha clicada en evolución, la usamos como fecha del día.
-    // Si no, se respeta la fecha seleccionada en el header.
-    const fechaDia = _selFecha || f.fecha;
-    return { fechaDia, turno: f.turno };
+// ───── Filtros propios de plan_attainment (rango fechas + multi-turno) ─
+const PA_FILTROS_KEY = 'pa_filtros_v2';
+
+function paSavedFiltros() {
+    try {
+        const raw = localStorage.getItem(PA_FILTROS_KEY);
+        if (!raw) return null;
+        const o = JSON.parse(raw);
+        if (typeof o !== 'object' || !o) return null;
+        return o;
+    } catch { return null; }
 }
 
-async function cargarGauge() {
-    const f = getFiltrosActuales();
-    const { fechaDia, turno } = efectivaFiltroFechas(f);
-    const data = await apiFetch('plan_attainment.php', {
-        fecha: fechaDia, turno, seccion: _selSeccion
+function paPersist(f) {
+    try { localStorage.setItem(PA_FILTROS_KEY, JSON.stringify(f)); } catch {}
+}
+
+function getPaFiltros() {
+    const desde = $('#pa-f-desde')?.value || '';
+    const hasta = $('#pa-f-hasta')?.value || desde;
+    const turnos = Array.from(document.querySelectorAll('.pa-turno-btn.active'))
+        .map(b => b.dataset.turno)
+        .filter(t => ['M','T','N','C'].includes(t));
+    return { fecha_desde: desde, fecha_hasta: hasta || desde, turnos };
+}
+
+function paApiParams() {
+    const f = getPaFiltros();
+    // Si el usuario clicó una fecha en evolución, ese drill-down se impone
+    // como día único sobre el rango.
+    const desde = _selFecha || f.fecha_desde;
+    const hasta = _selFecha || f.fecha_hasta;
+    return {
+        fecha_desde: desde,
+        fecha_hasta: hasta,
+        turnos:      f.turnos.join(','),
+    };
+}
+
+function initPaFiltros(onChange) {
+    const ayer = new Date();
+    ayer.setDate(ayer.getDate() - 1);
+    const fmt = d => d.toISOString().slice(0, 10);
+    const ayerStr = fmt(ayer);
+
+    const saved = paSavedFiltros();
+    const desde = saved?.fecha_desde || ayerStr;
+    const hasta = saved?.fecha_hasta || desde;
+    const turnos = Array.isArray(saved?.turnos) && saved.turnos.length
+        ? saved.turnos.filter(t => ['M','T','N','C'].includes(t))
+        : ['M','T','N'];
+
+    const fDesde = $('#pa-f-desde');
+    const fHasta = $('#pa-f-hasta');
+    if (fDesde) fDesde.value = desde;
+    if (fHasta) fHasta.value = hasta;
+    document.querySelectorAll('.pa-turno-btn').forEach(b => {
+        if (turnos.includes(b.dataset.turno)) b.classList.add('active');
+        else b.classList.remove('active');
     });
+
+    const onAnyChange = () => {
+        const f = getPaFiltros();
+        // Coerción mínima de fechas: si hasta < desde, igualar hasta = desde
+        if (f.fecha_hasta && f.fecha_desde && f.fecha_hasta < f.fecha_desde) {
+            if (fHasta) fHasta.value = f.fecha_desde;
+        }
+        paPersist(getPaFiltros());
+        if (onChange) onChange(getPaFiltros());
+    };
+
+    if (fDesde) fDesde.addEventListener('change', onAnyChange);
+    if (fHasta) fHasta.addEventListener('change', onAnyChange);
+    document.querySelectorAll('.pa-turno-btn').forEach(b => {
+        b.addEventListener('click', () => {
+            const others = Array.from(document.querySelectorAll('.pa-turno-btn.active'));
+            // No permitir dejar 0 turnos activos
+            if (b.classList.contains('active') && others.length <= 1) return;
+            b.classList.toggle('active');
+            onAnyChange();
+        });
+    });
+}
+
+// ───── Loaders ───────────────────────────────────────────────────────
+
+async function cargarGauge() {
+    const p = paApiParams();
+    const data = await apiFetch('plan_attainment.php', { ...p, seccion: _selSeccion });
     _gaugeMeta = data.meta || null;
     renderGauge(data.plan_attainment);
     $('#m-disp').textContent = data.disponibilidad.toFixed(1) + '%';
@@ -397,34 +481,29 @@ async function cargarGauge() {
 }
 
 async function cargarSeccion() {
-    const f = getFiltrosActuales();
-    const { fechaDia, turno } = efectivaFiltroFechas(f);
+    const p = paApiParams();
     // Importante: NO mandamos seccion aquí, queremos seguir viendo las 2 barras
     // (con la seleccionada destacada) para poder cambiar/quitar el filtro.
-    const data = await apiFetch('por_seccion.php', { fecha: fechaDia, turno });
+    const data = await apiFetch('por_seccion.php', p);
     renderSeccion(data.rows || []);
 }
 
 async function cargarEvolucion() {
-    const f = getFiltrosActuales();
-    // La evolución mantiene siempre los últimos 7 días desde la fecha_hasta
-    // del header (no la fecha clicada — eso es solo para el día puntual).
-    const dHasta = new Date(f.fecha_hasta);
-    const dDesde = new Date(dHasta);
-    dDesde.setDate(dDesde.getDate() - 6);
+    // Evolución usa SIEMPRE el rango configurado en la cabecera
+    // (ignora el drill-down _selFecha, que solo aplica a los módulos diarios).
+    const f = getPaFiltros();
     const data = await apiFetch('evolucion.php', {
-        fecha_desde: formatFecha(dDesde),
-        fecha_hasta: formatFecha(dHasta),
-        turno:       f.turno,
+        fecha_desde: f.fecha_desde,
+        fecha_hasta: f.fecha_hasta,
+        turnos:      f.turnos.join(','),
         seccion:     _selSeccion,
     });
     renderEvolucion(data.rows || []);
 }
 
 async function cargarMaquinas() {
-    const f = getFiltrosActuales();
-    const { fechaDia, turno } = efectivaFiltroFechas(f);
-    const data = await apiFetch('por_maquina.php', { fecha: fechaDia, turno });
+    const p = paApiParams();
+    const data = await apiFetch('por_maquina.php', p);
     let rows = data.rows || [];
     // Filtrado por sección (cliente — la API devuelve seccion en cada fila)
     if (_selSeccion) {
@@ -549,12 +628,19 @@ function renderDetalle(horas, filas, fecha, turno, scope) {
 async function cargarDetalle() {
     const cont = $('#detalle-articulos');
     const m5info = $('#m5-info');
-    const f = getFiltrosActuales();
-    const { fechaDia, turno } = efectivaFiltroFechas(f);
+    const f = getPaFiltros();
 
-    // Sin turno explícito (M/T/N/C) no podemos pedir el grid horario.
-    if (!turno || !['M','T','N','C'].includes(turno)) {
-        if (cont) cont.innerHTML = '<div class="pa-detalle-empty">Selecciona un turno (Mañana / Tarde / Noche / Central) en la cabecera para ver el desglose horario.</div>';
+    // El grid horario (grid.php) es por día y turno único: si el header
+    // tiene rango o multi-turno, exigimos un punto concreto (vía drill-down
+    // de evolución y un único turno activo).
+    const dia = _selFecha || (f.fecha_desde === f.fecha_hasta ? f.fecha_desde : null);
+    const turno = (f.turnos.length === 1) ? f.turnos[0] : null;
+
+    if (!dia || !turno) {
+        const motivos = [];
+        if (!dia)  motivos.push('una sola fecha (rango de un único día o un punto de la evolución)');
+        if (!turno) motivos.push('un solo turno (M / T / N / C)');
+        if (cont) cont.innerHTML = '<div class="pa-detalle-empty">Para ver el desglose horario plan vs producido selecciona ' + motivos.join(' y ') + '.</div>';
         if (m5info) m5info.textContent = '—';
         return;
     }
@@ -565,7 +651,7 @@ async function cargarDetalle() {
     else scope = 'GLOBAL';
 
     try {
-        const data = await apiFetch('grid.php', { fecha: fechaDia, turno });
+        const data = await apiFetch('grid.php', { fecha: dia, turno });
         // Filtros cliente: sección (vía _maquinasRows) y máquina.
         const seccionByMaq = {};
         _maquinasRows.forEach(r => {
@@ -601,9 +687,9 @@ async function cargarTodo() {
 
 // ───── Init ──────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    initFiltros(() => {
-        // Al cambiar fecha/turno del header se limpian TODOS los drill-downs.
-        // El cross-filter es opcional desde ese estado base.
+    initPaFiltros(() => {
+        // Al cambiar rango/turnos de la cabecera propia se limpian TODOS los
+        // drill-downs. El cross-filter es opcional desde ese estado base.
         _selSeccion = '';
         _selFecha   = '';
         _selMaquina = '';
@@ -612,6 +698,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     attachInfoIcon('#info-icon', () => _gaugeMeta);
     $('#pa-clear-filter')?.addEventListener('click', onClearFilter);
+    // Delegación: cualquier ✕ dentro de chips
+    $('#pa-active-filter-chips')?.addEventListener('click', (e) => {
+        const btn = e.target.closest('.pa-chip-x');
+        if (!btn) return;
+        onChipClear(btn.dataset.clear);
+    });
     refreshActiveFilterBar();
     cargarTodo();
 });

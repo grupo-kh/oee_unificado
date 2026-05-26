@@ -38,9 +38,7 @@ try {
     }
 
     ini_set('memory_limit', '2G');
-    $turnosAgg = $turno && in_array($turno, ['M','T','N','C'], true)
-        ? [$turno]
-        : ['M','T','N'];
+    $turnosAgg = parseTurnos();
 
     if ($maquina !== '') {
         $rows = PlanAttainmentAgg::rangeByMaquinaArticulo($fechaDesde, $fechaHasta, $turnosAgg, $maquina);

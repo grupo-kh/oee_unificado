@@ -27,29 +27,74 @@ try {
         $fechaHasta = getParam('fecha_hasta', date('Y-m-d', strtotime('-1 day')));
     }
     $turno = getParam('turno');
+    // Filtro opcional por sección (VARILLAS / TROQUELADOS) — usado por el
+    // panel unificado de plan_attainment.php cuando el usuario clica una barra
+    // del gráfico "Por Sección".
+    $seccion = strtoupper((string)getParam('seccion', ''));
+    if ($seccion !== '' && !in_array($seccion, ['VARILLAS','TROQUELADOS'], true)) {
+        $seccion = '';
+    }
 
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaDesde)) jsonError('fecha_desde inválida');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaHasta)) jsonError('fecha_hasta inválida');
 
     // ========= Plan Attainment real (prod_ok / plan) =========
     ini_set('memory_limit', '2G');
-    $turnosAgg = $turno && in_array($turno, ['M','T','N','C'], true)
-        ? [$turno]
-        : ['M','T','N'];          // TODOS = M+T+N (QW no tenía CENTRAL)
-    $agg = PlanAttainmentAgg::rangeTotals($fechaDesde, $fechaHasta, $turnosAgg);
-    // Plan Attainment estricto: sum(min(prod, plan) por artículo) / sum(plan)
-    // — la extraproducción no compensa artículos no cumplidos.
-    $planAttainment = $agg['attain_pct'];
+    $turnosAgg = parseTurnos();          // turnos=M,T,N | turno=M | default M+T+N
+
+    if ($seccion === '') {
+        // Sin filtro de sección: totales globales (comportamiento original)
+        $agg = PlanAttainmentAgg::rangeTotals($fechaDesde, $fechaHasta, $turnosAgg);
+        $planAttainment = $agg['attain_pct'];
+    } else {
+        // Con filtro: derivamos los totales del desglose por sección
+        $bySec = PlanAttainmentAgg::rangeBySeccion($fechaDesde, $fechaHasta, $turnosAgg);
+        $row = null;
+        foreach ($bySec as $r) {
+            if (strtoupper((string)($r['seccion'] ?? '')) === $seccion) { $row = $r; break; }
+        }
+        $planTot = $row ? (float)$row['plan_total'] : 0.0;
+        $prodTot = $row ? (float)$row['prod_total'] : 0.0;
+        $attTot  = $row ? (float)$row['attain']     : 0.0;
+        $agg = [
+            'plan'       => $planTot,
+            'prod'       => $prodTot,
+            'attain'     => $attTot,
+            'attain_pct' => $planTot > 0 ? ($attTot / $planTot) : 0,
+        ];
+        $planAttainment = $agg['attain_pct'];
+    }
 
     // ========= Métricas OEE (sin cambios) =========
     $where  = ["CAST(TimePeriod AS DATE) BETWEEN ? AND ?"];
     $params = [$fechaDesde, $fechaHasta];
 
-    if ($turno && in_array($turno, ['M', 'T', 'N'])) {
-        $where[] = "Cod_turno = ?";
-        $params[] = $turno;
+    // Multi-turno: si turnosAgg es un subconjunto estricto de {M,T,N}, filtramos por IN.
+    // Si es todos los productivos (M+T+N), no añadimos filtro (equivale a todos).
+    $turnosOEE = array_values(array_intersect($turnosAgg, ['M','T','N']));
+    if (count($turnosOEE) > 0 && count($turnosOEE) < 3) {
+        $placeholders = implode(',', array_fill(0, count($turnosOEE), '?'));
+        $where[] = "Cod_turno IN ($placeholders)";
+        $params = array_merge($params, $turnosOEE);
     }
     $where[] = "WorkGroup NOT IN ('Improductivos','AUX000','SOLD5','AUXI1','SOLD4')";
+    // Si hay filtro de sección, limitamos también las métricas OEE a las
+    // máquinas (WorkGroup) que pertenezcan a esa sección, para que las 4
+    // tarjetas Disp/Rend/Cal/OEE queden coherentes con el gauge.
+    if ($seccion !== '') {
+        $maquinasSec = [];
+        foreach (PlanAttainmentAgg::MAQUINA_TO_SECCION as $maq => $sec) {
+            if ($sec === $seccion) $maquinasSec[] = $maq;
+        }
+        if (count($maquinasSec) > 0) {
+            $placeholders = implode(',', array_fill(0, count($maquinasSec), '?'));
+            $where[] = "WorkGroup IN ($placeholders)";
+            $params  = array_merge($params, $maquinasSec);
+        } else {
+            // Sección sin máquinas: forzamos no resultados
+            $where[] = "1 = 0";
+        }
+    }
     $whereSQL = implode(' AND ', $where);
 
     // F_his_ct alinea TimePeriod a la fecha de inicio de la ventana (param 16).

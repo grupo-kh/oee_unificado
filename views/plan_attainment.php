@@ -1,16 +1,35 @@
 <?php
 $pageTitle = 'Plan Attainment';
+$hideFiltros = true;   // usamos cabecera propia (rango + multi-turno) en esta vista
 include __DIR__ . '/../includes/header.php';
 ?>
 
-<main class="view-main pa-stack">
-
-    <!-- Barra de selección activa (sección/fecha al hacer drill-down) -->
-    <div class="pa-active-filter" id="pa-active-filter" style="display:none">
-        <span class="pa-active-filter-label">Filtro activo:</span>
-        <span class="pa-active-filter-chips" id="pa-active-filter-chips"></span>
-        <button type="button" id="pa-clear-filter" class="pa-clear-filter-btn">Limpiar</button>
+<!-- ════════════════════════════════════════════════════════════════
+     CABECERA PROPIA (sticky): rango fechas + multi-turno + drill-downs
+     ════════════════════════════════════════════════════════════════ -->
+<div class="pa-filterbar" id="pa-filterbar">
+    <div class="pa-filterbar-row">
+        <div class="pa-filterbar-group">
+            <label for="pa-f-desde">Desde</label>
+            <input type="date" id="pa-f-desde" class="filter-field filter-green">
+            <label for="pa-f-hasta">Hasta</label>
+            <input type="date" id="pa-f-hasta" class="filter-field filter-green">
+        </div>
+        <div class="pa-filterbar-group">
+            <span class="pa-filterbar-label">Turnos</span>
+            <button type="button" class="pa-turno-btn" data-turno="M" title="Mañana (06:00–14:15)">M</button>
+            <button type="button" class="pa-turno-btn" data-turno="T" title="Tarde (14:15–22:30)">T</button>
+            <button type="button" class="pa-turno-btn" data-turno="N" title="Noche (22:30–06:00)">N</button>
+            <button type="button" class="pa-turno-btn" data-turno="C" title="Central (08:00–17:00)">C</button>
+        </div>
+        <div class="pa-filterbar-group pa-filterbar-chips-group">
+            <span class="pa-active-filter-chips" id="pa-active-filter-chips"></span>
+            <button type="button" id="pa-clear-filter" class="pa-clear-filter-btn" style="display:none">Limpiar drill-downs</button>
+        </div>
     </div>
+</div>
+
+<main class="view-main pa-stack">
 
     <!-- ════════════════════════════════════════════════════════════════
          MÓDULO 1 · GAUGE GLOBAL (+ leyenda a la derecha)

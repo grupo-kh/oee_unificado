@@ -36,3 +36,25 @@ function getListParam(string $name): array {
         : array_filter(array_map('trim', explode(',', (string)$raw)));
     return array_values(array_unique(array_filter($list, fn($v) => $v !== '')));
 }
+
+/**
+ * Resuelve la lista de turnos a aplicar en un endpoint.
+ * Acepta:
+ *   - turnos=M,T,N  (CSV, preferido)
+ *   - turnos[]=M&turnos[]=T  (array)
+ *   - turno=M  (compat hacia atrás, único valor)
+ * Si no se pasa nada, devuelve $defaultIfEmpty.
+ * Sanitiza contra $allowed (por defecto M/T/N/C).
+ */
+function parseTurnos(array $allowed = ['M','T','N','C'], array $defaultIfEmpty = ['M','T','N']): array {
+    $list = getListParam('turnos');
+    if (!$list) {
+        $single = getParam('turno');
+        if ($single) $list = [$single];
+    }
+    $list = array_values(array_unique(array_filter(
+        array_map(fn($t) => strtoupper((string)$t), $list),
+        fn($t) => in_array($t, $allowed, true)
+    )));
+    return $list ?: $defaultIfEmpty;
+}

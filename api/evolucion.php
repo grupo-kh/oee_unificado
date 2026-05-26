@@ -8,27 +8,47 @@ try {
     $fechaDesde = getParam('fecha_desde', date('Y-m-d', strtotime('-6 days')));
     $fechaHasta = getParam('fecha_hasta', date('Y-m-d'));
     $turno      = getParam('turno');
+    $seccion    = strtoupper((string)getParam('seccion', ''));
+    if ($seccion !== '' && !in_array($seccion, ['VARILLAS','TROQUELADOS'], true)) {
+        $seccion = '';
+    }
 
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaDesde)) jsonError('fecha_desde inválida');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaHasta)) jsonError('fecha_hasta inválida');
 
-    $turnos = ($turno && in_array($turno, ['M','T','N']))
-        ? [$turno]
-        : ['M','T','N'];
+    $turnos = parseTurnos();
 
     $rows = [];
     $d = new DateTime($fechaDesde);
     $dHasta = new DateTime($fechaHasta);
     while ($d <= $dHasta) {
         $ymd = $d->format('Y-m-d');
-        $r = PlanAttainmentAgg::rangeTotals($ymd, $ymd, $turnos);
-        $plan = (float)($r['plan'] ?? 0);
+        if ($seccion === '') {
+            $r = PlanAttainmentAgg::rangeTotals($ymd, $ymd, $turnos);
+            $plan = (float)($r['plan'] ?? 0);
+            $pa   = (float)($r['attain_pct'] ?? 0);
+            $prod = (float)($r['prod'] ?? 0);
+        } else {
+            // Filtrado por sección: extraemos la fila correspondiente del
+            // desglose por sección de ese día/turno.
+            $bySec = PlanAttainmentAgg::rangeBySeccion($ymd, $ymd, $turnos);
+            $plan = 0.0; $prod = 0.0; $att = 0.0;
+            foreach ($bySec as $rrow) {
+                if (strtoupper((string)($rrow['seccion'] ?? '')) === $seccion) {
+                    $plan = (float)$rrow['plan_total'];
+                    $prod = (float)$rrow['prod_total'];
+                    $att  = (float)$rrow['attain'];
+                    break;
+                }
+            }
+            $pa = $plan > 0 ? ($att / $plan) : 0;
+        }
         if ($plan > 0) {
             $rows[] = [
                 'fecha'           => $ymd,
-                'plan_attainment' => round(((float)($r['attain_pct'] ?? 0)) * 100, 2),
+                'plan_attainment' => round($pa * 100, 2),
                 'plan'            => $plan,
-                'producido'       => (float)($r['prod'] ?? 0),
+                'producido'       => $prod,
             ];
         }
         $d->modify('+1 day');
