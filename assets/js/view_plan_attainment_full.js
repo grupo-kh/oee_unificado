@@ -435,9 +435,91 @@ async function cargarMaquinas() {
     if (info) info.textContent = _selSeccion ? `Filtrado · ${_selSeccion}` : 'VARILLAS + TROQUELADOS';
 }
 
+// ───── Helper: escape HTML (si common.js no lo provee) ───────────────
+// (Si common.js ya define escapeHTML, este bloque puede eliminarse.)
+function escapeHTML(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 function ocultarDetalle() {
     const m5 = document.getElementById('pa-module-5');
     if (m5) m5.style.display = 'none';
+}
+
+function renderDetalle(rows, totales, maquina) {
+    const cont = $('#detalle-articulos');
+    if (!rows || !rows.length) {
+        cont.innerHTML = '<div class="pa-detalle-empty">Sin datos para ' + escapeHTML(maquina || '') + ' en este turno.</div>';
+        return;
+    }
+    const fila = r => {
+        const pa = parseFloat(r.plan_attainment);
+        const color = semColor(pa);
+        const pct = Math.min(100, Math.max(0, pa));
+        return `
+            <tr>
+                <td>${escapeHTML(r.cod_articulo)}</td>
+                <td class="num">${Number(r.plan).toLocaleString('es-ES')}</td>
+                <td class="num">${Number(r.prod).toLocaleString('es-ES')}</td>
+                <td class="num">${Number(r.attain).toLocaleString('es-ES')}</td>
+                <td>
+                    <span class="pa-bar"><span class="pa-bar-fill" style="width:${pct}%;background:${color}"></span></span>
+                    ${pa.toFixed(1)}%
+                </td>
+            </tr>`;
+    };
+    const tot = totales || {};
+    const totPa = parseFloat(tot.plan_attainment || 0);
+    cont.innerHTML = `
+        <table class="pa-detalle-table">
+            <thead>
+                <tr>
+                    <th>Artículo</th>
+                    <th style="text-align:right">Plan</th>
+                    <th style="text-align:right">Producido</th>
+                    <th style="text-align:right">Attain</th>
+                    <th>% Plan Attainment</th>
+                </tr>
+            </thead>
+            <tbody>${rows.map(fila).join('')}</tbody>
+            <tfoot>
+                <tr>
+                    <td>TOTAL · ${escapeHTML(maquina || '')}</td>
+                    <td class="num">${Number(tot.plan || 0).toLocaleString('es-ES')}</td>
+                    <td class="num">${Number(tot.prod || 0).toLocaleString('es-ES')}</td>
+                    <td class="num">${Number(tot.attain || 0).toLocaleString('es-ES')}</td>
+                    <td>${totPa.toFixed(2)}%</td>
+                </tr>
+            </tfoot>
+        </table>
+    `;
+}
+
+async function cargarDetalle() {
+    if (!_selMaquina) {
+        ocultarDetalle();
+        return;
+    }
+    const f = getFiltrosActuales();
+    const { fechaDia, turno } = efectivaFiltroFechas(f);
+    try {
+        const data = await apiFetch('por_articulo_maquina.php', {
+            fecha: fechaDia, turno, maquina: _selMaquina
+        });
+        renderDetalle(data.rows || [], data.totales || {}, _selMaquina);
+        const m5 = document.getElementById('pa-module-5');
+        const m5info = $('#m5-info');
+        if (m5info) m5info.textContent = _selMaquina;
+        if (m5) {
+            m5.style.display = '';
+            m5.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    } catch (e) {
+        const cont = $('#detalle-articulos');
+        if (cont) cont.innerHTML = '<div class="pa-detalle-empty">Sin detalle disponible: ' + escapeHTML(e.message || '') + '</div>';
+        const m5 = document.getElementById('pa-module-5');
+        if (m5) m5.style.display = '';
+    }
 }
 
 async function cargarTodo() {
