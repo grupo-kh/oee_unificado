@@ -577,6 +577,56 @@ function escapeHTML(s) {
 // ───── Render detalle horario (grid Plan/Prod estilo grid.php) ──────
 const _TURNO_LABEL_DET = { M: 'MAÑANA', T: 'TARDE', N: 'NOCHE', C: 'CENTRAL' };
 
+// Tabla agregada por artículo (cuando hay rango o multi-turno y no podemos
+// usar el grid horario por hora).
+function renderDetalleAgregado(rows, totales, scope) {
+    const cont = $('#detalle-articulos');
+    if (!rows || !rows.length) {
+        cont.innerHTML = '<div class="pa-detalle-empty">Sin datos para ' + escapeHTML(scope || '') + ' en el periodo seleccionado.</div>';
+        return;
+    }
+    const fila = r => {
+        const pa = parseFloat(r.plan_attainment);
+        const color = semColor(pa);
+        const pct = Math.min(100, Math.max(0, pa));
+        return `
+            <tr>
+                <td>${escapeHTML(r.cod_articulo)}</td>
+                <td class="num">${Number(r.plan).toLocaleString('es-ES')}</td>
+                <td class="num">${Number(r.prod).toLocaleString('es-ES')}</td>
+                <td class="num">${Number(r.attain).toLocaleString('es-ES')}</td>
+                <td>
+                    <span class="pa-bar"><span class="pa-bar-fill" style="width:${pct}%;background:${color}"></span></span>
+                    ${pa.toFixed(1)}%
+                </td>
+            </tr>`;
+    };
+    const tot = totales || {};
+    const totPa = parseFloat(tot.plan_attainment || 0);
+    cont.innerHTML = `
+        <table class="pa-detalle-table">
+            <thead>
+                <tr>
+                    <th>Artículo</th>
+                    <th style="text-align:right">Plan</th>
+                    <th style="text-align:right">Producido</th>
+                    <th style="text-align:right">Attain</th>
+                    <th>% Plan Attainment</th>
+                </tr>
+            </thead>
+            <tbody>${rows.map(fila).join('')}</tbody>
+            <tfoot>
+                <tr>
+                    <td>TOTAL · ${escapeHTML(scope || '')}</td>
+                    <td class="num">${Number(tot.plan || 0).toLocaleString('es-ES')}</td>
+                    <td class="num">${Number(tot.prod || 0).toLocaleString('es-ES')}</td>
+                    <td class="num">${Number(tot.attain || 0).toLocaleString('es-ES')}</td>
+                    <td>${totPa.toFixed(2)}%</td>
+                </tr>
+            </tfoot>
+        </table>`;
+}
+
 function renderDetalle(horas, filas, fecha, turno, scope) {
     const cont = $('#detalle-articulos');
     if (!horas || !horas.length || !filas || !filas.length) {
@@ -675,43 +725,43 @@ async function cargarDetalle() {
     const m5info = $('#m5-info');
     const f = getPaFiltros();
 
-    // El grid horario (grid.php) es por día y turno único: si el header
-    // tiene rango o multi-turno, exigimos un punto concreto (vía drill-down
-    // de evolución y un único turno activo).
-    const dia = _selFecha || (f.fecha_desde === f.fecha_hasta ? f.fecha_desde : null);
-    const turno = (f.turnos.length === 1) ? f.turnos[0] : null;
-
-    if (!dia || !turno) {
-        const motivos = [];
-        if (!dia)  motivos.push('una sola fecha (rango de un único día o un punto de la evolución)');
-        if (!turno) motivos.push('un solo turno (M / T / N / C)');
-        if (cont) cont.innerHTML = '<div class="pa-detalle-empty">Para ver el desglose horario plan vs producido selecciona ' + motivos.join(' y ') + '.</div>';
-        if (m5info) m5info.textContent = '—';
-        return;
-    }
-
     let scope;
     if (_selMaquina) scope = _selMaquina;
     else if (_selSeccion) scope = _selSeccion;
     else scope = 'GLOBAL';
+    if (m5info) m5info.textContent = scope;
+
+    // Modo grid horario: requiere un día único y un solo turno activo.
+    // El drill-down de evolución impone día único aunque el rango sea mayor.
+    const dia = _selFecha || (f.fecha_desde === f.fecha_hasta ? f.fecha_desde : null);
+    const turno = (f.turnos.length === 1) ? f.turnos[0] : null;
+    const modoHorario = !!(dia && turno);
 
     try {
-        const data = await apiFetch('grid.php', { fecha: dia, turno });
-        // Filtros cliente: sección (vía _maquinasRows) y máquina.
-        const seccionByMaq = {};
-        _maquinasRows.forEach(r => {
-            if (r.seccion) seccionByMaq[r.maquina] = String(r.seccion).toUpperCase();
-        });
-        const filas = (data.filas || []).filter(fila => {
-            if (_selMaquina && fila.maquina !== _selMaquina) return false;
-            if (_selSeccion && (seccionByMaq[fila.maquina] || '') !== _selSeccion) return false;
-            return true;
-        });
-        renderDetalle(data.horas || [], filas, data.fecha, data.turno, scope);
-        if (m5info) m5info.textContent = scope;
+        if (modoHorario) {
+            const data = await apiFetch('grid.php', { fecha: dia, turno });
+            const seccionByMaq = {};
+            _maquinasRows.forEach(r => {
+                if (r.seccion) seccionByMaq[r.maquina] = String(r.seccion).toUpperCase();
+            });
+            const filas = (data.filas || []).filter(fila => {
+                if (_selMaquina && fila.maquina !== _selMaquina) return false;
+                if (_selSeccion && (seccionByMaq[fila.maquina] || '') !== _selSeccion) return false;
+                return true;
+            });
+            renderDetalle(data.horas || [], filas, data.fecha, data.turno, scope);
+        } else {
+            // Modo agregado: rango o multi-turno. Pedimos al endpoint que
+            // ya sabe responder con o sin máquina/sección.
+            const p = paApiParams();
+            const params = { ...p };
+            if (_selMaquina) params.maquina = _selMaquina;
+            else if (_selSeccion) params.seccion = _selSeccion;
+            const data = await apiFetch('por_articulo_maquina.php', params);
+            renderDetalleAgregado(data.rows || [], data.totales || {}, scope);
+        }
     } catch (e) {
         if (cont) cont.innerHTML = '<div class="pa-detalle-empty">Sin detalle disponible: ' + escapeHTML(e.message || '') + '</div>';
-        if (m5info) m5info.textContent = scope;
     }
 }
 
