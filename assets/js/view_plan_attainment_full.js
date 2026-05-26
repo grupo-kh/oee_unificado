@@ -423,13 +423,14 @@ async function cargarMaquinas() {
         rows = rows.filter(r => (r.seccion || '').toUpperCase() === _selSeccion);
     }
     _maquinasRows = rows;
-    renderMaquinas(rows);
-    // Auto-descarte: si la máquina seleccionada ya no aparece, limpiar
+    // Auto-descarte ANTES de renderizar: si la máquina seleccionada ya no
+    // aparece, limpiamos para que renderMaquinas no atenúe todas las barras.
     if (_selMaquina && !rows.some(r => r.maquina === _selMaquina)) {
         _selMaquina = '';
         refreshActiveFilterBar();
         ocultarDetalle();
     }
+    renderMaquinas(rows);
     const info = $('#m4-info');
     if (info) info.textContent = _selSeccion ? `Filtrado · ${_selSeccion}` : 'VARILLAS + TROQUELADOS';
 }
