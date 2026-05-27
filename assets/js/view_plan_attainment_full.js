@@ -226,7 +226,9 @@ function onMaquinaClick(maq) {
     // Solo re-renderizamos máquinas (para destacar/atenuar) y detalle.
     // El gauge, sección y evolución no se filtran por máquina.
     renderMaquinas(_maquinasRows);
-    cargarDetalle();
+    // El usuario pidió ver el detalle de esta máquina explícitamente:
+    // forzamos la carga (saltándonos el lazy del módulo 5).
+    cargarDetalleConAbort();
 }
 
 // ───── Render máquinas (horizontal bars) ─────────────────────────────
@@ -479,6 +481,7 @@ function initPaFiltros(onChange) {
         else b.classList.remove('active');
     });
 
+    let _paChangeDebounce = null;
     const onAnyChange = () => {
         const f = getPaFiltros();
         // Coerción mínima de fechas: si hasta < desde, igualar hasta = desde
@@ -486,7 +489,12 @@ function initPaFiltros(onChange) {
             if (fHasta) fHasta.value = f.fecha_desde;
         }
         paPersist(getPaFiltros());
-        if (onChange) onChange(getPaFiltros());
+        // Debounce: si el usuario sigue tocando filtros rápido, esperamos a
+        // que se quieten antes de disparar la cascada de fetches.
+        clearTimeout(_paChangeDebounce);
+        _paChangeDebounce = setTimeout(() => {
+            if (onChange) onChange(getPaFiltros());
+        }, 220);
     };
 
     if (fDesde) fDesde.addEventListener('change', onAnyChange);
@@ -514,9 +522,9 @@ function initPaFiltros(onChange) {
 
 // ───── Loaders ───────────────────────────────────────────────────────
 
-async function cargarGauge() {
+async function cargarGauge(signal) {
     const p = paApiParams();
-    const data = await apiFetch('plan_attainment.php', { ...p, seccion: _selSeccion });
+    const data = await apiFetch('plan_attainment.php', { ...p, seccion: _selSeccion }, signal);
     _gaugeMeta = data.meta || null;
     renderGauge(data.plan_attainment);
     $('#m-disp').textContent = data.disponibilidad.toFixed(1) + '%';
@@ -525,15 +533,15 @@ async function cargarGauge() {
     $('#m-oee').textContent  = data.oee.toFixed(1) + '%';
 }
 
-async function cargarSeccion() {
+async function cargarSeccion(signal) {
     const p = paApiParams();
     // Importante: NO mandamos seccion aquí, queremos seguir viendo las 2 barras
     // (con la seleccionada destacada) para poder cambiar/quitar el filtro.
-    const data = await apiFetch('por_seccion.php', p);
+    const data = await apiFetch('por_seccion.php', p, signal);
     renderSeccion(data.rows || []);
 }
 
-async function cargarEvolucion() {
+async function cargarEvolucion(signal) {
     // Evolución usa SIEMPRE el rango configurado en la cabecera
     // (ignora el drill-down _selFecha, que solo aplica a los módulos diarios).
     const f = getPaFiltros();
@@ -542,13 +550,13 @@ async function cargarEvolucion() {
         fecha_hasta: f.fecha_hasta,
         turnos:      f.turnos.join(','),
         seccion:     _selSeccion,
-    });
+    }, signal);
     renderEvolucion(data.rows || []);
 }
 
-async function cargarMaquinas() {
+async function cargarMaquinas(signal) {
     const p = paApiParams();
-    const data = await apiFetch('por_maquina.php', p);
+    const data = await apiFetch('por_maquina.php', p, signal);
     let rows = data.rows || [];
     // Filtrado por sección (cliente — la API devuelve seccion en cada fila)
     if (_selSeccion) {
@@ -677,10 +685,12 @@ function _enumeraDetalleCombos(fechaDesde, fechaHasta, turnos) {
     return combos;
 }
 
-async function cargarDetalle() {
+async function cargarDetalle(signal) {
     const cont = $('#detalle-articulos');
     const m5info = $('#m5-info');
     const f = getPaFiltros();
+    _paDetalleLoaded = true;
+    _paDetalleNeedsReload = false;
 
     let scope;
     if (_selMaquina) scope = _selMaquina;
@@ -713,7 +723,7 @@ async function cargarDetalle() {
     try {
         const results = await Promise.all(
             listaCombos.map(c =>
-                apiFetch('grid.php', { fecha: c.fecha, turno: c.turno })
+                apiFetch('grid.php', { fecha: c.fecha, turno: c.turno }, signal)
                     .then(d => ({ combo: c, data: d }))
                     .catch(e => ({ combo: c, error: e }))
             )
@@ -754,19 +764,110 @@ async function cargarDetalle() {
     }
 }
 
-async function cargarTodo() {
-    showLoader(true);
-    try {
-        // Paralelo para los 4 módulos superiores
-        await Promise.all([cargarGauge(), cargarSeccion(), cargarEvolucion(), cargarMaquinas()]);
-        // El detalle (módulo 5) corre después porque cargarMaquinas puede haber
-        // hecho auto-descarte sobre _selMaquina y cargarDetalle depende de él.
-        await cargarDetalle();
-    } catch (e) {
-        showToast('Error: ' + e.message, 'error');
-    } finally {
-        showLoader(false);
+// ───── Estado de carga (abort + lazy módulo 5) ───────────────────────
+let _paAbortTodo    = null;   // AbortController de los 4 módulos superiores
+let _paAbortDetalle = null;   // AbortController del módulo 5 (independiente)
+let _paDetalleLoaded     = false;  // ¿se ha cargado alguna vez con los filtros actuales?
+let _paDetalleNeedsReload = true;  // ¿hay que recargar la próxima vez que entre en viewport?
+let _paDetalleObserver = null;
+
+function paShowLoading(yes) {
+    const el = $('#pa-filterbar-loading');
+    if (el) el.style.display = yes ? '' : 'none';
+}
+
+function resetDetallePerezoso() {
+    const cont = $('#detalle-articulos');
+    const m5info = $('#m5-info');
+    if (!cont) return;
+    _paDetalleLoaded = false;
+    _paDetalleNeedsReload = true;
+    if (m5info) m5info.textContent = '—';
+    cont.innerHTML = `
+        <div class="pa-detalle-empty pa-detalle-cta">
+            <p>El desglose horario plan vs producido puede ser pesado en rangos amplios.<br>
+               Cárgalo cuando lo necesites (o haz clic en una máquina para ver solo la suya).</p>
+            <button type="button" id="pa-detalle-load" class="pa-detalle-load-btn">Cargar desglose</button>
+        </div>`;
+    $('#pa-detalle-load')?.addEventListener('click', () => cargarDetalleConAbort());
+
+    // Si el módulo 5 ya está visible (el usuario llegó haciendo scroll antes
+    // de cambiar el filtro), disparamos la carga directamente — el
+    // IntersectionObserver no re-emite mientras el elemento sigue en viewport.
+    const m5 = document.getElementById('pa-module-5');
+    if (m5) {
+        const r = m5.getBoundingClientRect();
+        const vh = window.innerHeight || document.documentElement.clientHeight;
+        const visible = r.top < vh && r.bottom > 0;
+        if (visible) {
+            _paDetalleNeedsReload = false;
+            cargarDetalleConAbort();
+        }
     }
+}
+
+async function cargarDetalleConAbort() {
+    if (_paAbortDetalle) _paAbortDetalle.abort();
+    _paAbortDetalle = new AbortController();
+    const sig = _paAbortDetalle.signal;
+    paShowLoading(true);
+    try {
+        await cargarDetalle(sig);
+    } catch (e) {
+        if (e.name !== 'AbortError') showToast('Error: ' + e.message, 'error');
+    } finally {
+        if (!sig.aborted) paShowLoading(false);
+    }
+}
+
+function setupDetalleAutoload() {
+    if (_paDetalleObserver) _paDetalleObserver.disconnect();
+    const m5 = document.getElementById('pa-module-5');
+    if (!m5 || !('IntersectionObserver' in window)) return;
+    _paDetalleObserver = new IntersectionObserver(entries => {
+        for (const e of entries) {
+            if (e.isIntersecting && _paDetalleNeedsReload) {
+                _paDetalleNeedsReload = false;  // evita re-disparos rápidos
+                cargarDetalleConAbort();
+            }
+        }
+    }, { rootMargin: '200px' });
+    _paDetalleObserver.observe(m5);
+}
+
+async function cargarTodo() {
+    // 1) Abortar cualquier petición en vuelo (la previa quedó obsoleta).
+    if (_paAbortTodo)    _paAbortTodo.abort();
+    if (_paAbortDetalle) _paAbortDetalle.abort();
+    _paAbortTodo = new AbortController();
+    const sig = _paAbortTodo.signal;
+
+    paShowLoading(true);
+
+    // 2) Lanzar los 4 módulos superiores en paralelo. allSettled para que
+    //    el fallo de uno no aborte la pintura de los demás. Cada módulo
+    //    se renderiza en cuanto su fetch resuelve (render incremental).
+    const results = await Promise.allSettled([
+        cargarGauge(sig),
+        cargarSeccion(sig),
+        cargarEvolucion(sig),
+        cargarMaquinas(sig),
+    ]);
+
+    // Si nos abortaron antes de terminar, otra cargarTodo ya está corriendo.
+    if (sig.aborted) return;
+
+    // Reportar errores reales (no AbortError) en un solo toast resumido.
+    const errs = results
+        .filter(r => r.status === 'rejected' && r.reason?.name !== 'AbortError')
+        .map(r => r.reason?.message || String(r.reason));
+    if (errs.length) showToast('Error: ' + errs[0], 'error');
+
+    paShowLoading(false);
+
+    // 3) Módulo 5: vuelve a estado perezoso. Si está en pantalla, el
+    //    IntersectionObserver disparará la recarga automáticamente.
+    resetDetallePerezoso();
 }
 
 // ───── Init ──────────────────────────────────────────────────────────
@@ -789,5 +890,6 @@ document.addEventListener('DOMContentLoaded', () => {
         onChipClear(btn.dataset.clear);
     });
     refreshActiveFilterBar();
+    setupDetalleAutoload();   // IntersectionObserver para el módulo 5
     cargarTodo();
 });

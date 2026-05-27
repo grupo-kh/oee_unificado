@@ -1030,6 +1030,45 @@ a { text-decoration: none; color: inherit; }
 }
 .pa-clear-filter-btn:hover { background: #a30e26; }
 
+/* Indicador inline de carga en la cabecera */
+.pa-filterbar-loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: #2d4d7a;
+    padding: 0 8px;
+}
+.pa-mini-spinner {
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(45, 77, 122, 0.2);
+    border-top-color: #2d4d7a;
+    border-radius: 50%;
+    display: inline-block;
+    animation: spin 0.8s linear infinite;
+}
+
+/* CTA "Cargar desglose" en el módulo 5 perezoso */
+.pa-detalle-cta { padding: 30px 20px; text-align: center; }
+.pa-detalle-cta p { margin: 0 0 14px 0; color: #5b8cc7; font-size: 13px; }
+.pa-detalle-load-btn {
+    padding: 8px 18px;
+    background: #2f7d4c;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+.pa-detalle-load-btn:hover { background: #1f5c37; }
+
 /* Tabla del módulo 5 */
 .pa-detalle-table {
     width: 100%;

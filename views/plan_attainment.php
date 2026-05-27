@@ -30,6 +30,9 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <div class="pa-filterbar-group pa-filterbar-chips-group">
             <span class="pa-active-filter-chips" id="pa-active-filter-chips"></span>
+            <span class="pa-filterbar-loading" id="pa-filterbar-loading" style="display:none">
+                <span class="pa-mini-spinner"></span> Cargando…
+            </span>
             <button type="button" id="pa-clear-filter" class="pa-clear-filter-btn" style="display:none">Limpiar drill-downs</button>
         </div>
     </div>
