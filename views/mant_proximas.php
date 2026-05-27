@@ -20,13 +20,12 @@ include __DIR__ . '/../includes/header.php';
 
             <div class="dual-selector-row">
                 <div class="machine-selector-row" style="flex:0 0 auto">
-                    <label for="dias-selector" class="machine-selector-label">Ventana:</label>
-                    <select id="dias-selector" class="machine-selector" style="min-width:140px">
-                        <option value="7">Próximos 7 días</option>
-                        <option value="15">Próximos 15 días</option>
-                        <option value="30" selected>Próximos 30 días</option>
-                        <option value="60">Próximos 60 días</option>
-                    </select>
+                    <label for="fecha-desde" class="machine-selector-label">Desde:</label>
+                    <input type="date" id="fecha-desde" class="machine-selector" style="min-width:140px">
+                </div>
+                <div class="machine-selector-row" style="flex:0 0 auto">
+                    <label for="fecha-hasta" class="machine-selector-label">Hasta:</label>
+                    <input type="date" id="fecha-hasta" class="machine-selector" style="min-width:140px">
                 </div>
                 <div class="machine-selector-row" style="flex:1">
                     <label for="machine-selector" class="machine-selector-label">Máquina:</label>
@@ -63,7 +62,7 @@ include __DIR__ . '/../includes/header.php';
                     <div class="oee-detalle-subtitle">Resumen</div>
                     <div class="mant-stats" id="mant-stats">
                         <div class="mant-stat mant-stat-vencidas"><span class="mant-stat-value" id="stat-vencidas">—</span><span class="mant-stat-label">Vencidas</span></div>
-                        <div class="mant-stat mant-stat-urgentes"><span class="mant-stat-value" id="stat-urgentes">—</span><span class="mant-stat-label">Pendientes (≤7 días)</span></div>
+                        <div class="mant-stat mant-stat-urgentes"><span class="mant-stat-value" id="stat-urgentes">—</span><span class="mant-stat-label">Próximas (≤10 días)</span></div>
                         <div class="mant-stat mant-stat-en-plazo"><span class="mant-stat-value" id="stat-en-plazo">—</span><span class="mant-stat-label">En plazo</span></div>
                         <div class="mant-stat mant-stat-total"><span class="mant-stat-value" id="stat-total">—</span><span class="mant-stat-label">Total</span></div>
                     </div>
@@ -71,7 +70,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
 
             <div class="mant-chart-box mant-chart-fullwidth">
-                <div class="oee-detalle-subtitle">Top Máquinas con tareas vencidas/pendientes <small class="mant-hint">(clic para filtrar)</small></div>
+                <div class="oee-detalle-subtitle">Top Máquinas con tareas vencidas/próximas <small class="mant-hint">(clic para filtrar)</small></div>
                 <div id="chart-top-maquinas-prox"></div>
                 <div id="chart-top-maquinas-prox-empty" class="drill-down-empty" style="display:none">Sin máquinas con tareas en este rango</div>
             </div>
@@ -99,7 +98,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <div class="view-card-footer metric-legend metric-legend-compact">
             <div class="metric-legend-text">
-                <p><strong>Próximas Revisiones</strong> · datos del fichero <code>Z:\Mantenimiento\…</code> (hoja <em>PROXIMAS REV.</em>). Una tarea se considera <strong>vencida</strong> si su fecha de "Próxima revisión" es anterior a hoy, <strong>pendiente</strong> si vence en los próximos 7 días, y <strong>en plazo</strong> en caso contrario. El gauge muestra el % no vencido sobre el total filtrado.</p>
+                <p><strong>Próximas Revisiones</strong> · una tarea se considera <strong>vencida</strong> si su fecha de "Próxima revisión" superó el margen de tolerancia (gap por periodicidad), <strong>próxima</strong> si vence en los siguientes 10 días, y <strong>en plazo</strong> en caso contrario. El gauge muestra el % no vencido sobre el total del filtro aplicado.</p>
                 <p class="metric-legend-note" id="footer-actualizado">Fichero actualizado: —</p>
             </div>
         </div>
@@ -179,7 +178,7 @@ include __DIR__ . '/../includes/header.php';
                 <label for="mark-operario-otro">Número de operario</label>
                 <input type="text" inputmode="numeric" pattern="[0-9]+" id="mark-operario-otro" class="machine-selector" placeholder="Ej. 1004">
                 <small style="color:var(--blue-mid);font-style:italic">
-                    Introduce solo el número de operario (sin nombre).
+                    Solo se permite usarlo si la API no devolvió el catálogo activo. Introduce solo el número de operario.
                 </small>
             </div>
             <div class="mant-modal-field">

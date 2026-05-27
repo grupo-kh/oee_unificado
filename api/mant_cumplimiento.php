@@ -48,14 +48,15 @@ try {
         if ($p['periodicidad']     !== '') $periodicidadesSet[$p['periodicidad']] = true;
     }
 
-    // Detección de máquinas del grupo SECUENCIA (E66, RACKS, PLATAFORMAS):
+    // Detección de máquinas del grupo SECUENCIA (E66, RACKS, PLATAFORMAS, TROLEYS):
     // se excluyen del cómputo de "no realizadas" y "recuperaciones" tanto
     // en el gauge como en el detalle por mes.
     $isSecuencia = function(string $desc): bool {
         $s = trim($desc);
         return preg_match('/^E66($|[^A-Za-z0-9])/i', $s)
             || preg_match('/^RACK[\s\-_]/i', $s)
-            || preg_match('/^PLATAFORMA/i', $s);
+            || preg_match('/^PLATAFORMA/i', $s)
+            || preg_match('/^TROLEY[\s\-_]/i', $s);
     };
 
     // ───────── Métrica del gauge: realizadas / (realizadas + previstas + atrasadas) ─────────

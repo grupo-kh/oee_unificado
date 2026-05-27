@@ -37,6 +37,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../lib/Db.php';
 require_once __DIR__ . '/../lib/MaintenancePlanStore.php';
 require_once __DIR__ . '/../lib/MaintenanceCompletionStore.php';
+require_once __DIR__ . '/../lib/CalendarioLaboral.php';
 
 $apply         = in_array('--apply', $argv, true);
 $skipSecuencia = in_array('--skip-secuencia', $argv, true);
@@ -190,12 +191,13 @@ foreach ($rows as $r) {
     //   - Si la tarea ya estaba vencida (px <= hoy): aleatoria entre px y hoy.
     //   - Si está en el futuro próximo (caso --ventana): la fecha de
     //     intervención es hoy (no podemos fingir una intervención futura).
+    //   - Ajustamos al día hábil más cercano (lun-vie, no festivo CV).
     $tsIni = strtotime($px);
     $tsHoy = strtotime($hoy);
     $tsFi  = ($tsIni > $tsHoy) ? $tsHoy : mt_rand($tsIni, $tsHoy);
-    $fechaInt = date('Y-m-d', $tsFi);
+    $fechaInt = CalendarioLaboral::ajustarADiaHabil(date('Y-m-d', $tsFi), 'anterior');
 
-    $hora = sprintf('%02d:%02d', mt_rand(6, 20), mt_rand(0, 59));
+    $hora = MaintenanceCompletionStore::horaTurnoAleatoria();
     $tiempoSeg = ($teMin && $teMin > 0)
         ? MaintenanceCompletionStore::aplicarDecalajeAleatorio($teMin * 60)
         : null;
@@ -297,6 +299,7 @@ if ($apply && $recupPct > 0) {
         if (!$tsBase) continue;
         $mesSig = date('Y-m', strtotime(date('Y-m-01', $tsBase) . ' +1 month'));
         $fechaRecup = $mesSig . '-' . sprintf('%02d', mt_rand(1, 5));
+        $fechaRecup = CalendarioLaboral::ajustarADiaHabil($fechaRecup, 'posterior');
         if ($fechaRecup > $hoy) continue;  // solo recuperaciones del pasado
 
         // tiempo estimado para la duración
@@ -307,7 +310,7 @@ if ($apply && $recupPct > 0) {
         $teMin = $te && $te['tiempo_estimado'] ? (int)$te['tiempo_estimado'] : null;
         $tiempoSeg = ($teMin && $teMin > 0)
             ? MaintenanceCompletionStore::aplicarDecalajeAleatorio($teMin * 60) : null;
-        $hora = sprintf('%02d:%02d', mt_rand(6, 20), mt_rand(0, 59));
+        $hora = MaintenanceCompletionStore::horaTurnoAleatoria();
         $op   = $ops[mt_rand(0, count($ops) - 1)];
 
         try {

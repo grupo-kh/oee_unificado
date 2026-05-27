@@ -27,27 +27,59 @@ include __DIR__ . '/../includes/header.php';
 
     <div class="home-grid">
 
-        <?php /* Tile móvil oculto temporalmente para auditoría
-        <a href="mant_mobile.php" class="tile tile-mant-mobile" target="_blank" rel="noopener">
+        <!--
+            Acceso al MANUAL DE USO de la app de mantenimiento. Va el primero
+            del menú general para que cualquier usuario lo encuentre antes de
+            entrar en los módulos. Abre el manual en pestaña nueva, imprimible
+            a PDF desde el botón superior.
+        -->
+        <a href="manual.php" class="tile tile-mant-manual" target="_blank" rel="noopener">
             <div class="tile-icon">
-                <svg viewBox="0 0 100 60" fill="none">
-                    <rect x="32" y="6" width="36" height="50" rx="5" fill="#1a2d4a" stroke="#3a6aa3" stroke-width="1.5"/>
-                    <rect x="35" y="11" width="30" height="38" rx="2" fill="#5b8cc7"/>
-                    <circle cx="50" cy="53" r="2" fill="#a3b8d1"/>
-                    <rect x="40" y="16" width="20" height="4" rx="1" fill="#ffffff"/>
-                    <rect x="40" y="22" width="14" height="3" rx="1" fill="#ffffff" opacity="0.7"/>
-                    <rect x="40" y="28" width="20" height="3" rx="1" fill="#10b981"/>
-                    <rect x="40" y="33" width="20" height="3" rx="1" fill="#10b981" opacity="0.6"/>
-                    <rect x="40" y="38" width="20" height="3" rx="1" fill="#10b981" opacity="0.4"/>
+                <svg viewBox="0 0 100 60" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <!-- Libro abierto -->
+                    <path d="M14 14 L48 18 L48 50 L14 46 Z" fill="#5b3fb8"/>
+                    <path d="M86 14 L52 18 L52 50 L86 46 Z" fill="#7c5fd9"/>
+                    <line x1="20" y1="24" x2="42" y2="27"/>
+                    <line x1="20" y1="30" x2="42" y2="33"/>
+                    <line x1="20" y1="36" x2="38" y2="38"/>
+                    <line x1="58" y1="27" x2="80" y2="24"/>
+                    <line x1="58" y1="33" x2="80" y2="30"/>
+                    <line x1="58" y1="38" x2="76" y2="36"/>
                 </svg>
             </div>
             <div class="tile-body">
-                <h2>Móvil · Operario <span class="tile-badge">webapp</span></h2>
-                <p>Versión responsive para móvil: el operario filtra su máquina, marca tareas como hechas y se reprograman automáticamente</p>
+                <h2>Manual de uso app mantenimiento <span class="tile-badge">guía</span></h2>
+                <p>Resumen de cómo se usa cada módulo (Acciones, Próximas, Cumplimiento, Histórico, Móvil). Botón para imprimir o guardar como PDF.</p>
             </div>
             <div class="tile-arrow">→</div>
         </a>
-        */ ?>
+
+        <!--
+            Acceso al PROTOTIPO de la app móvil del operario.
+            Aún no es operativo: enlaza al mockup HTML autocontenido.
+            Cuando se cablée a la BD se sustituirá el href.
+        -->
+        <a href="../prototipos/operario_mobile.html" class="tile tile-mant-mobile tile-wip" target="_blank" rel="noopener">
+            <div class="tile-icon">
+                <svg viewBox="0 0 100 60" fill="none">
+                    <rect x="32" y="6" width="36" height="50" rx="5" fill="#0d0d0d" stroke="#8c181a" stroke-width="1.8"/>
+                    <rect x="35" y="11" width="30" height="38" rx="2" fill="#1d1d1d"/>
+                    <circle cx="50" cy="53" r="2" fill="#8c181a"/>
+                    <rect x="40" y="16" width="20" height="4" rx="1" fill="#8c181a"/>
+                    <rect x="40" y="22" width="14" height="3" rx="1" fill="#ffffff" opacity="0.7"/>
+                    <rect x="40" y="28" width="20" height="3" rx="1" fill="#ffffff" opacity="0.5"/>
+                    <rect x="40" y="33" width="20" height="3" rx="1" fill="#ffffff" opacity="0.35"/>
+                    <rect x="40" y="38" width="20" height="3" rx="1" fill="#ffffff" opacity="0.2"/>
+                </svg>
+            </div>
+            <div class="tile-body">
+                <h2>Móvil · Operario
+                    <span class="tile-badge tile-badge-wip">En proceso de aplicación</span>
+                </h2>
+                <p>App responsive para móvil. El operario se identifica con su nº, abre la tarea (arranca cronómetro), marca las sub-tareas hechas y la revisión queda registrada con su tiempo real.</p>
+            </div>
+            <div class="tile-arrow">→</div>
+        </a>
 
         <a href="mant_acciones.php" class="tile tile-mant-acciones role-tecnico-only">
             <div class="tile-icon">

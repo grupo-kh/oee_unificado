@@ -58,6 +58,14 @@ class Auth
     /**
      * Valida usuario+contraseña y arranca la sesión.
      * Aplica rate-limit por IP para frenar fuerza bruta.
+     *
+     * Dos caminos de autenticación:
+     *   1. TÉCNICO → usuario+contraseña de .env (MANT_TECNICO_*) o fallback.
+     *   2. OPERARIO → cualquier número activo de mant_operarios sirve tanto
+     *      como usuario como contraseña (user == pass == numero). Así
+     *      cada operario tiene su login propio y la sesión guarda su numero
+     *      como `mant_user`, que es el código que luego aparece en las
+     *      marcas de revisión.
      */
     public static function login(string $user, string $pass): bool
     {
@@ -68,28 +76,65 @@ class Auth
             return false;
         }
 
-        $u  = trim($user);
+        $u = trim($user);
+        $p = $pass; // sin trim: las contraseñas pueden tener espacios
+
+        // ── 1. Camino TÉCNICO (.env + fallback) ──
         $db = self::loadUsers();
-        if (!isset($db[$u])) {
-            self::registerFailedAttempt($ip);
-            // Hash dummy para que el tiempo no revele si el usuario existe.
-            password_verify($pass, '$2y$10$' . str_repeat('x', 53));
-            return false;
+        if (isset($db[$u]) && password_verify($p, $db[$u]['hash'])) {
+            self::completarLogin($ip, $u, $db[$u]['role']);
+            return true;
         }
 
-        if (!password_verify($pass, $db[$u]['hash'])) {
-            self::registerFailedAttempt($ip);
-            return false;
+        // ── 2. Camino OPERARIO (catálogo mant_operarios) ──
+        // El operario introduce su numero como usuario Y como contraseña.
+        // Si el numero está activo en BD, login válido como rol=operario.
+        if ($u !== '' && $u === $p && self::isOperarioActivo($u)) {
+            self::completarLogin($ip, $u, 'operario');
+            return true;
         }
 
-        // Limpia el contador y regenera id contra fixation.
+        // Fallo: gasta tiempo en bcrypt dummy para no revelar caminos.
+        self::registerFailedAttempt($ip);
+        password_verify($p, '$2y$10$' . str_repeat('x', 53));
+        return false;
+    }
+
+    /**
+     * Una vez verificadas las credenciales, regenera la sesión, limpia el
+     * rate-limit y guarda los datos del usuario logueado.
+     */
+    private static function completarLogin(string $ip, string $user, string $role): void
+    {
         self::clearAttempts($ip);
         session_regenerate_id(true);
-        $_SESSION['mant_user']     = $u;
-        $_SESSION['mant_role']     = $db[$u]['role'];
+        $_SESSION['mant_user']     = $user;
+        $_SESSION['mant_role']     = $role;
         $_SESSION['mant_login_at'] = time();
         self::csrfToken();
-        return true;
+    }
+
+    /**
+     * Comprueba si un número es de un operario actualmente activo en
+     * mant_operarios. Si la BD no está disponible, devuelve false.
+     */
+    private static function isOperarioActivo(string $numero): bool
+    {
+        // Solo dígitos para evitar pasadas accidentales como SQL injection
+        // (aunque PDO ya protege, validamos el formato esperado del numero).
+        if (!preg_match('/^\d+$/', $numero)) return false;
+        try {
+            require_once __DIR__ . '/Db.php';
+            $row = Db::pgFetchOne(
+                "SELECT 1 AS ok FROM mant_operarios
+                  WHERE numero = :n AND COALESCE(activo, TRUE) = TRUE
+                  LIMIT 1",
+                [':n' => $numero]
+            );
+            return !empty($row);
+        } catch (Throwable $e) {
+            return false;
+        }
     }
 
     public static function logout(): void
@@ -232,7 +277,15 @@ class Auth
 
     // ───────────── Internos: usuarios y rate-limit ─────────────
 
-    /** @return array<string, array{hash:string, role:string}> */
+    /**
+     * Devuelve solo los usuarios "fijos" del login (técnico).
+     *
+     * Los operarios ya NO viven aquí: cualquiera de los 8 del catálogo
+     * (mant_operarios.activo=TRUE) entra con su numero como user y pass
+     * por el camino de login() · 2 (ver método login()).
+     *
+     * @return array<string, array{hash:string, role:string}>
+     */
     private static function loadUsers(): array
     {
         $users = [];
@@ -243,20 +296,14 @@ class Auth
             $users[$techUser] = ['hash' => $techHash, 'role' => 'tecnico'];
         }
 
-        $opUser = (string) (env('MANT_OPERARIO_USER', '') ?: '');
-        $opHash = (string) (env('MANT_OPERARIO_PASS_HASH', '') ?: '');
-        if ($opUser !== '' && $opHash !== '') {
-            $users[$opUser] = ['hash' => $opHash, 'role' => 'operario'];
-        }
-
         // Fallback solo fuera de producción para no dejar el módulo inoperativo
         // en entornos locales sin .env configurado. En producción esto es vacío
-        // y los logins fallan hasta que se configuren las variables de entorno.
+        // y el login técnico falla hasta que se configuren las variables de
+        // entorno. El operario sigue funcionando vía catálogo (mant_operarios).
         if (empty($users)) {
             $appEnv = strtolower((string) (env('APP_ENV', 'production') ?: 'production'));
             if ($appEnv !== 'production') {
-                $users['Ricardo']  = ['hash' => password_hash('7876', PASSWORD_BCRYPT), 'role' => 'tecnico'];
-                $users['Operario'] = ['hash' => password_hash('7043', PASSWORD_BCRYPT), 'role' => 'operario'];
+                $users['Ricardo'] = ['hash' => password_hash('7876', PASSWORD_BCRYPT), 'role' => 'tecnico'];
             }
         }
 

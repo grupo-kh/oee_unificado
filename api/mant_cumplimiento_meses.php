@@ -33,7 +33,8 @@ try {
         $s = trim($desc);
         return preg_match('/^E66($|[^A-Za-z0-9])/i', $s)
             || preg_match('/^RACK[\s\-_]/i', $s)
-            || preg_match('/^PLATAFORMA/i', $s);
+            || preg_match('/^PLATAFORMA/i', $s)
+            || preg_match('/^TROLEY[\s\-_]/i', $s);
     };
 
     $items = MaintenanceCompletionStore::loadAll();

@@ -55,7 +55,7 @@ function _estadoLabel(string $estado): string
 {
     switch ($estado) {
         case 'vencida':  return 'VENCIDA';
-        case 'urgente':  return 'PENDIENTE';
+        case 'urgente':  return 'PRÓXIMA';
         case 'en_plazo': return 'EN PLAZO';
         default:         return strtoupper($estado);
     }
@@ -64,13 +64,40 @@ function _estadoLabel(string $estado): string
 try {
     ini_set('memory_limit', '256M');
 
-    $diasRaw = getParam('dias', '30');
-    $dias    = max(1, min(365, (int)$diasRaw));
-    $cm      = (string) getParam('cod_maquina_mant', '');
-    $pe      = (string) getParam('periodicidad', '');
-    $solo    = (int) getParam('solo_vencidas', '0') === 1;
-    $fmt     = strtolower((string) getParam('fmt', 'xlsx'));
+    $hoy = date('Y-m-d');
+    $fdesde = (string) getParam('fecha_desde', '');
+    $fhasta = (string) getParam('fecha_hasta', '');
+    $diasRaw = getParam('dias', '');
+    if ($fdesde === '' || $fhasta === '') {
+        $dias = max(1, min(365, (int)($diasRaw !== '' ? $diasRaw : 30)));
+        if ($fdesde === '') $fdesde = date('Y-m-d', strtotime("-90 days"));
+        if ($fhasta === '') $fhasta = date('Y-m-d', strtotime("+$dias days"));
+    }
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fdesde)) jsonError("fecha_desde inválida");
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fhasta)) jsonError("fecha_hasta inválida");
+    if ($fhasta < $fdesde) { $tmp = $fdesde; $fdesde = $fhasta; $fhasta = $tmp; }
+
+    $cm   = (string) getParam('cod_maquina_mant', '');
+    $pe   = (string) getParam('periodicidad', '');
+    $solo = (int) getParam('solo_vencidas', '0') === 1;
+    $fmt  = strtolower((string) getParam('fmt', 'xlsx'));
     if (!in_array($fmt, ['xlsx', 'pdf'], true)) jsonError("fmt debe ser 'xlsx' o 'pdf'");
+
+    // Gap por periodicidad antes de considerar vencida (alineado con API)
+    $gapVencida = function(string $per): int {
+        switch (strtoupper(trim($per))) {
+            case 'DIARIO': case 'DIARIA':       return 1;
+            case 'SEMANAL':                     return 3;
+            case 'QUINCENAL':                   return 5;
+            case 'MENSUAL':                     return 7;
+            case 'BIMESTRAL': case 'BIMENSUAL': return 10;
+            case 'TRIMESTRAL':                  return 14;
+            case 'CUATRIMESTRAL':               return 18;
+            case 'SEMESTRAL':                   return 21;
+            case 'ANUAL':                       return 30;
+            default:                            return 0;
+        }
+    };
 
     // ─────────── Reproducimos el filtrado de api/mant_proximas.php ───────────
     $data           = MaintenancePlanStore::load();
@@ -100,7 +127,6 @@ try {
     ));
     $proximas = MaintenancePlanStore::consolidateSecuenciaProximas($proximasFiltradas);
 
-    $hoy = date('Y-m-d');
     $rows = [];
     foreach ($proximas as $p) {
         $idOverride = MaintenancePeriodicidadStore::buildId(
@@ -126,7 +152,8 @@ try {
         if ($solo) {
             if ($diff >= 0) continue;
         } else {
-            if ($diff > $dias) continue;
+            // Filtramos por rango efectivo del usuario
+            if ($px < $fdesde || $px > $fhasta) continue;
         }
 
         // Resolver tiempo estimado. Para consolidadas (orden CONSOL:*) sumamos
@@ -145,9 +172,14 @@ try {
             if ($cntTE > 0) $teMin = $sumTE;
         }
 
+        // Estado con gap por periodicidad. Próxima = ≤10 días (alineado con API).
+        $gap = $gapVencida((string)($eff['periodicidad'] ?? ''));
+        $estado = 'en_plazo';
+        if ($diff < -$gap)      $estado = 'vencida';
+        elseif ($diff <= 10)    $estado = 'urgente';
         $rows[] = $eff + [
             'dias_restantes'   => $diff,
-            'estado'           => $diff < 0 ? 'vencida' : ($diff <= 7 ? 'urgente' : 'en_plazo'),
+            'estado'           => $estado,
             'tiempo_estimado'  => $teMin,
         ];
     }
@@ -216,7 +248,7 @@ function _exportProximasXlsx(array $rows, array $resumen, string $filtrosTxt, st
     $ws->setTitle('Calendario');
 
     // ── Cabecera ──
-    $ws->setCellValue('A1', 'ACCIONES PREVENTIVAS VENCIDAS Y PENDIENTES');
+    $ws->setCellValue('A1', 'F12028_Seguimiento y asignación tareas de mantenimiento');
     $ws->mergeCells('A1:I1');
     $ws->getStyle('A1')->getFont()->setBold(true)->setSize(16)->getColor()->setRGB('FFFFFF');
     $ws->getStyle('A1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('1A2D4A');
@@ -228,7 +260,7 @@ function _exportProximasXlsx(array $rows, array $resumen, string $filtrosTxt, st
     $sub = [];
     $sub[] = 'Filtros: ' . ($filtrosTxt ?: '—');
     $sub[] = 'Tareas listadas: ' . $resumen['exportadas']
-            . ' (' . $resumen['vencidas'] . ' vencidas + ' . $resumen['urgentes'] . ' pendientes)';
+            . ' (' . $resumen['vencidas'] . ' vencidas + ' . $resumen['urgentes'] . ' próximas)';
     $sub[] = 'En plazo (no listadas): ' . $resumen['en_plazo'];
     $sub[] = 'Exportado: ' . date('d/m/Y H:i');
     $ws->setCellValue('A2', implode('  ·  ', $sub));
@@ -393,12 +425,12 @@ function _exportProximasPdf(array $rows, array $resumen, string $filtrosTxt, str
 <body>
 
 <div class="portada">
-    <h1>ACCIONES PREVENTIVAS VENCIDAS Y PENDIENTES</h1>
+    <h1>F12028_Seguimiento y asignación tareas de mantenimiento</h1>
     <div class="stamp">Exportado el <?= date('d/m/Y H:i') ?></div>
     <div class="total"><?= (int)$resumen['exportadas'] ?> tareas a realizar</div>
     <div class="resumen-row">
         <span class="pill pill-venc">Vencidas: <?= (int)$resumen['vencidas'] ?></span>
-        <span class="pill pill-urg">Pendientes (≤7 d): <?= (int)$resumen['urgentes'] ?></span>
+        <span class="pill pill-urg">Próximas (≤10 d): <?= (int)$resumen['urgentes'] ?></span>
         <span class="pill pill-ok">En plazo (no listadas): <?= (int)$resumen['en_plazo'] ?></span>
     </div>
 </div>

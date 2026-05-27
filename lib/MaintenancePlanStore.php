@@ -151,12 +151,14 @@ class MaintenancePlanStore
                    m.desc_maquina,
                    m.is_user_added,
                    COALESCE(t.task_count, 0)::int        AS task_count,
-                   COALESCE(t.user_added_count, 0)::int  AS user_added_count
+                   COALESCE(t.user_added_count, 0)::int  AS user_added_count,
+                   COALESCE(t.paused_count, 0)::int      AS paused_count
               FROM mant_maquinas m
               LEFT JOIN (
                     SELECT cod_maquina_mant,
-                           COUNT(*)                                  AS task_count,
-                           COUNT(*) FILTER (WHERE is_user_added)     AS user_added_count
+                           COUNT(*)                                       AS task_count,
+                           COUNT(*) FILTER (WHERE is_user_added)          AS user_added_count,
+                           COUNT(*) FILTER (WHERE fecha_pausado IS NOT NULL) AS paused_count
                       FROM mant_plan
                      WHERE COALESCE(alta_baja, 'ALTA') = 'ALTA'
                        AND COALESCE(activa,    'A')    = 'A'
@@ -779,6 +781,7 @@ class MaintenancePlanStore
         if ($s === '') return false;
         if (preg_match('/^RACK[\s\-]/i', $s))    return true;
         if (preg_match('/^PLATAFORMA/i', $s))    return true;
+        if (preg_match('/^TROLEY[\s\-]/i', $s))  return true;
         return false;
     }
 

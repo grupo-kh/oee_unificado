@@ -2,11 +2,25 @@
 
 let gaugeMant = null;
 let chartTopMaqProx = null;
-let _mantDias = 30;
+// Filtro por rango de fechas (sustituye al antiguo desplegable "dias").
+// Default: desde hoy hasta hoy+30 días.
+let _mantFechaDesde = '';   // YYYY-MM-DD
+let _mantFechaHasta = '';   // YYYY-MM-DD
 let _mantCodMaquina = '';
 let _mantPeriodicidad = '';
 let _mantSoloVencidas = false;
+
+function _hoyIso() { return new Date().toISOString().substring(0, 10); }
+function _addDaysIso(iso, days) {
+    const d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    return d.toISOString().substring(0, 10);
+}
 let _operariosKnown = [];
+// Catálogo de operarios ACTIVOS (los 8 actuales). Cada entrada:
+// {numero: '881', nombre: 'Juan Navarro'}. Es lo que alimenta el desplegable
+// del popup "marcar como hecha" — muestra el nombre, guarda el código.
+let _operariosActivos = [];
 // Map de filas consolidadas: idx → array de sub_tareas. Para marcar bulk.
 let _consolRowsByIdx = {};
 let _markPayload = null;
@@ -55,7 +69,7 @@ function renderGauge(value) {
             }
         },
         colors: [semColor(v)],
-        labels: ['En plazo'],
+        labels: ['En plazo (filtro)'],
         stroke: { lineCap: 'round' }
     };
     if (gaugeMant) gaugeMant.destroy();
@@ -131,7 +145,7 @@ function renderTopMaquinas(arr) {
         },
         series: [
             { name: 'Vencidas', data: data.map(d => d.vencidas) },
-            { name: 'Pendientes', data: data.map(d => d.urgentes) },
+            { name: 'Próximas', data: data.map(d => d.urgentes) },
             { name: 'En plazo', data: data.map(d => d.en_plazo) }
         ],
         xaxis: { categories: data.map(d => d.x), labels: { style: { colors: '#2d4d7a', fontSize: '11px' } } },
@@ -156,7 +170,7 @@ function renderTopMaquinas(arr) {
                         <div style="font-weight:700;margin-bottom:6px;font-size:13px">${escHtml(r.x)}</div>
                         <div style="color:#a3b8d1;font-size:11px;margin-bottom:6px">${escHtml(r.cod)}</div>
                         <div style="display:flex;justify-content:space-between;gap:12px;color:#fca5a5"><span>Vencidas</span><span>${r.vencidas}</span></div>
-                        <div style="display:flex;justify-content:space-between;gap:12px;color:#fbbf24"><span>Pendientes</span><span>${r.urgentes}</span></div>
+                        <div style="display:flex;justify-content:space-between;gap:12px;color:#fbbf24"><span>Próximas</span><span>${r.urgentes}</span></div>
                         <div style="display:flex;justify-content:space-between;gap:12px;color:#86efac"><span>En plazo</span><span>${r.en_plazo}</span></div>
                         <div style="border-top:1px solid #3a5576;margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;gap:12px;font-weight:700;font-size:13px">
                             <span>Total</span><span>${r.total}</span>
@@ -298,16 +312,50 @@ function abrirModalMarcar(d) {
     if (motivoSel) motivoSel.value = '';
     _aplicarTipoMarcado('completada');
 
+    // Desplegable Operario: solo los ACTIVOS del catálogo (8 operarios).
+    // Se muestra el NOMBRE como texto y se guarda el CÓDIGO como value.
+    // Si la API no devolvió operarios_activos (instancia antigua), caemos al
+    // listado plano de códigos vistos en histórico.
     const sel = $('#mark-operario');
     sel.innerHTML = '<option value="">— Sin operario —</option>';
-    _operariosKnown.forEach(op => {
-        const o = document.createElement('option'); o.value = op; o.textContent = op;
-        sel.appendChild(o);
-    });
-    const otroOpt = document.createElement('option'); otroOpt.value = '__otro__'; otroOpt.textContent = 'Otro…';
-    sel.appendChild(otroOpt);
-    const last = (function() { try { return localStorage.getItem(LS_LAST_OPERARIO) || ''; } catch(e) { return ''; } })();
-    if (last && _operariosKnown.includes(last)) {
+    const usaActivos = Array.isArray(_operariosActivos) && _operariosActivos.length > 0;
+    const codigosActivos = usaActivos ? _operariosActivos.map(o => String(o.numero)) : [];
+    if (usaActivos) {
+        _operariosActivos.forEach(op => {
+            const o = document.createElement('option');
+            o.value = String(op.numero);
+            o.textContent = op.nombre;
+            sel.appendChild(o);
+        });
+    } else {
+        _operariosKnown.forEach(op => {
+            const o = document.createElement('option');
+            o.value = op; o.textContent = op;
+            sel.appendChild(o);
+        });
+    }
+    // "Otro…" solo se ofrece como válvula de escape cuando NO hay catálogo
+    // de activos (instancia antigua). Si el catálogo está cargado, forzamos
+    // al usuario a elegir entre los 8 operarios oficiales.
+    if (!usaActivos) {
+        const otroOpt = document.createElement('option');
+        otroOpt.value = '__otro__'; otroOpt.textContent = 'Otro…';
+        sel.appendChild(otroOpt);
+    }
+    // Si el usuario ha entrado como OPERARIO con su numero, lo preseleccionamos
+    // automáticamente — su numero es a la vez `mant_user` en sesión y `value`
+    // del option en el dropdown. Para técnicos seguimos usando el último
+    // operario marcado (localStorage) como sugerencia.
+    let inicial = '';
+    if (window.__IS_OPERARIO && window.__USER_NAME) {
+        inicial = String(window.__USER_NAME);
+    }
+    if (!inicial) {
+        try { inicial = localStorage.getItem(LS_LAST_OPERARIO) || ''; } catch(e) {}
+    }
+    const last = inicial;
+    const lastEsActivo = usaActivos ? codigosActivos.includes(last) : _operariosKnown.includes(last);
+    if (last && lastEsActivo) {
         sel.value = last;
     } else if (last) {
         sel.value = '__otro__';
@@ -460,7 +508,10 @@ async function confirmarMarcar() {
 async function cargarVista() {
     showLoader(true);
     try {
-        const params = { dias: _mantDias };
+        const params = {
+            fecha_desde: _mantFechaDesde,
+            fecha_hasta: _mantFechaHasta,
+        };
         if (_mantCodMaquina)   params.cod_maquina_mant = _mantCodMaquina;
         if (_mantPeriodicidad) params.periodicidad     = _mantPeriodicidad;
         if (_mantSoloVencidas) params.solo_vencidas    = 1;
@@ -469,7 +520,8 @@ async function cargarVista() {
 
         populateMaquinas(d.maquinas || [], _mantCodMaquina);
         populatePeriodicidades(d.periodicidades || [], _mantPeriodicidad);
-        _operariosKnown = d.operarios || [];
+        _operariosKnown   = d.operarios || [];
+        _operariosActivos = Array.isArray(d.operarios_activos) ? d.operarios_activos : [];
 
         // Validar filtros actuales contra los disponibles
         const okMaq = !_mantCodMaquina   || (d.maquinas || []).some(m => m.cod_maquina_mant === _mantCodMaquina);
@@ -478,7 +530,11 @@ async function cargarVista() {
         if (!okPer) { _mantPeriodicidad = ''; $('#periodicidad-selector').value = ''; updateUrlParams({ periodicidad: '' }); }
 
         const btn = $('#filter-clear');
-        if (btn) btn.style.display = (_mantCodMaquina || _mantPeriodicidad || _mantSoloVencidas || _mantDias != 30) ? '' : 'none';
+        // Mostrar "× Quitar filtros" si hay cualquier filtro distinto del default.
+        const defDesde = _addDaysIso(_hoyIso(), -90);
+        const defHasta = _addDaysIso(_hoyIso(), 30);
+        const hayRangoNoDefault = (_mantFechaDesde !== defDesde) || (_mantFechaHasta !== defHasta);
+        if (btn) btn.style.display = (_mantCodMaquina || _mantPeriodicidad || _mantSoloVencidas || hayRangoNoDefault) ? '' : 'none';
 
         const scopeBits = [];
         if (_mantCodMaquina) {
@@ -489,7 +545,19 @@ async function cargarVista() {
         if (_mantSoloVencidas) scopeBits.push('solo vencidas');
         $('#header-scope').textContent = scopeBits.length ? '· ' + scopeBits.join(' · ') : '';
 
-        $('#info-line').textContent = 'Hoy ' + fmtFecha(d.hoy) + ' · ventana ' + d.dias + ' días · ' + d.total + ' tareas';
+        // info-line refleja el rango activo + total RESULTANTE del filtro,
+        // para que el gauge y los stats sean claramente del subconjunto filtrado.
+        const filtroBits = [];
+        if (_mantCodMaquina)   filtroBits.push('máquina');
+        if (_mantPeriodicidad) filtroBits.push('periodicidad');
+        if (_mantSoloVencidas) filtroBits.push('solo vencidas');
+        const filtroTxt = filtroBits.length
+            ? ' · filtro: ' + filtroBits.join(' + ')
+            : ' · sin filtros';
+        $('#info-line').textContent =
+            'Hoy ' + fmtFecha(d.hoy) + ' · ' +
+            fmtFecha(d.fecha_desde) + ' → ' + fmtFecha(d.fecha_hasta) +
+            ' · ' + d.total + ' tareas en el rango' + filtroTxt;
         $('#stat-vencidas').textContent = d.vencidas;
         $('#stat-urgentes').textContent = d.urgentes;
         $('#stat-en-plazo').textContent = d.en_plazo;
@@ -509,17 +577,21 @@ async function cargarVista() {
     }
 }
 
-function onDiasChange()         { _mantDias = parseInt($('#dias-selector').value || '30', 10); updateUrlParams({ dias: _mantDias }); cargarVista(); }
+function onFechaDesdeChange() { _mantFechaDesde = $('#fecha-desde').value || _addDaysIso(_hoyIso(), -90); updateUrlParams({ fecha_desde: _mantFechaDesde }); cargarVista(); }
+function onFechaHastaChange() { _mantFechaHasta = $('#fecha-hasta').value || _addDaysIso(_hoyIso(), 30); updateUrlParams({ fecha_hasta: _mantFechaHasta }); cargarVista(); }
 function onMachineChange()      { _mantCodMaquina = $('#machine-selector').value || ''; updateUrlParams({ cod_maquina_mant: _mantCodMaquina }); cargarVista(); }
 function onPeriodicidadChange() { _mantPeriodicidad = $('#periodicidad-selector').value || ''; updateUrlParams({ periodicidad: _mantPeriodicidad }); cargarVista(); }
 function onSoloVencidasChange() { _mantSoloVencidas = $('#solo-vencidas').checked; updateUrlParams({ solo_vencidas: _mantSoloVencidas ? '1' : '' }); cargarVista(); }
 function onClearFilters() {
-    _mantDias = 30; _mantCodMaquina = ''; _mantPeriodicidad = ''; _mantSoloVencidas = false;
-    $('#dias-selector').value = '30';
+    _mantFechaDesde = _addDaysIso(_hoyIso(), -90);
+    _mantFechaHasta = _addDaysIso(_hoyIso(), 30);
+    _mantCodMaquina = ''; _mantPeriodicidad = ''; _mantSoloVencidas = false;
+    $('#fecha-desde').value = _mantFechaDesde;
+    $('#fecha-hasta').value = _mantFechaHasta;
     $('#machine-selector').value = '';
     $('#periodicidad-selector').value = '';
     $('#solo-vencidas').checked = false;
-    updateUrlParams({ dias: '', cod_maquina_mant: '', periodicidad: '', solo_vencidas: '' });
+    updateUrlParams({ fecha_desde: '', fecha_hasta: '', cod_maquina_mant: '', periodicidad: '', solo_vencidas: '' });
     cargarVista();
 }
 
@@ -532,7 +604,8 @@ function descargarCalendario(fmt) {
     console.log('[prox] descargarCalendario invocado', fmt);
     const params = new URLSearchParams();
     params.set('fmt', fmt === 'pdf' ? 'pdf' : 'xlsx');
-    params.set('dias', String(_mantDias || 30));
+    if (_mantFechaDesde) params.set('fecha_desde', _mantFechaDesde);
+    if (_mantFechaHasta) params.set('fecha_hasta', _mantFechaHasta);
     if (_mantCodMaquina)   params.set('cod_maquina_mant', _mantCodMaquina);
     if (_mantPeriodicidad) params.set('periodicidad', _mantPeriodicidad);
     if (_mantSoloVencidas) params.set('solo_vencidas', '1');
@@ -551,15 +624,21 @@ function descargarCalendario(fmt) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    _mantDias          = parseInt(getQueryParam('dias') || '30', 10);
+    // Default: 90 días atrás → 30 días adelante. El "atrás" garantiza que las
+    // tareas ya vencidas se vean al cargar la vista; el "adelante" muestra
+    // próximas. El usuario siempre puede acotar más.
+    _mantFechaDesde    = getQueryParam('fecha_desde') || _addDaysIso(_hoyIso(), -90);
+    _mantFechaHasta    = getQueryParam('fecha_hasta') || _addDaysIso(_hoyIso(), 30);
     _mantCodMaquina    = getQueryParam('cod_maquina_mant') || '';
     _mantPeriodicidad  = getQueryParam('periodicidad') || '';
     _mantSoloVencidas  = getQueryParam('solo_vencidas') === '1';
 
-    $('#dias-selector').value = String(_mantDias);
+    $('#fecha-desde').value = _mantFechaDesde;
+    $('#fecha-hasta').value = _mantFechaHasta;
     $('#solo-vencidas').checked = _mantSoloVencidas;
 
-    $('#dias-selector').addEventListener('change', onDiasChange);
+    $('#fecha-desde').addEventListener('change', onFechaDesdeChange);
+    $('#fecha-hasta').addEventListener('change', onFechaHastaChange);
     $('#machine-selector').addEventListener('change', onMachineChange);
     $('#periodicidad-selector').addEventListener('change', onPeriodicidadChange);
     $('#solo-vencidas').addEventListener('change', onSoloVencidasChange);

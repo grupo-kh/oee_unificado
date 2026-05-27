@@ -276,7 +276,7 @@ function _exportCumplXlsx(array $global, array $perMesAcc, string $filtrosTxt, s
     $ws2 = $book->createSheet();
     $ws2->setTitle('Por mes');
     $headers = ['Mes', 'Cumplimiento (%)', 'Programadas', 'Realizadas',
-                'Completadas', 'No realizadas', 'Vencidas sin marcar', 'Recuperaciones'];
+                'Completadas', 'No realizadas', 'Pendientes', 'Recuperaciones'];
     $headerRow = 1;
     foreach ($headers as $i => $h) $ws2->setCellValue([$i + 1, $headerRow], $h);
     $rangoHead = 'A1:H1';
@@ -412,7 +412,7 @@ function _exportCumplPdf(array $global, array $perMesAcc, string $filtrosTxt, st
             <th>Realizadas</th>
             <th>Completadas</th>
             <th>No realizadas</th>
-            <th>Vencidas sin marcar</th>
+            <th>Pendientes</th>
             <th>Recuperaciones</th>
         </tr>
     </thead>
@@ -434,8 +434,8 @@ function _exportCumplPdf(array $global, array $perMesAcc, string $filtrosTxt, st
     </tbody>
 </table>
 <div class="leyenda">
-    "Vencidas sin marcar" son tareas cuya fecha de próxima revisión ya pasó pero
-    nadie las ha marcado todavía: cuentan como pendientes en el cálculo del mes.
+    Las "Pendientes" son tareas cuya fecha de próxima revisión ya pasó pero
+    nadie las ha marcado todavía: cuentan como no realizadas en el cálculo del mes.
     Una tarea marcada como "Recuperación" suma como realizada en el mes en que
     se hizo, no en el mes original.
 </div>

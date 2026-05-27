@@ -436,7 +436,7 @@ async function cargarMesDetalle() {
             <span class="mant-stat-pill"><b>${t.total ?? 0}</b> tareas</span>
             <span class="mant-stat-pill mant-stat-pill-ok"><b>${t.realizadas ?? 0}</b> realizadas</span>
             <span class="mant-stat-pill mant-stat-pill-ko"><b>${t.no_realizadas ?? 0}</b> no realizadas</span>
-            <span class="mant-stat-pill mant-stat-pill-ko"><b>${t.vencidas_sin_marcar ?? 0}</b> vencidas sin marcar</span>
+            <span class="mant-stat-pill mant-stat-pill-ko"><b>${t.vencidas_sin_marcar ?? 0}</b> pendientes</span>
             <span class="mant-stat-pill mant-stat-pill-rec"><b>${t.recuperaciones ?? 0}</b> recuperadas</span>
             <span class="mant-stat-pill mant-stat-pill-cumpl">cumplimiento <b>${cumpl}</b></span>
         `;
@@ -459,7 +459,7 @@ function renderMesDetalleTabla(rows) {
         let badge;
         if      (r.tipo === 'no_realizada')        badge = '<span class="mant-source-badge mant-source-missed">NO REALIZADA</span>';
         else if (r.tipo === 'recuperacion')        badge = '<span class="mant-source-badge mant-source-catchup">RECUPERACIÓN</span>';
-        else if (r.tipo === 'vencida_sin_marcar') badge = '<span class="mant-source-badge mant-source-missed">VENCIDA SIN MARCAR</span>';
+        else if (r.tipo === 'vencida_sin_marcar') badge = '<span class="mant-source-badge mant-source-missed">PENDIENTE</span>';
         else                                       badge = '<span class="mant-source-badge mant-source-web">REALIZADA</span>';
 
         // Resumimos a "Realizada / Pendiente / Recuperada":
@@ -476,7 +476,7 @@ function renderMesDetalleTabla(rows) {
                 ? `<span class="mant-pill-status mant-pill-pendiente">Pendiente</span> <span class="mant-cod">· ${escHtml(motivo)}</span>`
                 : `<span class="mant-pill-status mant-pill-pendiente">Pendiente</span>`;
         } else if (r.tipo === 'vencida_sin_marcar') {
-            obs = `<span class="mant-pill-status mant-pill-pendiente">Pendiente</span> <span class="mant-cod">· sin imputar</span>`;
+            obs = `<span class="mant-pill-status mant-pill-pendiente">Pendiente</span>`;
         } else if (obsTxt && !obsIsSeed) {
             obs = `<span class="mant-pill-status mant-pill-realizada">Realizada</span> <span class="mant-cod">· ${escHtml(obsTxt)}</span>`;
         } else {
@@ -732,7 +732,7 @@ function actualizarLeyendaGauge(g, mesesData) {
     const pct               = g.cumplimiento ?? 0;
 
     const formulaLine = `<strong>Cómo se calcula:</strong> realizadas ${realizadas} `
-        + `/ (realizadas ${realizadas} + no realizadas ${noRealizadas} + vencidas sin marcar ${vencSinMarcar})`
+        + `/ (realizadas ${realizadas} + no realizadas ${noRealizadas} + pendientes ${vencSinMarcar})`
         + ` = <strong>${Number(pct).toFixed(2)} %</strong>.`;
 
     let porQue;

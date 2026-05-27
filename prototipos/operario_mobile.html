@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0d0d">
+<title>KH · Mantenimiento Operario</title>
+<style>
+:root {
+    /* Paleta corporativa KH */
+    --kh-red:        #8c181a;   /* rojo principal corporativo */
+    --kh-red-2:      #a52125;   /* rojo claro para hovers/gradientes */
+    --kh-red-dark:   #6a1213;   /* rojo oscuro para profundidad */
+    --kh-red-bg:     #fbe6e7;   /* fondo claro para badges */
+    --kh-black:      #0d0d0d;
+    --kh-black-2:    #1d1d1d;
+    --kh-amber:      #c47600;
+    --kh-amber-bg:   #fff5e1;
+    --kh-green:      #1f8a3c;
+    --kh-green-bg:   #e3f5e8;
+    --kh-text:       #1a1a1a;
+    --kh-text-soft:  #6b6b6b;
+    --kh-line:       #e7e3e3;
+    --kh-bg:         #f5f3f3;
+    --kh-card:       #ffffff;
+    --kh-shadow:     0 2px 12px rgba(140, 24, 26, 0.08);
+    --kh-shadow-lg:  0 6px 28px rgba(140, 24, 26, 0.20);
+
+    /* Aliases legacy: el JS y el resto del CSS los siguen usando.
+       Reapuntamos al palette nuevo en vez de hacer find/replace.    */
+    --kh-navy:       var(--kh-black);
+    --kh-navy-2:     var(--kh-black-2);
+    --kh-purple:     var(--kh-red);
+    --kh-purple-2:   var(--kh-red-2);
+    --kh-pink:       var(--kh-red-bg);
+    --kh-pink-dark:  var(--kh-red);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body {
+    height: 100%;
+    background: var(--kh-bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--kh-text);
+    overscroll-behavior: none;
+}
+
+button { border: none; background: none; font: inherit; color: inherit; cursor: pointer; }
+input { font: inherit; }
+
+/* ===== Estructura general ===== */
+#app {
+    min-height: 100vh;
+    min-height: 100dvh;
+    max-width: 480px;
+    margin: 0 auto;
+    background: var(--kh-bg);
+    position: relative;
+    box-shadow: 0 0 32px rgba(0,0,0,0.08);
+}
+
+.screen { display: none; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+.screen.active { display: flex; }
+
+.topbar {
+    background: var(--kh-black);
+    color: #fff;
+    padding: 16px 18px;
+    padding-top: calc(16px + env(safe-area-inset-top));
+    display: flex; align-items: center; gap: 12px;
+    position: sticky; top: 0; z-index: 10;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.30);
+    border-bottom: 3px solid var(--kh-red);
+}
+.topbar h1 { font-size: 17px; font-weight: 700; letter-spacing: 0.2px; }
+.topbar .sub { font-size: 12px; opacity: 0.7; margin-top: 1px; }
+.topbar .back {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: grid; place-items: center; background: rgba(255,255,255,0.10);
+    flex-shrink: 0;
+}
+.topbar .back:active { background: rgba(255,255,255,0.20); }
+.topbar .logout {
+    margin-left: auto; font-size: 12px; opacity: 0.7;
+    padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,0.08);
+}
+
+.body { flex: 1; padding: 16px 14px 100px; overflow-y: auto; }
+
+/* ===== Pantalla 1 · Login ===== */
+.login {
+    background:
+        radial-gradient(ellipse at top right, rgba(140, 24, 26, 0.45) 0%, transparent 55%),
+        radial-gradient(ellipse at bottom left, rgba(140, 24, 26, 0.25) 0%, transparent 55%),
+        linear-gradient(180deg, var(--kh-black) 0%, var(--kh-black-2) 70%);
+    color: #fff;
+    padding: 32px 22px;
+    padding-top: calc(32px + env(safe-area-inset-top));
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; flex-direction: column;
+}
+.brand-block {
+    display: flex; align-items: center; gap: 14px;
+    margin: 12px 0 36px;
+    padding: 14px 16px 14px 14px;
+    background: rgba(0, 0, 0, 0.40);
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.brand-logo {
+    width: 52px; height: 52px;
+    flex-shrink: 0;
+}
+.brand-sep {
+    width: 2px; height: 38px;
+    background: rgba(255,255,255,0.85);
+    border-radius: 2px;
+}
+.brand-text { display: flex; flex-direction: column; }
+.brand-block .brand-name {
+    font-family: "Georgia", "Times New Roman", serif;
+    font-size: 30px; font-weight: 700;
+    letter-spacing: 4px; line-height: 1; color: #fff;
+}
+.brand-block .brand-sub  {
+    font-family: "Georgia", "Times New Roman", serif;
+    font-size: 10px; opacity: 0.85;
+    letter-spacing: 5px; margin-top: 4px; color: #fff;
+}
+
+.login h2 { font-size: 26px; line-height: 1.25; margin: 8px 0 6px; font-weight: 700; }
+.login p.helper { font-size: 14px; opacity: 0.7; margin-bottom: 28px; }
+
+.op-input {
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.16);
+    border-radius: 14px;
+    color: #fff;
+    font-size: 30px;
+    text-align: center;
+    font-weight: 600;
+    letter-spacing: 4px;
+    padding: 18px;
+    width: 100%;
+    margin-bottom: 24px;
+    outline: none;
+    transition: border-color 0.15s;
+}
+.op-input::placeholder { color: rgba(255,255,255,0.35); letter-spacing: 0; font-weight: 400; }
+.op-input:focus { border-color: var(--kh-red); background: rgba(255,255,255,0.14); }
+
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.key {
+    aspect-ratio: 1.6 / 1;
+    background: rgba(255,255,255,0.08);
+    border-radius: 14px;
+    font-size: 24px; font-weight: 600; color: #fff;
+    display: grid; place-items: center;
+    transition: background 0.1s, transform 0.05s;
+    user-select: none;
+}
+.key:active { background: rgba(255,255,255,0.18); transform: scale(0.96); }
+.key.action { background: rgba(140, 24, 26, 0.65); }
+.key.action:active { background: var(--kh-red); }
+.key.dim { background: transparent; color: rgba(255,255,255,0.6); }
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--kh-red) 0%, var(--kh-red-2) 100%);
+    color: #fff; font-size: 16px; font-weight: 700;
+    padding: 16px; border-radius: 14px; width: 100%;
+    margin-top: 24px;
+    box-shadow: 0 6px 16px rgba(140, 24, 26, 0.40);
+    transition: transform 0.05s;
+}
+.btn-primary:active { transform: scale(0.98); }
+.btn-primary:disabled { opacity: 0.4; box-shadow: none; }
+
+/* ===== Pantalla 2 · Lista ===== */
+.day-header {
+    background: var(--kh-card);
+    border-radius: 14px;
+    padding: 14px 16px;
+    box-shadow: var(--kh-shadow);
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 12px;
+}
+.day-header .icon {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: var(--kh-pink); color: var(--kh-pink-dark);
+    display: grid; place-items: center; font-size: 18px;
+    flex-shrink: 0;
+}
+.day-header .date-main { font-size: 14px; font-weight: 700; }
+.day-header .date-sub  { font-size: 12px; color: var(--kh-text-soft); margin-top: 1px; }
+
+.counts {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;
+}
+.count-pill {
+    background: var(--kh-card); border-radius: 14px; padding: 12px 14px;
+    box-shadow: var(--kh-shadow);
+    display: flex; align-items: center; gap: 10px;
+}
+.count-pill .dot { width: 10px; height: 10px; border-radius: 50%; }
+.count-pill .dot.red { background: var(--kh-red); }
+.count-pill .dot.amber { background: var(--kh-amber); }
+.count-pill .n { font-size: 20px; font-weight: 800; }
+.count-pill .l { font-size: 11px; color: var(--kh-text-soft); text-transform: uppercase; letter-spacing: 0.4px; }
+
+.section-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--kh-text-soft); margin: 8px 4px 8px; font-weight: 700; }
+
+.task-card {
+    background: var(--kh-card);
+    border-radius: 14px;
+    padding: 14px 16px;
+    box-shadow: var(--kh-shadow);
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 12px;
+    transition: transform 0.05s;
+    border-left: 4px solid transparent;
+}
+.task-card:active { transform: scale(0.99); }
+.task-card.vencida { border-left-color: var(--kh-red); }
+.task-card.hoy     { border-left-color: var(--kh-amber); }
+.task-card .info { flex: 1; min-width: 0; }
+.task-card .maq {
+    font-size: 15px; font-weight: 700;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.task-card .descr {
+    font-size: 13px; color: var(--kh-text-soft); margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.task-card .meta { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.badge {
+    font-size: 10px; padding: 3px 8px; border-radius: 999px;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
+}
+.badge.red { background: var(--kh-red-bg); color: var(--kh-red); }
+.badge.amber { background: var(--kh-amber-bg); color: var(--kh-amber); }
+.badge.purple { background: var(--kh-red-bg); color: var(--kh-red); }
+.badge.pink { background: var(--kh-pink); color: var(--kh-pink-dark); }
+.badge.grey { background: #eef0f4; color: var(--kh-text-soft); }
+.chev {
+    color: var(--kh-text-soft); font-size: 22px; flex-shrink: 0;
+    width: 24px; text-align: right;
+}
+
+/* ===== Pantalla 3 · Cronómetro / Detalle ===== */
+.detail-head {
+    background:
+        radial-gradient(ellipse at top right, rgba(140, 24, 26, 0.55) 0%, transparent 60%),
+        linear-gradient(135deg, var(--kh-black) 0%, var(--kh-black-2) 100%);
+    color: #fff; padding: 20px 18px 24px;
+    margin: -16px -14px 16px; border-radius: 0 0 18px 18px;
+    box-shadow: var(--kh-shadow);
+}
+.detail-head .maq-name { font-size: 18px; font-weight: 800; }
+.detail-head .periodicidad { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+.detail-head .badges-row { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+
+.timer-card {
+    background: var(--kh-card); border-radius: 16px; padding: 22px 18px;
+    box-shadow: var(--kh-shadow); margin-bottom: 14px;
+    text-align: center;
+}
+.timer-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--kh-text-soft); font-weight: 700; }
+.timer {
+    font-size: 56px; font-weight: 800; letter-spacing: -1px; margin: 6px 0 4px;
+    font-variant-numeric: tabular-nums; color: var(--kh-purple);
+}
+.timer-meta { font-size: 12px; color: var(--kh-text-soft); }
+
+.field-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px;
+    background: var(--kh-card);
+    border-radius: 12px;
+    margin-bottom: 8px;
+    box-shadow: var(--kh-shadow);
+}
+.field-row .lbl { font-size: 11px; color: var(--kh-text-soft); text-transform: uppercase; letter-spacing: 0.4px; font-weight: 700; min-width: 90px; }
+.field-row .val { font-size: 14px; font-weight: 600; }
+
+.subtask-card {
+    background: var(--kh-card); border-radius: 14px; padding: 14px 16px;
+    box-shadow: var(--kh-shadow); margin-bottom: 12px;
+}
+.subtask-card h4 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--kh-text-soft); margin-bottom: 10px; }
+.subtask-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--kh-line);
+}
+.subtask-item:last-child { border-bottom: none; }
+.subtask-item .check {
+    width: 26px; height: 26px; border-radius: 8px;
+    border: 2px solid var(--kh-line);
+    flex-shrink: 0; display: grid; place-items: center;
+    transition: all 0.1s;
+    margin-top: 1px;
+}
+.subtask-item.done .check {
+    background: var(--kh-green); border-color: var(--kh-green); color: #fff;
+}
+.subtask-item .txt { font-size: 13px; line-height: 1.4; flex: 1; }
+.subtask-item.done .txt { text-decoration: line-through; color: var(--kh-text-soft); }
+
+.bottom-bar {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    max-width: 480px; margin: 0 auto;
+    background: var(--kh-card);
+    padding: 14px;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.06);
+    display: flex; gap: 10px;
+    z-index: 5;
+}
+.bottom-bar .btn-secondary {
+    flex: 0 0 auto;
+    background: var(--kh-bg); color: var(--kh-text);
+    padding: 14px 16px; border-radius: 12px; font-weight: 700; font-size: 14px;
+}
+.bottom-bar .btn-secondary:active { background: var(--kh-line); }
+.bottom-bar .btn-finish {
+    flex: 1;
+    background: var(--kh-green); color: #fff;
+    padding: 14px; border-radius: 12px;
+    font-weight: 700; font-size: 15px;
+    box-shadow: 0 4px 14px rgba(31, 138, 60, 0.30);
+}
+.bottom-bar .btn-finish:active { transform: scale(0.98); }
+.bottom-bar .btn-finish.disabled { opacity: 0.5; background: var(--kh-text-soft); box-shadow: none; }
+
+/* ===== Pantalla 4 · Confirmación ===== */
+.conf-screen {
+    background: linear-gradient(180deg, #fff 0%, var(--kh-bg) 60%);
+    align-items: center; justify-content: center;
+    padding: 28px 24px;
+    padding-bottom: calc(28px + env(safe-area-inset-bottom));
+    text-align: center;
+    flex: 1;
+}
+.conf-icon {
+    width: 92px; height: 92px; border-radius: 50%;
+    background: var(--kh-green-bg);
+    display: grid; place-items: center;
+    font-size: 44px; color: var(--kh-green);
+    margin: 20px auto 18px;
+    animation: pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes pop {
+    0%   { transform: scale(0.4); opacity: 0; }
+    100% { transform: scale(1);   opacity: 1; }
+}
+.conf-title { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+.conf-sub   { font-size: 14px; color: var(--kh-text-soft); margin-bottom: 26px; }
+
+.summary {
+    background: var(--kh-card); border-radius: 16px; padding: 14px 16px;
+    width: 100%; max-width: 360px; box-shadow: var(--kh-shadow);
+    margin-bottom: 18px;
+}
+.summary .row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--kh-line);
+    font-size: 14px;
+}
+.summary .row:last-child { border-bottom: none; }
+.summary .row .lbl { color: var(--kh-text-soft); }
+.summary .row .val { font-weight: 700; }
+
+.empty-state {
+    background: var(--kh-card); border-radius: 14px;
+    padding: 36px 24px; text-align: center; box-shadow: var(--kh-shadow);
+}
+.empty-state .e-icon { font-size: 42px; margin-bottom: 8px; }
+.empty-state .e-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.empty-state .e-sub { font-size: 13px; color: var(--kh-text-soft); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ════════════════ PANTALLA 1 · LOGIN ════════════════ -->
+  <div id="screen-login" class="screen active">
+    <div class="login">
+        <div class="brand-block">
+            <svg class="brand-logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-label="KH">
+                <!-- Símbolo K en clover de 4 lóbulos rojos -->
+                <g fill="#c8182b">
+                    <circle cx="28" cy="28" r="20"/>
+                    <circle cx="72" cy="28" r="14"/>
+                    <circle cx="28" cy="72" r="14"/>
+                    <circle cx="72" cy="72" r="20"/>
+                </g>
+                <!-- Punto central que une los lóbulos en forma de K -->
+                <circle cx="50" cy="50" r="5" fill="#c8182b"/>
+            </svg>
+            <div class="brand-sep"></div>
+            <div class="brand-text">
+                <div class="brand-name">KH</div>
+                <div class="brand-sub">KNOW HOW</div>
+            </div>
+        </div>
+
+        <h2>Identifícate</h2>
+        <p class="helper">Introduce tu número de operario para empezar el turno.</p>
+
+        <input id="op-input" class="op-input" type="tel" inputmode="numeric"
+               pattern="[0-9]*" maxlength="6" placeholder="Nº de operario"
+               autocomplete="off" readonly>
+
+        <div class="keypad">
+            <button class="key" data-k="1">1</button>
+            <button class="key" data-k="2">2</button>
+            <button class="key" data-k="3">3</button>
+            <button class="key" data-k="4">4</button>
+            <button class="key" data-k="5">5</button>
+            <button class="key" data-k="6">6</button>
+            <button class="key" data-k="7">7</button>
+            <button class="key" data-k="8">8</button>
+            <button class="key" data-k="9">9</button>
+            <button class="key dim" data-k="clear">×</button>
+            <button class="key" data-k="0">0</button>
+            <button class="key dim" data-k="back">⌫</button>
+        </div>
+
+        <button id="btn-login" class="btn-primary" disabled>Entrar</button>
+    </div>
+  </div>
+
+  <!-- ════════════════ PANTALLA 2 · LISTA ════════════════ -->
+  <div id="screen-list" class="screen">
+    <div class="topbar">
+        <div>
+            <h1 id="hello-op">Hola, Operario</h1>
+            <div class="sub">Turno del jueves 21/05/2026</div>
+        </div>
+        <button class="logout" onclick="cerrarSesion()">Salir</button>
+    </div>
+    <div class="body">
+
+        <div class="day-header">
+            <div class="icon">21</div>
+            <div>
+                <div class="date-main">Jueves, 21 de mayo</div>
+                <div class="date-sub">Tareas vencidas y de hoy</div>
+            </div>
+        </div>
+
+        <div class="counts">
+            <div class="count-pill">
+                <span class="dot red"></span>
+                <div>
+                    <div class="n" id="cnt-vencidas">3</div>
+                    <div class="l">Vencidas</div>
+                </div>
+            </div>
+            <div class="count-pill">
+                <span class="dot amber"></span>
+                <div>
+                    <div class="n" id="cnt-hoy">2</div>
+                    <div class="l">Caducan hoy</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title" id="lbl-vencidas">Vencidas</div>
+        <div id="list-vencidas"></div>
+
+        <div class="section-title" id="lbl-hoy">Caducan hoy</div>
+        <div id="list-hoy"></div>
+
+    </div>
+  </div>
+
+  <!-- ════════════════ PANTALLA 3 · DETALLE / CRONÓMETRO ════════════════ -->
+  <div id="screen-detail" class="screen">
+    <div class="topbar">
+        <button class="back" onclick="volverALista()" aria-label="Volver">‹</button>
+        <div>
+            <h1>Tarea en curso</h1>
+            <div class="sub" id="detail-bread">—</div>
+        </div>
+    </div>
+    <div class="body">
+
+        <div class="detail-head">
+            <div class="maq-name" id="d-maq">RACK LUNETAS TA - 01</div>
+            <div class="periodicidad" id="d-per">Periodicidad TRIMESTRAL · 14 sub-tareas</div>
+            <div class="badges-row" id="d-badges"></div>
+        </div>
+
+        <div class="timer-card">
+            <div class="timer-label">Tiempo en curso</div>
+            <div class="timer" id="timer-display">00:00</div>
+            <div class="timer-meta" id="timer-meta">Iniciado a las —</div>
+        </div>
+
+        <div class="field-row">
+            <div class="lbl">Operario</div>
+            <div class="val" id="d-op">—</div>
+        </div>
+        <div class="field-row">
+            <div class="lbl">Fecha</div>
+            <div class="val" id="d-fecha">—</div>
+        </div>
+
+        <div class="subtask-card" id="subtask-block">
+            <h4>Sub-tareas de la visita</h4>
+            <div id="subtask-list"></div>
+        </div>
+
+    </div>
+
+    <div class="bottom-bar">
+        <button class="btn-secondary" onclick="cancelar()">Cancelar</button>
+        <button id="btn-finish" class="btn-finish disabled" onclick="finalizar()">
+            Marcar como realizada
+        </button>
+    </div>
+  </div>
+
+  <!-- ════════════════ PANTALLA 4 · CONFIRMACIÓN ════════════════ -->
+  <div id="screen-conf" class="screen">
+    <div class="conf-screen">
+        <div class="conf-icon">✓</div>
+        <div class="conf-title">Revisión registrada</div>
+        <div class="conf-sub">Se ha guardado correctamente en el histórico.</div>
+
+        <div class="summary">
+            <div class="row"><div class="lbl">Máquina</div><div class="val" id="c-maq">—</div></div>
+            <div class="row"><div class="lbl">Operario</div><div class="val" id="c-op">—</div></div>
+            <div class="row"><div class="lbl">Fecha</div><div class="val" id="c-fecha">—</div></div>
+            <div class="row"><div class="lbl">Inicio</div><div class="val" id="c-inicio">—</div></div>
+            <div class="row"><div class="lbl">Duración</div><div class="val" id="c-dur">—</div></div>
+        </div>
+
+        <button class="btn-primary" onclick="continuar()" style="max-width: 360px;">
+            Continuar con la siguiente
+        </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   PROTOTIPO — datos mock
+   ════════════════════════════════════════════════════════════ */
+const MOCK_TASKS = [
+    {
+        id: 1, maq: 'RACK LUNETAS TA - 01', tipo: 'consolidada',
+        per: 'TRIMESTRAL', fpo: '2026-05-12', estado: 'vencida',
+        descCorta: 'Revisión completa · 14 sub-tareas',
+        subtareas: [
+            'LIMPIEZA INTERIOR RACK. Sin restos de vidrios.',
+            'ESTRUCTURA METÁLICA. Comprobar daños.',
+            'PROTECCIONES ENGOMADAS + barra tope lateral.',
+            'PEINES. Comprobar estado y sujeción.',
+            'RESORTES GAS-BRAZOS. Estado tornillería.',
+            'ESTADO PINTURA. Repintar zonas gastadas.',
+            'PRESENCIA Y ESTADO portadocumentos.',
+            'DIMENSIONADO RACK.',
+            'FUNDA PALAS. Sin golpes ni grietas.',
+            'RESORTES GAS-BRAZOS. Fuerza de cada amortiguador.',
+            'LUBRICACIÓN ejes de brazos separadores.',
+            'ETIQUETA. Verificar numeración física.',
+            'PEINES ABATIBLES. Zona de contacto.',
+            'PEINE CENTRAL. Movimiento de retorno.',
+        ],
+    },
+    {
+        id: 2, maq: 'ETIQUETADORA 01', tipo: 'individual',
+        per: 'MENSUAL', fpo: '2026-05-15', estado: 'vencida',
+        descCorta: 'Engrase de cadenas de transporte',
+        subtareas: null,
+    },
+    {
+        id: 3, maq: 'RACK PARABRISAS TA - 04', tipo: 'consolidada',
+        per: 'TRIMESTRAL', fpo: '2026-05-18', estado: 'vencida',
+        descCorta: 'Revisión completa · 14 sub-tareas',
+        subtareas: [
+            'LIMPIEZA INTERIOR RACK.',
+            'ESTRUCTURA METÁLICA.',
+            'PROTECCIONES ENGOMADAS.',
+            'PEINES.',
+            'RESORTES GAS-BRAZOS.',
+            'ESTADO PINTURA.',
+            'PRESENCIA Y ESTADO portadocumentos.',
+            'DIMENSIONADO RACK.',
+            'FUNDA PALAS.',
+            'AMORTIGUADORES.',
+            'LUBRICACIÓN.',
+            'ETIQUETA numeración.',
+            'TORNILLO PRIMERA POSICIÓN.',
+            'PEINES ADICIONALES.',
+        ],
+    },
+    {
+        id: 4, maq: 'PLATAFORMA TA - 02', tipo: 'consolidada',
+        per: 'MENSUAL', fpo: '2026-05-21', estado: 'hoy',
+        descCorta: 'Revisión mensual · 8 sub-tareas',
+        subtareas: [
+            'Verificar nivel hidráulico.',
+            'Inspección de cilindros.',
+            'Estado de mangueras.',
+            'Funcionamiento botoneras.',
+            'Sistema de seguridad de emergencia.',
+            'Lubricación articulaciones.',
+            'Estado bandejas y barandillas.',
+            'Comprobación de pesos.',
+        ],
+    },
+    {
+        id: 5, maq: 'ETIQUETADORA 02', tipo: 'individual',
+        per: 'SEMANAL', fpo: '2026-05-21', estado: 'hoy',
+        descCorta: 'Limpieza cabezales',
+        subtareas: null,
+    },
+];
+
+/* ════════════════════════════════════════════════════════════
+   Estado
+   ════════════════════════════════════════════════════════════ */
+const state = {
+    opNumero: null,
+    tareaActual: null,
+    inicio: null,        // Date
+    timerId: null,
+    subtareasDone: [],   // boolean[]
+};
+
+/* ════════════════════════════════════════════════════════════
+   Navegación entre pantallas
+   ════════════════════════════════════════════════════════════ */
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    window.scrollTo(0, 0);
+}
+
+/* ════════════════════════════════════════════════════════════
+   Pantalla 1 · Login
+   ════════════════════════════════════════════════════════════ */
+const opInput = document.getElementById('op-input');
+const btnLogin = document.getElementById('btn-login');
+
+document.querySelectorAll('.keypad .key').forEach(k => {
+    k.addEventListener('click', () => {
+        const v = k.dataset.k;
+        if (v === 'back')       opInput.value = opInput.value.slice(0, -1);
+        else if (v === 'clear') opInput.value = '';
+        else if (opInput.value.length < 6) opInput.value += v;
+        btnLogin.disabled = opInput.value.length < 2;
+    });
+});
+
+btnLogin.addEventListener('click', () => {
+    if (opInput.value.length < 2) return;
+    state.opNumero = opInput.value;
+    document.getElementById('hello-op').textContent = 'Hola, Operario ' + state.opNumero;
+    renderLista();
+    showScreen('screen-list');
+});
+
+function cerrarSesion() {
+    if (!confirm('¿Cerrar sesión?')) return;
+    state.opNumero = null;
+    opInput.value = '';
+    btnLogin.disabled = true;
+    showScreen('screen-login');
+}
+
+/* ════════════════════════════════════════════════════════════
+   Pantalla 2 · Lista
+   ════════════════════════════════════════════════════════════ */
+function renderLista() {
+    const v = MOCK_TASKS.filter(t => t.estado === 'vencida').sort((a,b) => a.fpo.localeCompare(b.fpo));
+    const h = MOCK_TASKS.filter(t => t.estado === 'hoy');
+    document.getElementById('cnt-vencidas').textContent = v.length;
+    document.getElementById('cnt-hoy').textContent     = h.length;
+
+    const wrapV = document.getElementById('list-vencidas');
+    const wrapH = document.getElementById('list-hoy');
+    document.getElementById('lbl-vencidas').style.display = v.length ? '' : 'none';
+    document.getElementById('lbl-hoy').style.display      = h.length ? '' : 'none';
+
+    wrapV.innerHTML = v.map(taskCardHtml).join('');
+    wrapH.innerHTML = h.map(taskCardHtml).join('');
+
+    if (!v.length && !h.length) {
+        wrapV.innerHTML = `<div class="empty-state">
+            <div class="e-icon">🎉</div>
+            <div class="e-title">¡Todo al día!</div>
+            <div class="e-sub">No tienes tareas vencidas ni de hoy.</div>
+        </div>`;
+    }
+
+    // bind taps
+    document.querySelectorAll('.task-card[data-id]').forEach(c => {
+        c.addEventListener('click', () => abrirTarea(parseInt(c.dataset.id, 10)));
+    });
+}
+
+function taskCardHtml(t) {
+    const dias = diasVencimiento(t.fpo);
+    const badge = t.estado === 'vencida'
+        ? `<span class="badge red">Vencida · ${dias} d</span>`
+        : `<span class="badge amber">Caduca hoy</span>`;
+    const tipo = t.tipo === 'consolidada' ? 'CONSOLIDADA' : 'INDIVIDUAL';
+    return `<div class="task-card ${t.estado}" data-id="${t.id}">
+        <div class="info">
+            <div class="maq">${t.maq}</div>
+            <div class="descr">${t.descCorta}</div>
+            <div class="meta">
+                ${badge}
+                <span class="badge pink">${t.per}</span>
+                <span class="badge grey">${tipo}</span>
+            </div>
+        </div>
+        <div class="chev">›</div>
+    </div>`;
+}
+
+function diasVencimiento(fpo) {
+    const hoy = new Date('2026-05-21');  // mock hoy
+    const f = new Date(fpo);
+    const d = Math.round((hoy - f) / (1000 * 60 * 60 * 24));
+    return d;
+}
+
+/* ════════════════════════════════════════════════════════════
+   Pantalla 3 · Detalle / Cronómetro
+   ════════════════════════════════════════════════════════════ */
+function abrirTarea(id) {
+    const t = MOCK_TASKS.find(x => x.id === id);
+    if (!t) return;
+    state.tareaActual  = t;
+    state.inicio       = new Date();
+    state.subtareasDone = (t.subtareas || []).map(() => false);
+
+    document.getElementById('d-maq').textContent = t.maq;
+    document.getElementById('d-per').textContent =
+        'Periodicidad ' + t.per + (t.subtareas ? ' · ' + t.subtareas.length + ' sub-tareas' : '');
+    document.getElementById('d-badges').innerHTML =
+        (t.estado === 'vencida' ? `<span class="badge red">Vencida</span>` : `<span class="badge amber">Caduca hoy</span>`) +
+        `<span class="badge pink">${t.per}</span>`;
+    document.getElementById('detail-bread').textContent = t.maq;
+    document.getElementById('d-op').textContent    = 'Operario ' + state.opNumero;
+    document.getElementById('d-fecha').textContent = fmtFechaHoy() + ' · ' + fmtHora(state.inicio);
+
+    document.getElementById('timer-meta').textContent = 'Iniciado a las ' + fmtHora(state.inicio);
+
+    const sub = document.getElementById('subtask-block');
+    if (t.subtareas && t.subtareas.length) {
+        sub.style.display = '';
+        document.getElementById('subtask-list').innerHTML = t.subtareas.map((s, i) => `
+            <div class="subtask-item" data-i="${i}">
+                <div class="check">✓</div>
+                <div class="txt">${s}</div>
+            </div>
+        `).join('');
+        document.querySelectorAll('.subtask-item').forEach(el => {
+            el.addEventListener('click', () => {
+                const i = parseInt(el.dataset.i, 10);
+                state.subtareasDone[i] = !state.subtareasDone[i];
+                el.classList.toggle('done', state.subtareasDone[i]);
+                actualizarBotonFinalizar();
+            });
+        });
+    } else {
+        sub.style.display = 'none';
+    }
+
+    actualizarBotonFinalizar();
+    arrancarTimer();
+    showScreen('screen-detail');
+}
+
+function arrancarTimer() {
+    pararTimer();
+    const display = document.getElementById('timer-display');
+    state.timerId = setInterval(() => {
+        const ms = Date.now() - state.inicio.getTime();
+        const s  = Math.floor(ms / 1000);
+        const mm = String(Math.floor(s / 60)).padStart(2, '0');
+        const ss = String(s % 60).padStart(2, '0');
+        display.textContent = mm + ':' + ss;
+    }, 250);
+}
+
+function pararTimer() {
+    if (state.timerId) { clearInterval(state.timerId); state.timerId = null; }
+}
+
+function actualizarBotonFinalizar() {
+    const btn = document.getElementById('btn-finish');
+    const t = state.tareaActual;
+    if (!t) return;
+    if (!t.subtareas) {
+        btn.classList.remove('disabled');
+        btn.textContent = 'Marcar como realizada';
+        return;
+    }
+    const done   = state.subtareasDone.filter(Boolean).length;
+    const total  = state.subtareasDone.length;
+    if (done === 0) {
+        btn.classList.add('disabled');
+        btn.textContent = 'Marcar como realizada';
+    } else if (done < total) {
+        btn.classList.remove('disabled');
+        btn.textContent = `Marcar como INCOMPLETA · ${done}/${total}`;
+    } else {
+        btn.classList.remove('disabled');
+        btn.textContent = `Marcar como realizada · ${done}/${total}`;
+    }
+}
+
+function cancelar() {
+    if (!confirm('¿Cancelar esta tarea? Se descartará el tiempo cronometrado.')) return;
+    pararTimer();
+    state.tareaActual = null;
+    showScreen('screen-list');
+}
+
+function volverALista() {
+    if (!confirm('¿Volver a la lista? Se descartará el tiempo cronometrado.')) return;
+    pararTimer();
+    state.tareaActual = null;
+    showScreen('screen-list');
+}
+
+/* ════════════════════════════════════════════════════════════
+   Pantalla 4 · Confirmación
+   ════════════════════════════════════════════════════════════ */
+function finalizar() {
+    const btn = document.getElementById('btn-finish');
+    if (btn.classList.contains('disabled')) return;
+    const t = state.tareaActual;
+    if (!t) return;
+    const fin = new Date();
+    const dur = Math.floor((fin - state.inicio) / 1000);
+
+    pararTimer();
+
+    document.getElementById('c-maq').textContent    = t.maq;
+    document.getElementById('c-op').textContent     = state.opNumero;
+    document.getElementById('c-fecha').textContent  = fmtFechaHoy();
+    document.getElementById('c-inicio').textContent = fmtHora(state.inicio);
+    document.getElementById('c-dur').textContent    = fmtDuracion(dur);
+
+    // Marcamos en mock como completada
+    const idx = MOCK_TASKS.findIndex(x => x.id === t.id);
+    if (idx >= 0) MOCK_TASKS.splice(idx, 1);
+
+    showScreen('screen-conf');
+}
+
+function continuar() {
+    state.tareaActual = null;
+    renderLista();
+    showScreen('screen-list');
+}
+
+/* ════════════════════════════════════════════════════════════
+   Formateo
+   ════════════════════════════════════════════════════════════ */
+function fmtHora(d) {
+    return String(d.getHours()).padStart(2,'0') + ':' +
+           String(d.getMinutes()).padStart(2,'0');
+}
+function fmtFechaHoy() {
+    const d = new Date();
+    return String(d.getDate()).padStart(2,'0') + '/' +
+           String(d.getMonth() + 1).padStart(2,'0') + '/' +
+           d.getFullYear();
+}
+function fmtDuracion(s) {
+    const m = Math.floor(s / 60);
+    const ss = s % 60;
+    if (m === 0) return ss + ' s';
+    if (m < 60)  return m + ' min ' + ss + ' s';
+    const h = Math.floor(m / 60);
+    return h + ' h ' + (m % 60) + ' min';
+}
+</script>
+</body>
+</html>

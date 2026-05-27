@@ -17,12 +17,43 @@ Auth::requireLoginApi();
  *   - solo_vencidas     (0/1): si 1, devuelve solo las que ya pasaron.
  */
 try {
-    $diasRaw = getParam('dias', '30');
-    $dias    = max(1, min(365, (int)$diasRaw));
+    // Compat: si llega `dias` antiguo, lo convertimos a rango (hoy → hoy+dias).
+    $hoy = date('Y-m-d');
+    $fdesde = (string) getParam('fecha_desde', '');
+    $fhasta = (string) getParam('fecha_hasta', '');
+    $diasRaw = getParam('dias', '');
+    if ($fdesde === '' || $fhasta === '') {
+        // Defaults: 90 días atrás → hoy+30. El "atrás" garantiza que las
+        // tareas vencidas se vean al cargar; el "adelante" muestra próximas.
+        $dias = max(1, min(365, (int)($diasRaw !== '' ? $diasRaw : 30)));
+        if ($fdesde === '') $fdesde = date('Y-m-d', strtotime("-90 days"));
+        if ($fhasta === '') $fhasta = date('Y-m-d', strtotime("+$dias days"));
+    }
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fdesde)) jsonError('fecha_desde inválida');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fhasta)) jsonError('fecha_hasta inválida');
+    if ($fhasta < $fdesde) { $tmp = $fdesde; $fdesde = $fhasta; $fhasta = $tmp; }
 
     $cm = getParam('cod_maquina_mant');
     $pe = getParam('periodicidad');
     $solo = (int)getParam('solo_vencidas', '0') === 1;
+
+    // Gap por periodicidad antes de declarar una tarea "vencida". Una tarea
+    // semanal puede estar 3 días retrasada sin alarmar, una mensual una
+    // semana, y así progresivamente.
+    $gapVencida = function(string $per): int {
+        switch (strtoupper(trim($per))) {
+            case 'DIARIO': case 'DIARIA':      return 1;
+            case 'SEMANAL':                    return 3;
+            case 'QUINCENAL':                  return 5;
+            case 'MENSUAL':                    return 7;
+            case 'BIMESTRAL': case 'BIMENSUAL': return 10;
+            case 'TRIMESTRAL':                 return 14;
+            case 'CUATRIMESTRAL':              return 18;
+            case 'SEMESTRAL':                  return 21;
+            case 'ANUAL':                      return 30;
+            default:                           return 0;
+        }
+    };
 
     $data = MaintenancePlanStore::load();
     $marcadasIdx = MaintenanceCompletionStore::loadIndexed();
@@ -47,14 +78,17 @@ try {
     // separadas por días en una misma máquina (las del grupo SECUENCIA).
     $proximas = MaintenancePlanStore::consolidateSecuenciaProximas($proximasFiltradas);
 
-    $hoy = date('Y-m-d');
-    $limite = date('Y-m-d', strtotime("+$dias days"));
-
+    // El rango efectivo es [$fdesde, $fhasta]. Ya no usamos $dias.
     $rows = [];
     $maquinasSet = [];
     $periodicidadesSet = [];
     // Operarios desde el almacén web (el histórico de Excel ya no se usa).
+    // Para filtros del listado: todos los que han intervenido (incluye históricos).
     $operarios = MaintenanceCompletionStore::loadOperarios();
+    // Para el desplegable del popup "marcar como hecha": SOLO los activos del
+    // catálogo (mant_operarios.activo=TRUE) con su nombre legible. El JS lo
+    // usa para mostrar nombres en lugar de códigos.
+    $operariosActivos = MaintenanceCompletionStore::loadOperariosActivos();
 
     foreach ($proximas as $p) {
         // Aplicar override de periodicidad si existe (afecta a periodicidad
@@ -92,12 +126,33 @@ try {
         if ($solo) {
             if ($diff >= 0) continue;
         } else {
-            if ($diff > $dias) continue;
+            // Filtramos por rango efectivo [fdesde, fhasta]. La proxima_revision
+            // debe caer dentro del rango. Las vencidas (px < hoy) se incluyen
+            // siempre si fdesde ≤ hoy.
+            if ($px < $fdesde || $px > $fhasta) continue;
         }
 
+        // Vencida con GAP por periodicidad. Una tarea solo se marca vencida
+        // cuando lleva más de N días retrasada según su cadencia.
+        $perEff = (string)($eff['periodicidad'] ?? '');
+        $gap    = $gapVencida($perEff);
+        // Estados:
+        //   - vencida : diff < -gap (pasó el margen de tolerancia)
+        //   - próxima : -gap ≤ diff ≤ 10 (a punto de vencer, aún en plazo)
+        //   - en_plazo: diff > 10 (con holgura)
+        // Internamente seguimos llamando 'urgente' al estado de "próxima" para
+        // no romper el JS / exports / CSS legacy; las etiquetas visibles ya
+        // dicen "Próxima".
+        $estado = 'en_plazo';
+        if ($diff < -$gap) {
+            $estado = 'vencida';
+        } elseif ($diff <= 10) {
+            $estado = 'urgente';
+        }
         $rows[] = $eff + [
             'dias_restantes' => $diff,
-            'estado'         => $diff < 0 ? 'vencida' : ($diff <= 7 ? 'urgente' : 'en_plazo'),
+            'gap_vencida'    => $gap,
+            'estado'         => $estado,
         ];
     }
 
@@ -147,9 +202,9 @@ try {
     sort($periodicidades);
 
     jsonOk([
-        'dias'             => $dias,
+        'fecha_desde'      => $fdesde,
+        'fecha_hasta'      => $fhasta,
         'hoy'              => $hoy,
-        'limite'           => $limite,
         'cod_maquina_mant' => $cm ?: null,
         'periodicidad'     => $pe ?: null,
         'solo_vencidas'    => $solo,
@@ -163,6 +218,7 @@ try {
         'maquinas'         => $maquinas,
         'periodicidades'   => $periodicidades,
         'operarios'        => $operarios,
+        'operarios_activos'=> $operariosActivos,
         'total_marcadas'   => count($marcadasIdx),
         'fichero_actualizado' => date('Y-m-d H:i:s', $data['file_mtime']),
     ]);

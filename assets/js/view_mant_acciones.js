@@ -25,9 +25,9 @@ let _accPath = [];
 const ACC_GROUPS = {
     SECUENCIA: {
         title:    'SECUENCIA',
-        subtitle: 'Líneas de secuencia: E66, racks y plataformas',
+        subtitle: 'Líneas de secuencia: E66, racks, plataformas y troleys',
         gradient: 'linear-gradient(135deg, #312e81, #6366f1)',
-        children: ['E66', 'RACKS', 'PLATAFORMAS'],
+        children: ['E66', 'RACKS', 'PLATAFORMAS', 'TROLEYS'],
     },
     E66: {
         title:    'E66',
@@ -57,6 +57,20 @@ const ACC_GROUPS = {
         subtitle: 'Plataformas de manejo',
         gradient: 'linear-gradient(135deg, #c2410c, #fb923c)',
         match:    desc => /^PLATAFORMA/i.test(desc),
+        parent:   'SECUENCIA',
+    },
+    TROLEYS: {
+        title:    'TROLEYS',
+        subtitle: 'Carretillas / troleys de transporte',
+        gradient: 'linear-gradient(135deg, #166534, #22c55e)',
+        // Wrapper dinámico: cada máquina cuyo desc empieza por TROLEY genera
+        // una familia (p. ej. "TROLEY CUSTODIAS"). El sufijo numérico final
+        // " - NN" se elimina para agrupar todos los TROLEY CUSTODIAS juntos.
+        dynamicFamily: desc => {
+            const s = String(desc ?? '').trim();
+            if (!/^TROLEY[\s\-]/i.test(s)) return null;
+            return s.replace(/\s*-\s*\d+\s*$/, '').trim().toUpperCase();
+        },
         parent:   'SECUENCIA',
     },
 };
@@ -199,8 +213,28 @@ function renderMaquinaCard(m) {
     // Etiquetas de origen ('web' / contador de tareas añadidas) eliminadas
     // a petición del usuario — la procedencia ya no se distingue en la UI.
     const empty = m.task_count === 0 ? ' acc-card-empty' : '';
+    // La badge naranja "PAUSADA" SOLO debe aparecer en los racks de las
+    // familias que el usuario marcó como pausadas (CUSTODIAS / LUNETAS /
+    // PARABRISAS TA). Para cualquier otra máquina — aunque tenga todas sus
+    // tareas con fecha_pausado por otros motivos — NO se pinta la pill,
+    // porque no representa el caso "rack en pausa institucional".
+    const desc = String(m.desc_maquina || '').toUpperCase();
+    // Familias pausables institucionalmente (no se les hace mantenimiento):
+    //   - RACK CUSTODIAS / LUNETAS / PARABRISAS  TA  (LH+RH)
+    //   - RACK PUERTAS TB TRA  (LH+RH)
+    //   - RACK PUERTAS TB DEL  (LH+RH)
+    const esRackPausable =
+           /^RACK\s+(CUSTODIAS|LUNETAS|PARABRISAS)\s+TA\s/.test(desc)
+        || /^RACK\s+PUERTAS\s+TB\s+(TRA|DEL)\s/.test(desc);
+    const pausedCount = parseInt(m.paused_count || 0, 10);
+    const taskCount   = parseInt(m.task_count   || 0, 10);
+    const allPaused   = esRackPausable && taskCount > 0 && pausedCount === taskCount;
+    const cardCls     = empty + (allPaused ? ' acc-card-pausada' : '');
+    const pausadaBadge = allPaused
+        ? `<span class="acc-card-badge acc-card-badge-pausada" title="Rack pausado — sin revisiones preventivas">PAUSADA</span>`
+        : '';
     return `
-        <button type="button" class="acc-card${empty}" data-cod="${escHtml(m.cod_maquina_mant)}" data-desc="${escHtml(m.desc_maquina)}">
+        <button type="button" class="acc-card${cardCls}" data-cod="${escHtml(m.cod_maquina_mant)}" data-desc="${escHtml(m.desc_maquina)}">
             <div class="acc-card-icon" style="background: linear-gradient(135deg, #3a6aa3, #5b8cc7)">
                 <svg viewBox="0 0 32 32" width="26" height="26" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="5" y="9" width="22" height="16" rx="2"/>
@@ -215,6 +249,7 @@ function renderMaquinaCard(m) {
             </div>
             <div class="acc-card-footer">
                 <span class="acc-card-badge acc-card-badge-count">${m.task_count} tareas</span>
+                ${pausadaBadge}
             </div>
         </button>
     `;
@@ -240,8 +275,45 @@ function renderGrupoCard(key, members) {
     const subBadge = isWrapper
         ? `<span class="acc-card-badge acc-card-badge-group">${subCount} sub-grupos</span>`
         : '';
+
+    // Badge "PAUSADA" a nivel de grupo: si TODAS las máquinas del grupo
+    // son racks TA pausables (CUSTODIAS / LUNETAS / PARABRISAS) y todas
+    // tienen sus tareas pausadas, pintamos la etiqueta naranja en la
+    // tarjeta-grupo igual que en la tarjeta de máquina individual.
+    //
+    // Si el grupo es heterogéneo (mezcla TA pausados + TB activos +
+    // PUERTAS, p.ej. la familia "RACKS" raíz), miramos el subconjunto
+    // de racks TA pausables: si TODOS los TA del grupo están pausados,
+    // mostramos un badge "TA PAUSADAS" más suave.
+    // Familias pausables (deben coincidir con renderMaquinaCard).
+    const pausableRe1 = /^RACK\s+(CUSTODIAS|LUNETAS|PARABRISAS)\s+TA\s/;
+    const pausableRe2 = /^RACK\s+PUERTAS\s+TB\s+(TRA|DEL)\s/;
+    const isTA = m => {
+        const d = String(m.desc_maquina || '').toUpperCase();
+        return pausableRe1.test(d) || pausableRe2.test(d);
+    };
+    const isFullyPaused = m => {
+        const pc = parseInt(m.paused_count || 0, 10);
+        const tc = parseInt(m.task_count   || 0, 10);
+        return tc > 0 && pc === tc;
+    };
+    const pausables     = members.filter(isTA);                              // miembros candidatos a pausa institucional
+    const pausedMembers = members.filter(m => isTA(m) && isFullyPaused(m)); // de esos, los que están totalmente pausados
+    let groupPausadaBadge = '';
+    let groupCls          = '';
+    if (pausables.length > 0 && pausables.length === pausedMembers.length) {
+        // Si el grupo es homogéneo (100% pausable) y todas pausadas → badge fuerte
+        if (members.length === pausables.length) {
+            groupPausadaBadge = `<span class="acc-card-badge acc-card-badge-pausada" title="Grupo pausado — sin revisiones preventivas">PAUSADA</span>`;
+            groupCls = ' acc-card-pausada';
+        } else {
+            // Mezcla pausables + otras activas → badge informativo
+            groupPausadaBadge = `<span class="acc-card-badge acc-card-badge-pausada-parcial" title="${pausedMembers.length} máquinas pausadas en este grupo">${pausedMembers.length} PAUSADAS</span>`;
+        }
+    }
+
     return `
-        <button type="button" class="acc-card acc-card-group${isWrapper ? ' acc-card-wrapper' : ''}" data-group="${escHtml(key)}">
+        <button type="button" class="acc-card acc-card-group${isWrapper ? ' acc-card-wrapper' : ''}${groupCls}" data-group="${escHtml(key)}">
             <div class="acc-card-icon" style="background: ${def.gradient}">
                 <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
@@ -255,6 +327,7 @@ function renderGrupoCard(key, members) {
                 ${subBadge}
                 <span class="acc-card-badge acc-card-badge-group">${members.length} máquinas</span>
                 <span class="acc-card-badge acc-card-badge-count">${totalTareas} tareas</span>
+                ${groupPausadaBadge}
             </div>
         </button>
     `;

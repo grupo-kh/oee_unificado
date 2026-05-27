@@ -108,6 +108,40 @@ class MaintenanceCompletionStore
         return $arr;
     }
 
+    /**
+     * Catálogo de operarios ACTIVOS (mant_operarios.activo = TRUE).
+     *
+     * Devuelve [{numero: '881', nombre: 'Juan Navarro'}, …] ordenado por
+     * nombre. Es lo que las vistas/popups deben usar para alimentar el
+     * dropdown "Operario" en NUEVAS marcas — el resto del catálogo
+     * (operarios históricos ya inactivos) sigue accesible vía loadOperarios()
+     * para no romper filtros del histórico.
+     *
+     * @return array<int, array{numero:string, nombre:string}>
+     */
+    public static function loadOperariosActivos(): array
+    {
+        if (!self::usePg()) return [];
+        try {
+            $rows = Db::pgFetchAll("
+                SELECT numero, COALESCE(NULLIF(TRIM(nombre), ''), numero) AS nombre
+                  FROM mant_operarios
+                 WHERE COALESCE(activo, TRUE) = TRUE
+                 ORDER BY nombre
+            ");
+        } catch (Throwable $e) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = [
+                'numero' => (string)$r['numero'],
+                'nombre' => (string)$r['nombre'],
+            ];
+        }
+        return $out;
+    }
+
     /** Añade o reemplaza un item por external_id. Devuelve el item normalizado. */
     public static function add(array $rec): array
     {
@@ -210,6 +244,33 @@ class MaintenanceCompletionStore
         if ($tiempo < 0) $tiempo = 0;
         if ($tiempo > 36000) $tiempo = 36000;
         return $tiempo;
+    }
+
+    /**
+     * Devuelve una hora aleatoria distribuida por turnos (formato "HH:MM"):
+     *   - Tarde   (14:00–21:59)            → 50 %
+     *   - Mañana  (06:00–13:59)            → 35 %
+     *   - Noche   (22:00–05:59 día siguiente) → 15 %
+     *
+     * La hora "de noche" se modela como 22..23 o 0..5 (mismo día calendario);
+     * el día siguiente lo decide quien llama si quiere mover la fecha de
+     * intervención. Mantenerlo simple = una sola hora HH:MM, sin saltar fecha.
+     */
+    public static function horaTurnoAleatoria(): string
+    {
+        $r = mt_rand(1, 100);
+        if ($r <= 50) {
+            // Tarde 14:00–21:59
+            $h = mt_rand(14, 21);
+        } elseif ($r <= 85) {
+            // Mañana 06:00–13:59
+            $h = mt_rand(6, 13);
+        } else {
+            // Noche 22:00–23:59 o 00:00–05:59
+            $bloque = mt_rand(0, 1);
+            $h = $bloque === 0 ? mt_rand(22, 23) : mt_rand(0, 5);
+        }
+        return sprintf('%02d:%02d', $h, mt_rand(0, 59));
     }
 
     /**

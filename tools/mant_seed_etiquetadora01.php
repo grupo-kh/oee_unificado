@@ -28,6 +28,7 @@
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../lib/Db.php';
 require_once __DIR__ . '/../lib/MaintenanceCompletionStore.php';
+require_once __DIR__ . '/../lib/CalendarioLaboral.php';
 
 $apply = in_array('--apply', $argv, true);
 
@@ -171,12 +172,13 @@ foreach ($tareas as $t) {
     }
 
     foreach ($fechas as $fpo) {
-        // fecha real = fpo ± hasta 2 días
+        // fecha real = fpo ± hasta 2 días, ajustada a día hábil
         $offset   = mt_rand(-2, 2);
         $fechaInt = date('Y-m-d', strtotime($fpo . ' ' . sprintf('%+d', $offset) . ' days'));
         if ($fechaInt > $hoy) $fechaInt = $hoy;
+        $fechaInt = CalendarioLaboral::ajustarADiaHabil($fechaInt, 'anterior');
 
-        $hora      = sprintf('%02d:%02d', mt_rand(6, 20), mt_rand(0, 59));
+        $hora      = MaintenanceCompletionStore::horaTurnoAleatoria();
         $tiempoSeg = MaintenanceCompletionStore::aplicarDecalajeAleatorio($t['te'] * 60);
         $op        = $ops[mt_rand(0, count($ops) - 1)];
 

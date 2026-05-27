@@ -31,9 +31,16 @@ function escHtml(s) {
 }
 
 function defaultFechas() {
+    // Por defecto el histórico arranca el 1 de enero del año en curso.
+    // Útil para que el usuario vea de un vistazo las intervenciones del año.
     const hoy = new Date();
-    const desde = new Date(hoy.getTime() - 365 * 86400 * 1000);
-    const fmt = d => d.toISOString().substring(0, 10);
+    const desde = new Date(hoy.getFullYear(), 0, 1); // 1 enero año en curso
+    const fmt = d => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${dd}`;
+    };
     return { desde: fmt(desde), hasta: fmt(hoy) };
 }
 
@@ -191,10 +198,23 @@ function _renderFamilyCard(m, autoOpen) {
     `;
 }
 
-// Render del histórico agrupado por máquina → tarea → intervenciones.
-// Cada máquina es una tarjeta plegable; al desplegar muestra la lista de
-// tareas preventivas y, dentro de cada tarea, las fechas e intervenciones
-// (operario, tipo) en el rango filtrado.
+// Clasifica una entrada (máquina o familia) en uno de los 2 grupos top-level
+// que agrupamos (RACKS / TROLEYS). El resto del catálogo se renderiza en la
+// raíz sin agrupar para no añadir un nivel de clic innecesario.
+function _topGroupKey(m) {
+    const d = String(m.desc_maquina || '').toUpperCase();
+    if (/^RACK[\s\-]/.test(d))   return 'RACKS';
+    if (/^TROLEY[\s\-]/.test(d)) return 'TROLEYS';
+    return null;
+}
+const _TOP_GROUP_META = {
+    RACKS:   { title: 'RACKS',   subtitle: 'Estanterías (custodias, lunetas, parabrisas, puertas)',  badge: 'GRUPO', color: '#0e7490' },
+    TROLEYS: { title: 'TROLEYS', subtitle: 'Carretillas (custodias, puertas, parabrisas / lunetas)', badge: 'GRUPO', color: '#166534' },
+};
+
+// Render del histórico agrupado en grupos top-level RACKS y TROLEYS. El
+// resto de máquinas se muestran en la raíz sin agrupar (cada una con su
+// propia tarjeta plegable, como antes).
 function renderMachines(machines) {
     const wrap = $('#mant-machines-wrap');
     if (!wrap) return;
@@ -205,17 +225,81 @@ function renderMachines(machines) {
         return;
     }
 
-    // Si hay solo una entrada (filtro por máquina aplicado), la abrimos
-    // automáticamente para que el usuario vea las tareas de inmediato.
-    const autoOpen = machines.length === 1;
+    // Si hay solo una entrada (filtro por máquina aplicado), saltamos el
+    // agrupamiento y abrimos directo la tarjeta de la máquina.
+    if (machines.length === 1) {
+        const m = machines[0];
+        wrap.innerHTML = m.is_family ? _renderFamilyCard(m, true) : _renderMachineCard(m, true);
+        _wireHistoricoEventos(wrap);
+        return;
+    }
 
-    wrap.innerHTML = machines.map(m => m.is_family
-        ? _renderFamilyCard(m, autoOpen)
-        : _renderMachineCard(m, autoOpen)
-    ).join('');
+    // Repartimos: RACKS, TROLEYS van a buckets agrupados; el resto va a
+    // "rootItems" y se renderiza directamente en la raíz.
+    const buckets = { RACKS: [], TROLEYS: [] };
+    const rootItems = [];
+    machines.forEach(m => {
+        const k = _topGroupKey(m);
+        if (k) buckets[k].push(m);
+        else   rootItems.push(m);
+    });
 
-    // Click delegado en filas editables (solo técnico — el HTML solo añade
-    // la clase mant-row-edit si data-role="tecnico").
+    // Construimos una lista mixta con sus claves de ordenación. Cada entrada
+    // tiene { sortKey, html }. Las máquinas sueltas usan desc_maquina como
+    // clave; los grupos top-level usan su título (RACKS / TROLEYS) para que
+    // queden colocados alfabéticamente dentro del listado general.
+    const _norm = s => String(s || '').toUpperCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+    const buildGroupHtml = (k) => {
+        const meta  = _TOP_GROUP_META[k];
+        const items = buckets[k];
+        const totalMaq = items.reduce((acc, m) => acc + (m.is_family ? (m.total_maquinas || 0) : 1), 0);
+        const totalInt = items.reduce((acc, m) => acc + (parseInt(m.total_intervenciones || 0, 10)), 0);
+        const inner = items.map(m => m.is_family
+            ? _renderFamilyCard(m, false)
+            : _renderMachineCard(m, false, 'mant-machine-card-child')
+        ).join('');
+        return `
+            <div class="mant-machine-card mant-top-group" data-top-group="${k}" style="--top-color:${meta.color}">
+                <div class="mant-machine-header" data-toggle>
+                    <span class="mant-toggle">▶</span>
+                    <span class="mant-family-badge" style="background:${meta.color}">${meta.badge}</span>
+                    <strong>${escHtml(meta.title)}</strong>
+                    <span class="mant-cod">· ${escHtml(meta.subtitle)}</span>
+                    <span class="mant-machine-count">${totalMaq} máquina${totalMaq === 1 ? '' : 's'} · ${totalInt} intervención${totalInt === 1 ? '' : 'es'}</span>
+                </div>
+                <div class="mant-machine-body" style="display:none">
+                    ${inner}
+                </div>
+            </div>
+        `;
+    };
+
+    const entradas = [];
+    rootItems.forEach(m => {
+        entradas.push({
+            sortKey: _norm(m.desc_maquina),
+            html: m.is_family ? _renderFamilyCard(m, false) : _renderMachineCard(m, false)
+        });
+    });
+    ['RACKS', 'TROLEYS'].forEach(k => {
+        if (buckets[k].length > 0) {
+            entradas.push({ sortKey: _norm(_TOP_GROUP_META[k].title), html: buildGroupHtml(k) });
+        }
+    });
+
+    entradas.sort((a, b) => a.sortKey.localeCompare(b.sortKey, 'es'));
+
+    wrap.innerHTML = entradas.map(e => e.html).join('');
+
+    _wireHistoricoEventos(wrap);
+}
+
+// Cableado de eventos comunes (toggle de tarjetas plegables + edición de
+// intervenciones). Se ejecuta tras cada render del histórico.
+function _wireHistoricoEventos(wrap) {
+    // Click delegado en filas editables (solo técnico).
     wrap.querySelectorAll('tr.mant-row-edit').forEach(tr => {
         tr.addEventListener('click', (ev) => {
             ev.stopPropagation();
@@ -227,9 +311,8 @@ function renderMachines(machines) {
         });
     });
 
-    // Wire up del toggle: clic en cabecera abre/cierra el cuerpo. Funciona
-    // tanto para tarjetas de máquina como para familias (que contienen
-    // máquinas hijas con su propio toggle independiente).
+    // Toggle plegable. Funciona tanto en grupos top-level como en máquinas
+    // y familias (cada uno tiene su propio mant-machine-body inmediato).
     wrap.querySelectorAll('.mant-machine-header[data-toggle]').forEach(h => {
         h.addEventListener('click', (ev) => {
             ev.stopPropagation();

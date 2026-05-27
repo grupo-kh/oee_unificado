@@ -74,13 +74,11 @@ $skipped = 0;
 $skippedReasons = ['sin_tiempo_estimado' => 0, 'tiempo_estimado_invalido' => 0];
 
 /**
- * Genera una hora de inicio aleatoria entre 08:00 y 17:00 (jornada típica).
- * Formato "HH:MM" para coherencia con el campo time.
+ * Hora aleatoria distribuida por turnos (50% tarde, 35% mañana, 15% noche).
+ * Reutiliza el helper compartido del store.
  */
 function horaAleatoria(): string {
-    $h = mt_rand(6, 20);
-    $m = mt_rand(0, 59);
-    return sprintf('%02d:%02d', $h, $m);
+    return MaintenanceCompletionStore::horaTurnoAleatoria();
 }
 
 foreach ($rows as $r) {

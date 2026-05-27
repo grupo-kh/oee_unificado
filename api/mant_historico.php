@@ -220,7 +220,12 @@ try {
                 foreach ($t['interventions'] as $iv) {
                     $fecha = (string)($iv['fecha_intervencion'] ?? '');
                     $fechaRef = $fecha !== '' ? $fecha : (string)($iv['fecha_proxima_original'] ?? '');
-                    $vk = $fechaRef . '|' . (string)$iv['operario'] . '|' . (string)$iv['tipo'];
+                    // Una "visita" consolidada agrupa todas las sub-tareas
+                    // que se hicieron el mismo día con el mismo tipo. El
+                    // operario que aparece es el primero detectado — si
+                    // distintas sub-tareas tienen operarios distintos por
+                    // datos sintéticos, se ven igualmente como UNA visita.
+                    $vk = $fechaRef . '|' . (string)$iv['tipo'];
                     if (isset($seenVisit[$vk])) continue;
                     $seenVisit[$vk] = true;
                     $mergedInts[] = $iv;
