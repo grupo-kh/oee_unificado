@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# KH Mantenimiento · Operario (mobile)
 
-## Getting Started
+App móvil Next.js para que los operarios de mantenimiento registren sus revisiones preventivas.
 
-First, run the development server:
+## Stack
 
-```bash
+- Next.js 14 (App Router) + TypeScript
+- Tailwind CSS (tema corporativo KH)
+- TanStack Query (React Query) v5
+- PWA básica (manifest + iconos), sin offline real
+
+## Dev
+
+El backend PHP (XAMPP) debe estar arrancado. En este equipo Apache escucha en
+`http://localhost:8080/` — el rewrite de `next.config.mjs` apunta ahí.
+
+```powershell
+cd mobile-operario
+npm install         # solo la primera vez
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abre `http://localhost:3000/`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Login: número de operario activo en `mant_operarios`. El mismo número sirve como
+usuario y como contraseña.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Las llamadas a `/api/*` se proxyean a `http://localhost:8080/PLAN_ATTAINMENT/api/*`
+vía `next.config.mjs`. Al ser mismo origen para el navegador, la cookie de sesión
+PHP funciona transparente.
 
-## Learn More
+> Si tu Apache escucha en otro puerto (p. ej. 80), edita el `destination` del
+> rewrite en `next.config.mjs`.
 
-To learn more about Next.js, take a look at the following resources:
+## Build
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```powershell
+npm run build
+npm start    # servidor de producción local
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploy al subdominio
 
-## Deploy on Vercel
+Cuando esté disponible el subdominio:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. `npm run build` genera `.next/` con assets optimizados y el service worker.
+2. Copia `.next/`, `public/`, `package.json` y `package-lock.json` al host; en el
+   servidor ejecuta `npm ci --omit=dev`.
+3. Arranca con `npm start` o un gestor de procesos (`pm2 start npm -- start`).
+4. Configura el front del subdominio (Apache/nginx) para hacer
+   `proxy_pass /api/* → http://<backend>/PLAN_ATTAINMENT/api/*`. Mismo origen al
+   navegador → cookies de sesión funcionan sin CORS.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Smoke test (manual)
+
+- [ ] Login con un nº de operario válido → redirige a `/hoy`.
+- [ ] Login con un nº incorrecto → muestra "Operario no válido".
+- [ ] `/hoy` muestra tareas programadas para hoy.
+- [ ] Botón "Pendientes" lleva a `/pendientes` con vencidas + marcadas.
+- [ ] Click en una tarea → detalle.
+- [ ] Iniciar → estado "▶ En curso" (sin segundero en vivo).
+- [ ] Pausar → "⏸ Pausado", tiempo total congelado.
+- [ ] Reanudar → "▶ En curso".
+- [ ] Finalizar → POST `mant_marcar_hecha.php`, redirige a `/confirmacion`.
+- [ ] Confirmación muestra resumen y auto-redirige a `/hoy` en 5s.
+- [ ] Cerrar pestaña a mitad de tarea + reabrir → estado restaurado desde `localStorage`.
+- [ ] Salir → POST logout, redirige a `/login`.
+- [ ] En Chrome Android: "Añadir a pantalla de inicio" → instala con icono KH.
+
+## Endpoints backend usados
+
+| Endpoint | Método | Uso |
+|---|---|---|
+| `/api/mant_login_json.php` | POST | Login |
+| `/api/mant_logout_json.php` | POST | Logout |
+| `/api/mant_session.php` | GET | Hidratación de sesión al recargar |
+| `/api/mant_dashboard.php` | GET | `{hoy, vencidas, marcadas}` |
+| `/api/mant_marcar_hecha.php` | POST | Marcar tarea como completada |
+
+CSRF: el login devuelve `csrf_token`; el wrapper `apiPost` lo envía en
+`X-CSRF-Token` en cada POST.
+
+## Notas
+
+- Los iconos `public/icon-*.png` y `apple-touch-icon.png` son placeholders
+  generados (cuadro rojo KH con "KH"). Sustitúyelos por el icono definitivo
+  cuando esté disponible.
+- El service worker (`public/sw.js`, `public/workbox-*.js`) se genera en el
+  build y está gitignored.
+- Fuera del MVP: sub-tareas de tareas consolidadas, histórico mensual por
+  operario/máquina, y modo offline real.
