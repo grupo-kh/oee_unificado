@@ -37,21 +37,22 @@ export default function HoyPage() {
         rightSlot={
           <button
             onClick={async () => { await logout(); router.replace('/login'); }}
-            className="text-xs font-semibold bg-white/10 px-3 py-2 rounded-lg active:scale-95"
+            className="text-sm font-bold bg-white/15 px-3 h-10 rounded-lg active:scale-95"
           >Salir</button>
         }
       />
 
       <div className="flex-1 p-4 pb-28">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-kh-text-soft mb-3">
-          Para hoy
-        </h2>
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-kh-text-soft">Para hoy</h2>
+          {data && <span className="text-sm font-bold text-kh-text">{data.hoy.length}</span>}
+        </div>
 
-        {isLoading && <div className="text-kh-text-soft text-sm">Cargando…</div>}
-        {error && <div className="text-kh-red text-sm">Error cargando tareas</div>}
+        {isLoading && <div className="text-kh-text-soft">Cargando…</div>}
+        {error && <div className="text-kh-danger font-semibold">Error cargando tareas</div>}
 
         {!isLoading && data && data.hoy.length === 0 && (
-          <div className="bg-white rounded-2xl p-6 text-center text-kh-text-soft shadow-kh-sm">
+          <div className="bg-kh-card rounded-lg p-6 text-center text-kh-text-soft border border-kh-line">
             No hay tareas programadas para hoy. Revisa los Pendientes.
           </div>
         )}
@@ -61,14 +62,14 @@ export default function HoyPage() {
         ))}
       </div>
 
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app p-4 bg-gradient-to-t from-kh-bg to-transparent">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app p-4 bg-gradient-to-t from-kh-bg via-kh-bg to-transparent">
         <button
           onClick={() => router.push('/pendientes')}
-          className="w-full h-14 rounded-2xl bg-kh-red text-white font-bold shadow-kh-lg active:scale-[0.98] flex items-center justify-center gap-2"
+          className="w-full h-16 rounded-lg bg-kh-red text-kh-on-red text-lg font-bold active:scale-[0.98] flex items-center justify-center gap-2 border-b-4 border-kh-red-dark"
         >
           Pendientes
           {totalPendientes > 0 && (
-            <span className="bg-white text-kh-red rounded-full px-2 py-0.5 text-sm">{totalPendientes}</span>
+            <span className="bg-white text-kh-red rounded-md px-2 py-0.5 text-base font-extrabold">{totalPendientes}</span>
           )}
         </button>
       </div>

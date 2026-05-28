@@ -2,22 +2,61 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+/* ════════════════════════════════════════════════════════════════════
+   SISTEMA DE DISEÑO · "Industrial robusto"
+   Tokens en variables CSS. Los componentes usan utilidades Tailwind
+   mapeadas a estas variables (bg-kh-bg, text-kh-text, …), así que el
+   modo oscuro se aplica a toda la app redefiniendo las variables bajo
+   [data-theme="dark"]. Paleta de alto contraste, neutra-fría, pensada
+   para guante, glare y vistazos rápidos en planta.
+   ════════════════════════════════════════════════════════════════════ */
+:root, [data-theme="light"] {
+  /* Superficies */
+  --kh-bg: #e9edf0;          /* fondo gris frío neutro */
+  --kh-card: #ffffff;        /* tarjeta */
+  --kh-card-2: #f3f6f8;      /* tarjeta alterna / hover */
+  /* Tinta */
+  --kh-text: #10151b;        /* casi negro, alto contraste */
+  --kh-text-soft: #48535e;   /* secundario */
+  --kh-line: #cfd6dc;        /* bordes visibles (sustituyen sombras) */
+  /* Marca / acción */
   --kh-red: #8c181a;
   --kh-red-2: #a52125;
   --kh-red-dark: #6a1213;
-  --kh-red-bg: #fbe6e7;
+  --kh-red-bg: #fbe3e6;
+  --kh-on-red: #ffffff;
   --kh-black: #0d0d0d;
-  --kh-black-2: #1d1d1d;
-  --kh-amber: #c47600;
-  --kh-amber-bg: #fff5e1;
-  --kh-green: #1f8a3c;
-  --kh-green-bg: #e3f5e8;
-  --kh-text: #1a1a1a;
-  --kh-text-soft: #6b6b6b;
-  --kh-line: #e7e3e3;
-  --kh-bg: #f5f3f3;
-  --kh-card: #ffffff;
+  /* Estado (semáforo de planta) */
+  --kh-amber: #b45309;       /* hoy / atención — ámbar oscuro legible */
+  --kh-amber-bg: #fdf0dd;
+  --kh-green: #1f7a37;       /* ok / hecho / en curso */
+  --kh-green-bg: #e2f3e7;
+  --kh-danger: #c8102e;      /* vencida */
+  --kh-danger-bg: #fbe3e6;
+  /* Sombra (mínima: el industrial prefiere bordes) */
+  --kh-shadow: 0 1px 2px rgba(16, 21, 27, 0.06);
+}
+
+[data-theme="dark"] {
+  --kh-bg: #0f1318;
+  --kh-card: #1a2027;
+  --kh-card-2: #222a33;
+  --kh-text: #eef2f5;
+  --kh-text-soft: #9aa6b1;
+  --kh-line: #2c343d;
+  --kh-red: #b3242a;         /* algo más vivo para contraste sobre oscuro */
+  --kh-red-2: #c8353a;
+  --kh-red-dark: #8c181a;
+  --kh-red-bg: #3a1e22;
+  --kh-on-red: #ffffff;
+  --kh-black: #0b0e12;
+  --kh-amber: #e0a23a;
+  --kh-amber-bg: #3a2e18;
+  --kh-green: #46b768;
+  --kh-green-bg: #173024;
+  --kh-danger: #ff5a6a;
+  --kh-danger-bg: #3a1e22;
+  --kh-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -26,12 +65,16 @@ html, body {
   color: var(--kh-text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   overscroll-behavior: none;
+  font-size: 18px;           /* base industrial: lectura a distancia de brazo */
 }
 button { font: inherit; }
 
-/* ─── Animaciones del logo KH ─────────────────────────────────────────
-   Entrada (una vez) en un wrapper + flotación continua en la imagen, en
-   capas separadas para que las transforms no colisionen. */
+/* Transición suave al cambiar de tema (no en la carga inicial) */
+[data-theme] body, [data-theme] * {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+/* ─── Animaciones del logo KH ───────────────────────────────────────── */
 @keyframes kh-logo-enter {
   0%   { opacity: 0; transform: translateY(14px) scale(0.90); }
   60%  { opacity: 1; }
@@ -45,19 +88,15 @@ button { font: inherit; }
   0%, 100% { filter: drop-shadow(0 6px 14px rgba(140, 24, 26, 0.18)); }
   50%      { filter: drop-shadow(0 12px 22px rgba(140, 24, 26, 0.30)); }
 }
-
-/* Login: logo grande y protagonista */
 .kh-logo-enter { animation: kh-logo-enter 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
 .kh-logo-float {
   animation: kh-logo-float 3.6s ease-in-out 0.7s infinite,
              kh-logo-glow 3.6s ease-in-out 0.7s infinite;
   will-change: transform, filter;
 }
-
-/* Cabecera: entrada sutil al montar, sin flotación (no distraer en sticky) */
 .kh-logo-header { animation: kh-logo-enter 0.5s ease-out both; }
 
-/* Accesibilidad: sin animación si el usuario lo pide */
 @media (prefers-reduced-motion: reduce) {
   .kh-logo-enter, .kh-logo-float, .kh-logo-header { animation: none !important; }
+  [data-theme] body, [data-theme] * { transition: none !important; }
 }

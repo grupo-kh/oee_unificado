@@ -23,9 +23,16 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
+// Script anti-flash: fija el tema ANTES del primer paint. Sin preferencia
+// guardada, auto-oscuro en horario nocturno (20:00–06:59) para turno de noche.
+const themeInitScript = `(function(){try{var t=localStorage.getItem('mobile-operario:theme');if(t!=='light'&&t!=='dark'){var h=new Date().getHours();t=(h>=20||h<7)?'dark':'light';}document.documentElement.dataset.theme=t;}catch(e){document.documentElement.dataset.theme='light';}})();`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body>
         <div className="min-h-screen mx-auto max-w-app bg-kh-bg shadow-lg">
           <Providers>{children}</Providers>
