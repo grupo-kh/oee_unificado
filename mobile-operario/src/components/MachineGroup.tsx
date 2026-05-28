@@ -39,17 +39,20 @@ export function MachineGroupList({ tareas }: { tareas: Tarea[] }) {
   // Peor estado primero, luego más tareas, luego alfabético.
   entries.sort((a, b) => b.worst - a.worst || b.list.length - a.list.length || a.maquina.localeCompare(b.maquina));
 
+  const single = entries.length === 1;
   return (
     <div>
       {entries.map(e => (
-        <MachineGroup key={e.maquina} maquina={e.maquina} list={e.list} />
+        // La key incluye `single` para que, al filtrar a una sola máquina, el
+        // grupo se remonte y respete defaultOpen (auto-desplegado).
+        <MachineGroup key={`${e.maquina}|${single}`} maquina={e.maquina} list={e.list} defaultOpen={single} />
       ))}
     </div>
   );
 }
 
-function MachineGroup({ maquina, list }: { maquina: string; list: Tarea[] }) {
-  const [open, setOpen] = useState(false);
+function MachineGroup({ maquina, list, defaultOpen = false }: { maquina: string; list: Tarea[]; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   const estado = worstEstado(list);
 
   return (
