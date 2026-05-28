@@ -5,6 +5,15 @@ import { Providers } from './providers';
 export const metadata: Metadata = {
   title: 'KH Mantenimiento Operario',
   description: 'Revisiones preventivas para operarios',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'KH Operario',
+  },
+  icons: {
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 export const viewport: Viewport = {
