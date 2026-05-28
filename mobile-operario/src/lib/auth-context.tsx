@@ -26,7 +26,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then(info => {
         if (cancelled) return;
         if (info.csrf_token) setCsrfToken(info.csrf_token);
-        setState({ user: info.user || null, role: info.role || null, loading: false });
+        // El backend puede devolver user como number (JSON_NUMERIC_CHECK).
+        setState({ user: info.user != null ? String(info.user) : null, role: info.role || null, loading: false });
       })
       .catch(() => {
         if (!cancelled) setState({ user: null, role: null, loading: false });

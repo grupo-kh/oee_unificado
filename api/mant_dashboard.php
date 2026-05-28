@@ -39,7 +39,7 @@ try {
             $latestDate  = (string)$latest['fecha_intervencion'];
             $excelUltima = (string)($p['ultima_revision'] ?? '');
             if ($latestDate >= $excelUltima) {
-                $diasPer = MaintenancePeriodicidadStore::diasPorPeriodicidad($eff['periodicidad']);
+                $diasPer = MaintenancePeriodicidadStore::diasPorPeriodicidad((string)($eff['periodicidad'] ?? ''));
                 if ($diasPer !== null) {
                     $eff['ultima_revision']  = $latestDate;
                     $eff['proxima_revision'] = date('Y-m-d', strtotime($latestDate) + $diasPer * 86400);

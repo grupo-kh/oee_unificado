@@ -23,7 +23,14 @@ function decodeSlug(slug: string): { orden: string; tarea: string; fpo: string }
 function findTask(data: DashboardData | undefined, orden: string, tarea: string, fpo: string): Tarea | null {
   if (!data) return null;
   const all = [...data.hoy, ...data.vencidas, ...data.marcadas];
-  return all.find(t => t.orden === orden && t.tarea === tarea && t.proxima_revision === fpo) ?? null;
+  // OJO: el backend usa JSON_NUMERIC_CHECK, así que `tarea` (y a veces otros
+  // campos) pueden llegar como number en el JSON. Comparamos con String()
+  // para no fallar el match contra los valores string del slug de la URL.
+  return all.find(t =>
+    String(t.orden) === orden &&
+    String(t.tarea) === tarea &&
+    String(t.proxima_revision) === fpo
+  ) ?? null;
 }
 
 export default function TareaDetailPage() {
