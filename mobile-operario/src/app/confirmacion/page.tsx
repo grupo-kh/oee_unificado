@@ -23,7 +23,7 @@ function ConfirmacionContent() {
       <h1 className="text-2xl font-bold text-kh-text mb-1">Revisión registrada</h1>
       <p className="text-kh-text-soft mb-6">Se ha guardado correctamente en el histórico.</p>
 
-      <section className="w-full max-w-xs bg-white rounded-2xl p-4 shadow-kh-sm border border-kh-line text-left">
+      <section className="w-full max-w-xs bg-kh-card rounded-lg p-4 border border-kh-line text-left">
         <Row label="Máquina" value={maq || '—'} />
         <Row label="Operario" value={op || '—'} />
         <Row label="Fecha" value={today()} />
@@ -31,7 +31,7 @@ function ConfirmacionContent() {
       </section>
 
       <button onClick={() => router.replace('/hoy')}
-        className="mt-6 w-full max-w-xs h-12 rounded-2xl bg-kh-red text-white font-bold shadow-kh-md active:scale-[0.98]">
+        className="mt-6 w-full max-w-xs h-16 rounded-lg bg-kh-red text-white text-lg font-bold border-b-4 border-kh-red-dark active:scale-[0.98]">
         Volver a la lista
       </button>
     </main>

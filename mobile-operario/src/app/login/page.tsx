@@ -45,19 +45,19 @@ export default function LoginPage() {
       <form onSubmit={onSubmit} className="w-full max-w-xs">
         <input
           readOnly value={numero || ' '} aria-label="Número de operario"
-          className="w-full text-center text-3xl font-bold tracking-widest bg-white rounded-xl border border-kh-line py-4 mb-4 shadow-kh-sm"
+          className="w-full text-center text-4xl font-bold tracking-[0.3em] bg-kh-card text-kh-text rounded-lg border-2 border-kh-line py-4 mb-4 tabular-nums"
         />
 
         <KeypadInput value={numero} onChange={setNumero} disabled={busy} />
 
         {error && (
-          <p className="mt-4 text-center text-sm text-kh-red font-semibold">{error}</p>
+          <p className="mt-4 text-center text-sm text-kh-danger font-bold">{error}</p>
         )}
 
         <button
           type="submit"
           disabled={!numero || busy}
-          className="mt-6 w-full h-14 rounded-2xl bg-kh-red text-white text-lg font-bold shadow-kh-md disabled:opacity-50 active:scale-[0.98]"
+          className="mt-6 w-full h-16 rounded-lg bg-kh-red text-white text-lg font-bold border-b-4 border-kh-red-dark disabled:opacity-50 active:scale-[0.98]"
         >
           {busy ? 'Entrando…' : 'Entrar'}
         </button>

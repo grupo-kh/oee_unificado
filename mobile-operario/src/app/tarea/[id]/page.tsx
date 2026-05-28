@@ -94,7 +94,7 @@ export default function TareaDetailPage() {
       <TopBar title="Tarea en curso" subtitle={tarea?.desc_maquina ?? '—'} onBack={() => router.push('/hoy')} />
 
       <div className="flex-1 p-4">
-        <section className="bg-white rounded-2xl p-5 shadow-kh-sm border border-kh-line">
+        <section className="bg-kh-card rounded-lg p-5 border border-kh-line">
           <div className="text-xl font-bold text-kh-text mb-2">{tarea?.desc_maquina ?? '—'}</div>
           <div className="text-lg font-medium text-kh-text whitespace-pre-line leading-snug">
             {tarea?.desc_tarea ?? '—'}
@@ -106,31 +106,31 @@ export default function TareaDetailPage() {
 
         <TimerCard state={timer.state} totalSeconds={timer.totalSeconds} />
 
-        <div className="bg-white rounded-2xl p-4 shadow-kh-sm border border-kh-line">
-          <div className="flex justify-between text-sm">
-            <span className="text-kh-text-soft">Operario</span>
-            <span className="font-semibold">{user}</span>
+        <div className="bg-kh-card rounded-lg p-4 border border-kh-line">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-kh-text-soft uppercase tracking-wide">Operario</span>
+            <span className="font-bold text-kh-text text-lg tabular-nums">{user}</span>
           </div>
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app p-4 bg-white border-t border-kh-line">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app p-4 bg-kh-card border-t border-kh-line">
         {timer.state.state === 'idle' && (
           <button onClick={timer.start}
-            className="w-full h-14 rounded-2xl bg-kh-red text-white font-bold shadow-kh-md active:scale-[0.98] flex items-center justify-center gap-2">
-            <Play className="w-5 h-5" /> Iniciar
+            className="w-full h-16 rounded-lg bg-kh-red text-white text-lg font-bold border-b-4 border-kh-red-dark active:scale-[0.98] flex items-center justify-center gap-2">
+            <Play className="w-6 h-6" strokeWidth={2.5} /> Iniciar
           </button>
         )}
 
         {timer.state.state === 'running' && (
           <div className="grid grid-cols-2 gap-3">
             <button onClick={timer.pause}
-              className="h-14 rounded-2xl bg-kh-amber-bg text-kh-amber font-bold border-2 border-kh-amber active:scale-[0.98] flex items-center justify-center gap-2">
-              <Pause className="w-5 h-5" /> Pausar
+              className="h-16 rounded-lg bg-kh-amber-bg text-kh-amber text-lg font-bold border-2 border-kh-amber active:scale-[0.98] flex items-center justify-center gap-2">
+              <Pause className="w-6 h-6" strokeWidth={2.5} /> Pausar
             </button>
             <button onClick={onFinalizar} disabled={submitting}
-              className="h-14 rounded-2xl bg-kh-green text-white font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50">
-              <Square className="w-5 h-5" /> Finalizar
+              className="h-16 rounded-lg bg-kh-green text-white text-lg font-bold border-b-4 border-black/20 active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50">
+              <Square className="w-6 h-6" strokeWidth={2.5} /> Finalizar
             </button>
           </div>
         )}
@@ -138,12 +138,12 @@ export default function TareaDetailPage() {
         {timer.state.state === 'paused' && (
           <div className="grid grid-cols-2 gap-3">
             <button onClick={timer.resume}
-              className="h-14 rounded-2xl bg-kh-red text-white font-bold active:scale-[0.98] flex items-center justify-center gap-2">
-              <Play className="w-5 h-5" /> Reanudar
+              className="h-16 rounded-lg bg-kh-red text-white text-lg font-bold border-b-4 border-kh-red-dark active:scale-[0.98] flex items-center justify-center gap-2">
+              <Play className="w-6 h-6" strokeWidth={2.5} /> Reanudar
             </button>
             <button onClick={onFinalizar} disabled={submitting}
-              className="h-14 rounded-2xl bg-kh-green text-white font-bold active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50">
-              <Square className="w-5 h-5" /> Finalizar
+              className="h-16 rounded-lg bg-kh-green text-white text-lg font-bold border-b-4 border-black/20 active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50">
+              <Square className="w-6 h-6" strokeWidth={2.5} /> Finalizar
             </button>
           </div>
         )}

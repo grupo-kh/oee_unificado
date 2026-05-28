@@ -19,6 +19,7 @@ export function KeypadInput({ value, onChange, maxLength = 6, disabled }: Props)
   const back = () => { if (!disabled) onChange(value.slice(0, -1)); };
   const clear = () => { if (!disabled) onChange(''); };
 
+  const keyBase = 'h-[64px] rounded-lg text-3xl font-bold active:scale-95 transition-transform disabled:opacity-50';
   return (
     <div className="grid grid-cols-3 gap-3 w-full">
       {[1,2,3,4,5,6,7,8,9].map(d => (
@@ -27,30 +28,25 @@ export function KeypadInput({ value, onChange, maxLength = 6, disabled }: Props)
           type="button"
           onClick={() => press(String(d))}
           disabled={disabled}
-          className={cn(
-            'h-16 rounded-2xl bg-white text-2xl font-bold text-kh-text',
-            'shadow-kh-sm border border-kh-line',
-            'active:scale-95 active:bg-kh-line transition-transform',
-            'disabled:opacity-50',
-          )}
+          className={cn(keyBase, 'bg-kh-card text-kh-text border-2 border-kh-line active:bg-kh-card-2')}
         >
           {d}
         </button>
       ))}
       <button
         type="button" onClick={clear} disabled={disabled}
-        className="h-16 rounded-2xl bg-kh-line text-2xl font-bold text-kh-text-soft active:scale-95"
+        className={cn(keyBase, 'bg-kh-card-2 text-kh-text-soft border-2 border-kh-line')}
         aria-label="Limpiar"
       >×</button>
       <button
         type="button" onClick={() => press('0')} disabled={disabled}
-        className="h-16 rounded-2xl bg-white text-2xl font-bold text-kh-text border border-kh-line shadow-kh-sm active:scale-95"
+        className={cn(keyBase, 'bg-kh-card text-kh-text border-2 border-kh-line active:bg-kh-card-2')}
       >0</button>
       <button
         type="button" onClick={back} disabled={disabled}
-        className="h-16 rounded-2xl bg-kh-line text-kh-text-soft active:scale-95 grid place-items-center"
+        className={cn(keyBase, 'bg-kh-card-2 text-kh-text-soft border-2 border-kh-line grid place-items-center')}
         aria-label="Borrar"
-      ><Delete className="w-6 h-6" /></button>
+      ><Delete className="w-7 h-7" /></button>
     </div>
   );
 }
