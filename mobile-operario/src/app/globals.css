@@ -3,25 +3,28 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --kh-red: #8c181a;
+  --kh-red-2: #a52125;
+  --kh-red-dark: #6a1213;
+  --kh-red-bg: #fbe6e7;
+  --kh-black: #0d0d0d;
+  --kh-black-2: #1d1d1d;
+  --kh-amber: #c47600;
+  --kh-amber-bg: #fff5e1;
+  --kh-green: #1f8a3c;
+  --kh-green-bg: #e3f5e8;
+  --kh-text: #1a1a1a;
+  --kh-text-soft: #6b6b6b;
+  --kh-line: #e7e3e3;
+  --kh-bg: #f5f3f3;
+  --kh-card: #ffffff;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  background: var(--kh-bg);
+  color: var(--kh-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overscroll-behavior: none;
 }
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-}
+button { font: inherit; }
