@@ -48,8 +48,8 @@ export default function HoyPage() {
           {data && <span className="text-sm font-bold text-kh-text">{data.hoy.length}</span>}
         </div>
 
-        {isLoading && <div className="text-kh-text-soft">Cargando…</div>}
-        {error && <div className="text-kh-danger font-semibold">Error cargando tareas</div>}
+        {isLoading && <div className="flex items-center gap-3 text-kh-text-soft py-6"><span className="kh-spinner" /> Cargando…</div>}
+        {error && <div className="text-kh-danger font-semibold py-4">Error cargando tareas</div>}
 
         {!isLoading && data && data.hoy.length === 0 && (
           <div className="bg-kh-card rounded-lg p-6 text-center text-kh-text-soft border border-kh-line">
@@ -62,7 +62,7 @@ export default function HoyPage() {
         ))}
       </div>
 
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app p-4 bg-gradient-to-t from-kh-bg via-kh-bg to-transparent">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app px-4 pt-4 safe-bottom bg-gradient-to-t from-kh-bg via-kh-bg to-transparent">
         <button
           onClick={() => router.push('/pendientes')}
           className="w-full h-16 rounded-lg bg-kh-red text-white text-lg font-bold active:scale-[0.98] flex items-center justify-center gap-2 border-b-4 border-kh-red-dark"

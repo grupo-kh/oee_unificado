@@ -45,8 +45,8 @@ export default function PendientesPage() {
           <span className="text-sm font-bold text-kh-text">{tareas.length}</span>
         </div>
 
-        {isLoading && <div className="text-kh-text-soft">Cargando…</div>}
-        {error && <div className="text-kh-danger font-semibold">Error cargando pendientes</div>}
+        {isLoading && <div className="flex items-center gap-3 text-kh-text-soft py-6"><span className="kh-spinner" /> Cargando…</div>}
+        {error && <div className="text-kh-danger font-semibold py-4">Error cargando pendientes</div>}
 
         {!isLoading && tareas.length > 0 && <MachineGroupList tareas={tareas} />}
 
