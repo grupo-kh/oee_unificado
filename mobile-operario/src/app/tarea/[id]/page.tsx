@@ -29,7 +29,7 @@ function findTask(data: DashboardData | undefined, orden: string, tarea: string,
 export default function TareaDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { data } = useDashboard();
   const slug = decodeSlug(params.id);
   const timerId = slug ? `${slug.orden}__${slug.tarea}__${slug.fpo}` : '__invalid__';
@@ -38,8 +38,11 @@ export default function TareaDetailPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!user) router.replace('/login');
-  }, [user, router]);
+    // Solo redirigir cuando la sesión ya se resolvió; si no, un usuario
+    // logado que abre /tarea/… directamente (deep link/refresh) sería
+    // expulsado al /login antes de hidratar la sesión.
+    if (!authLoading && !user) router.replace('/login');
+  }, [user, authLoading, router]);
 
   const tarea = useMemo(
     () => slug ? findTask(data, slug.orden, slug.tarea, slug.fpo) : null,
