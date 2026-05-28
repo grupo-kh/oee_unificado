@@ -54,33 +54,6 @@ include __DIR__ . '/../includes/header.php';
             <div class="tile-arrow">→</div>
         </a>
 
-        <!--
-            Acceso al PROTOTIPO de la app móvil del operario.
-            Aún no es operativo: enlaza al mockup HTML autocontenido.
-            Cuando se cablée a la BD se sustituirá el href.
-        -->
-        <a href="../prototipos/operario_mobile.html" class="tile tile-mant-mobile tile-wip" target="_blank" rel="noopener">
-            <div class="tile-icon">
-                <svg viewBox="0 0 100 60" fill="none">
-                    <rect x="32" y="6" width="36" height="50" rx="5" fill="#0d0d0d" stroke="#8c181a" stroke-width="1.8"/>
-                    <rect x="35" y="11" width="30" height="38" rx="2" fill="#1d1d1d"/>
-                    <circle cx="50" cy="53" r="2" fill="#8c181a"/>
-                    <rect x="40" y="16" width="20" height="4" rx="1" fill="#8c181a"/>
-                    <rect x="40" y="22" width="14" height="3" rx="1" fill="#ffffff" opacity="0.7"/>
-                    <rect x="40" y="28" width="20" height="3" rx="1" fill="#ffffff" opacity="0.5"/>
-                    <rect x="40" y="33" width="20" height="3" rx="1" fill="#ffffff" opacity="0.35"/>
-                    <rect x="40" y="38" width="20" height="3" rx="1" fill="#ffffff" opacity="0.2"/>
-                </svg>
-            </div>
-            <div class="tile-body">
-                <h2>Móvil · Operario
-                    <span class="tile-badge tile-badge-wip">En proceso de aplicación</span>
-                </h2>
-                <p>App responsive para móvil. El operario se identifica con su nº, abre la tarea (arranca cronómetro), marca las sub-tareas hechas y la revisión queda registrada con su tiempo real.</p>
-            </div>
-            <div class="tile-arrow">→</div>
-        </a>
-
         <a href="mant_acciones.php" class="tile tile-mant-acciones role-tecnico-only">
             <div class="tile-icon">
                 <svg viewBox="0 0 100 60" fill="none">
