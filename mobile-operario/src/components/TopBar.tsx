@@ -13,7 +13,7 @@ type Props = {
 
 export function TopBar({ title, subtitle, onBack, rightSlot }: Props) {
   return (
-    <header className="sticky top-0 z-10 bg-kh-red text-kh-on-red px-4 py-3 flex items-center gap-3 border-b-4 border-kh-red-dark">
+    <header className="sticky top-0 z-10 bg-kh-red text-white px-4 py-3 flex items-center gap-3 border-b-4 border-kh-red-dark">
       {onBack && (
         <button
           onClick={onBack}
