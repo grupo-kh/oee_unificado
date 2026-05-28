@@ -33,8 +33,9 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen flex flex-col items-center px-6 py-8">
-      <div className="w-20 h-20 rounded-full bg-kh-red grid place-items-center mb-4 shadow-kh-md">
-        <span className="text-white text-2xl font-bold">KH</span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <div className="kh-logo-enter mt-2 mb-6">
+        <img src="/logo_kh.svg" alt="KH Know How" className="kh-logo-float w-60 max-w-[80vw] h-auto" />
       </div>
       <h1 className="text-2xl font-bold text-kh-text mb-1">Identifícate</h1>
       <p className="text-sm text-kh-text-soft mb-6 text-center">
