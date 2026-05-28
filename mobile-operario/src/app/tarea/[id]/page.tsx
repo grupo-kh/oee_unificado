@@ -94,10 +94,12 @@ export default function TareaDetailPage() {
       <TopBar title="Tarea en curso" subtitle={tarea?.desc_maquina ?? '—'} onBack={() => router.push('/hoy')} />
 
       <div className="flex-1 p-4">
-        <section className="bg-white rounded-2xl p-4 shadow-kh-sm border border-kh-line">
-          <div className="font-bold text-kh-text">{tarea?.desc_maquina ?? '—'}</div>
-          <div className="text-sm text-kh-text-soft">{tarea?.desc_tarea ?? '—'}</div>
-          <div className="text-xs text-kh-text-soft mt-2">
+        <section className="bg-white rounded-2xl p-5 shadow-kh-sm border border-kh-line">
+          <div className="text-xl font-bold text-kh-text mb-2">{tarea?.desc_maquina ?? '—'}</div>
+          <div className="text-lg font-medium text-kh-text whitespace-pre-line leading-snug">
+            {tarea?.desc_tarea ?? '—'}
+          </div>
+          <div className="text-sm text-kh-text-soft mt-3">
             Periodicidad: {tarea?.periodicidad || '—'} · Programada: {tarea?.proxima_revision || '—'}
           </div>
         </section>
