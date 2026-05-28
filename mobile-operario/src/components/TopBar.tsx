@@ -22,10 +22,10 @@ export function TopBar({ title, subtitle, onBack, rightSlot }: Props) {
           <ChevronLeft className="w-5 h-5" />
         </button>
       )}
-      {/* Logo en chip blanco para que el logo corporativo (rojo + gris) se lea
-          sobre la cabecera roja. Sustituye public/kh.png por el oficial. */}
-      <div className="bg-white rounded-lg px-2 py-1 shrink-0 flex items-center">
-        <img src="/kh.png" alt="KH Know How" className="h-7 w-auto" />
+      {/* Logo corporativo (símbolo KH rojo sobre blanco) en chip blanco para
+          que quede limpio sobre la cabecera roja. */}
+      <div className="bg-white rounded-lg p-1.5 shrink-0 flex items-center">
+        <img src="/kh.jpg" alt="KH" className="h-7 w-auto" />
       </div>
       <div className="flex-1 min-w-0">
         <h1 className="text-base font-bold truncate">{title}</h1>
