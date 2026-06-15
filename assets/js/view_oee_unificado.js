@@ -37,12 +37,12 @@ const METRICA_LABELS = {
     oee:            'OEE',
 };
 const METRICA_COLORS = {
-    disponibilidad: '#8c181a',
+    disponibilidad: '#3a6aa3',
     rendimiento:    '#c45a2c',
     calidad:        '#6b2d5b',
     oee:            '#2a7a4b',
 };
-const CORP_COLOR = '#8c181a';
+const CORP_COLOR = '#3a6aa3';
 const MOTIVO_TITLES = {
     disponibilidad: 'Motivos de paro (horas)',
     rendimiento:    'Pérdidas rendimiento por artículo',
@@ -101,7 +101,12 @@ function labelTurnos(arr) {
 // ───── Rangos rápidos ─────
 function setRange(kind) {
     const today = new Date();
-    const ymd = (d) => d.toISOString().slice(0, 10);
+    // OJO: usamos componentes LOCALES de la fecha. `toISOString()` convierte
+    // a UTC y como España va +1/+2 h por delante, medianoche local se
+    // traduce al día anterior — eso hacía que "Mes" mostrase el último día
+    // del mes anterior como "Desde".
+    const pad = n => String(n).padStart(2, '0');
+    const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
     let desde = today, hasta = today;
     if (kind === 'today') {
         desde = today; hasta = today;
@@ -194,12 +199,12 @@ function renderSecciones(secciones) {
         annotations: {
             xaxis: [{
                 x: 75,
-                borderColor: '#8c181a',
+                borderColor: '#3a6aa3',
                 strokeDashArray: 6,
                 label: {
                     text: 'Objetivo 75%',
-                    borderColor: '#8c181a',
-                    style: { color: '#fff', background: '#8c181a', fontSize: '11px', fontWeight: 700 },
+                    borderColor: '#3a6aa3',
+                    style: { color: '#fff', background: '#3a6aa3', fontSize: '11px', fontWeight: 700 },
                 },
             }],
         },
@@ -229,8 +234,10 @@ function renderSeccionDrc(sec) {
                 dataPointSelection: (_e, _ctx, cfg) => {
                     const metrica = metricaKeys[cfg.dataPointIndex];
                     if (!metrica) return;
-                    // Rendimiento → redirige al "Histórico de Rendimiento" en lugar
-                    // de abrir el desglose por máquinas/motivos.
+                    // Rendimiento → redirige al "Histórico de Rendimiento"
+                    // (oee_unificado_ref_historico.php) donde están todos
+                    // los módulos específicos de pérdidas por producto,
+                    // ranking por máquina y drills detallados.
                     if (metrica === 'rendimiento') {
                         window.location.href = 'oee_unificado_ref_historico.php';
                         return;
@@ -258,7 +265,7 @@ function renderSeccionDrc(sec) {
                 dataLabels: { position: 'center' },
             },
         },
-        colors: ['#8c181a', '#c45a2c', '#6b2d5b', '#2a7a4b'],
+        colors: ['#3a6aa3', '#c45a2c', '#6b2d5b', '#2a7a4b'],
         dataLabels: {
             enabled: true,
             style: { colors: ['#ffffff'], fontFamily: 'Arial', fontSize: '13px', fontWeight: 700 },
@@ -432,13 +439,22 @@ function renderChartMaquinas(data, metrica, por) {
                 borderRadius: 3,
                 borderRadiusApplication: 'end',
                 distributed: true,
-                dataLabels: { position: 'center' },
+                // Etiquetas FUERA del extremo de la barra (no centradas)
+                // para que el valor se lea siempre, incluso en barras
+                // pequeñas. ApexCharts posiciona el texto al lado del
+                // extremo derecho cuando position='top' en barras
+                // horizontales.
+                dataLabels: { position: 'top' },
             },
         },
-        colors: esRef ? vals.map(() => '#8c181a') : vals.map(v => semColor(v)),
+        colors: esRef ? vals.map(() => '#3a6aa3') : vals.map(v => semColor(v)),
         dataLabels: {
             enabled: true,
-            style: { colors: ['#ffffff'], fontFamily: 'Arial', fontSize: '12px', fontWeight: 700 },
+            // Texto oscuro sobre fondo blanco para que sea visible al estar
+            // fuera de la barra.
+            style: { colors: ['#1a2d4a'], fontFamily: 'Arial', fontSize: '12px', fontWeight: 700 },
+            background: { enabled: true, foreColor: '#fff', borderRadius: 3, padding: 2, borderWidth: 0, opacity: 0.95 },
+            offsetX: 28, // desplazamos el label fuera del final de la barra
             formatter: v => esRef ? v.toFixed(1) + 'h' : v.toFixed(1) + '%',
         },
         grid: { borderColor: '#e0e8f0', strokeDashArray: 3 },
@@ -548,18 +564,21 @@ function renderChartMotivos(data, metrica) {
         colors: [METRICA_COLORS[metrica] || '#3a6aa3', '#ef4444'],
         stroke: { width: [0, 2], curve: 'smooth' },
         markers: { size: [0, 4], colors: ['#ef4444'], strokeWidth: 0 },
-        // Etiquetas SOLO sobre la línea de % Acumulado (índice 1). La etiqueta
-        // muestra la SUMA ACUMULADA en horas (o unidades, según métrica), no el %:
-        // así el usuario ve el total real acumulado en cada punto de ruptura.
+        // Etiquetas EN AMBAS series:
+        //   · Barra (seriesIndex 0)  → valor individual de esa barra (h/uds).
+        //   · Línea (seriesIndex 1)  → suma ACUMULADA en horas/uds (no el %).
+        // Así el usuario ve el dato de cada barra y, además, el acumulado.
         dataLabels: {
             enabled: true,
-            enabledOnSeries: [1],
-            formatter: (_v, opts) => {
-                const i = opts.dataPointIndex;
-                const acc = cumBar[i] ?? 0;
+            enabledOnSeries: [0, 1],
+            formatter: (val, opts) => {
+                if (opts.seriesIndex === 0) {
+                    return isHoras ? val.toFixed(1) + 'h' : Math.round(val) + ' uds';
+                }
+                const acc = cumBar[opts.dataPointIndex] ?? 0;
                 return isHoras ? acc.toFixed(1) + 'h' : Math.round(acc) + ' uds';
             },
-            style: { fontSize: '10px', fontWeight: 700, colors: ['#ef4444'] },
+            style: { fontSize: '10px', fontWeight: 700, colors: ['#1a2d4a'] },
             background: { enabled: true, foreColor: '#fff', borderRadius: 3, padding: 2, borderWidth: 0, opacity: 0.92 },
             offsetY: -8,
         },
@@ -680,12 +699,17 @@ let chartMaqMotivoDia  = null;  // Nivel 1: línea temporal por día
 let chartMaqMotivoHora = null;  // Nivel 2: 24h del día clicado
 let chartMaqMotivoParos = null; // Nivel 3: paros individuales en la hora clicada
 let chartMaqEvolucion  = null;  // Evolución D/R/C/OEE de la máquina seleccionada
+let chartMaqRefs       = null;  // Bloque NUEVO: horas paro por referencia en la máquina
+let chartMaqRefTempo   = null;  // Sub-bloque NUEVO: temporal acumulado de la referencia clicada
 let _maqMotivosActivo  = null;  // { esRef, cod, nombre, motivo, dia, hora }
 let _maqMotivosAbort   = null;
 let _maqMotivoDiaAbort = null;
 let _maqMotivoHoraAbort = null;
 let _maqMotivoParosAbort = null;
 let _maqEvolucionAbort = null;
+let _maqRefsAbort      = null;
+let _maqRefTempoAbort  = null;
+let _maqRefsCache      = []; // últimas refs cargadas (para el handler de click)
 
 async function abrirDrillMaqMotivos(esRef, cod, nombre) {
     if (!_seccionActiva || !_metricaActiva) return;
@@ -725,7 +749,246 @@ async function abrirDrillMaqMotivos(esRef, cod, nombre) {
         showToast('Error motivos por ' + tipo.toLowerCase() + ': ' + e.message, 'error');
     }
 
+    // Solo en modo Máquina cargamos el bloque NUEVO de "horas de paro por
+    // referencia en esta máquina" (no aplica si el drill se abrió por referencia).
+    if (!esRef) cargarRefsPorMaquina(cod, nombre);
+    else        $('#maq-refs-wrap').style.display = 'none';
+
     $('#maq-motivos-drill-block').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ───── Bloque NUEVO: horas de paro por referencia DENTRO de la máquina ─────
+async function cargarRefsPorMaquina(codMaq, nombreMaq) {
+    cerrarTemporalRef();
+    if (chartMaqRefs) { chartMaqRefs.destroy(); chartMaqRefs = null; }
+    const wrap = $('#maq-refs-wrap');
+    const cont = $('#chart-maq-refs');
+    if (!wrap || !cont) return;
+    wrap.style.display = '';
+    cont.innerHTML = '<div class="drill-down-empty">Cargando referencias…</div>';
+
+    if (_maqRefsAbort) _maqRefsAbort.abort();
+    _maqRefsAbort = new AbortController();
+
+    const f = getFiltros();
+    const params = addCommonParams({
+        fecha_desde: f.desde,
+        fecha_hasta: f.hasta,
+        cod_maquina: codMaq,
+    }, f);
+
+    try {
+        const d = await apiFetch('oee_unificado_maq_refs.php', params, _maqRefsAbort.signal);
+        const refs = d.referencias || [];
+        _maqRefsCache = refs;
+        if (!refs.length) {
+            cont.innerHTML = '<div class="drill-down-empty">Sin paros con referencia identificada en el rango</div>';
+            return;
+        }
+        renderChartMaqRefs(refs, codMaq, nombreMaq);
+    } catch (e) {
+        if (e.name === 'AbortError') return;
+        cont.innerHTML = '<div class="drill-down-empty">Error cargando referencias: ' + (e.message || e) + '</div>';
+    }
+}
+
+function renderChartMaqRefs(data, codMaq, nombreMaq) {
+    const cont = $('#chart-maq-refs');
+    cont.innerHTML = '';
+    if (chartMaqRefs) { chartMaqRefs.destroy(); chartMaqRefs = null; }
+    if (!data.length) return;
+
+    // El backend ya devuelve DESC. Para barras horizontales ApexCharts
+    // dibuja la primera al fondo: invertimos para que la mayor quede arriba.
+    const rows = data.slice().reverse();
+    const cats = rows.map(r => r.referencia || r.cod_referencia);
+    const vals = rows.map(r => +r.horas_paro);
+
+    const options = {
+        chart: {
+            type: 'bar',
+            height: Math.max(260, rows.length * 30),
+            background: 'transparent',
+            toolbar: { show: false },
+            fontFamily: 'Arial',
+            events: {
+                dataPointSelection: (_e, _ctx, cfg) => {
+                    if (_renderingCharts) return;
+                    const row = rows[cfg.dataPointIndex];
+                    if (row) cargarTemporalRef(codMaq, row.cod_referencia, row.referencia);
+                },
+            },
+        },
+        series: [{ name: 'Horas paro', data: vals }],
+        xaxis: {
+            categories: cats,
+            labels: {
+                style: { colors: '#2d4d7a', fontSize: '11px' },
+                formatter: v => (+v).toFixed(1) + 'h',
+            },
+        },
+        yaxis: {
+            labels: {
+                style: { colors: '#1a2d4a', fontSize: '11px', fontWeight: 600 },
+                maxWidth: 340,
+            },
+        },
+        plotOptions: {
+            bar: {
+                horizontal: true,
+                barHeight: '65%',
+                borderRadius: 3,
+                borderRadiusApplication: 'end',
+                distributed: true,
+                dataLabels: { position: 'top' },
+            },
+        },
+        colors: vals.map(() => '#c45a2c'),
+        dataLabels: {
+            enabled: true,
+            style: { colors: ['#1a2d4a'], fontFamily: 'Arial', fontSize: '11px', fontWeight: 700 },
+            background: { enabled: true, foreColor: '#fff', borderRadius: 3, padding: 2, borderWidth: 0, opacity: 0.95 },
+            offsetX: 28,
+            formatter: v => v.toFixed(1) + 'h',
+        },
+        grid: { borderColor: '#e0e8f0', strokeDashArray: 3 },
+        legend: { show: false },
+        states: {
+            hover:  { filter: { type: 'lighten', value: 0.10 } },
+            active: { filter: { type: 'darken',  value: 0.12 } },
+        },
+        tooltip: {
+            custom: ({ dataPointIndex }) => {
+                const r = rows[dataPointIndex];
+                return `
+                    <div style="padding:8px 12px;background:#1a2d4a;color:#fff;font-family:Arial;font-size:12px">
+                        <div style="font-weight:700">${r.referencia}</div>
+                        <div style="opacity:.85;font-size:11px">${r.cod_referencia}</div>
+                        <div style="margin-top:4px">Horas paro: <strong>${(+r.horas_paro).toFixed(2)} h</strong></div>
+                        <div style="margin-top:4px;opacity:.8;font-size:10.5px">Clic para ver evolución temporal</div>
+                    </div>`;
+            },
+        },
+    };
+    chartMaqRefs = new ApexCharts(cont, options);
+    chartMaqRefs.render();
+}
+
+// ───── Sub-bloque: gráfico temporal acumulado de la referencia clicada ─────
+async function cargarTemporalRef(codMaq, codRef, refLabel) {
+    cerrarTemporalRef();
+    const wrap  = $('#maq-ref-tempo-wrap');
+    const cont  = $('#chart-maq-ref-tempo');
+    const label = $('#maq-ref-tempo-label');
+    if (!wrap || !cont || !label) return;
+    wrap.style.display = '';
+    label.textContent  = (refLabel || codRef) + ' (' + codRef + ')';
+    cont.innerHTML = '<div class="drill-down-empty">Cargando paros…</div>';
+
+    if (_maqRefTempoAbort) _maqRefTempoAbort.abort();
+    _maqRefTempoAbort = new AbortController();
+
+    const f = getFiltros();
+    const params = addCommonParams({
+        fecha_desde:    f.desde,
+        fecha_hasta:    f.hasta,
+        cod_maquina:    codMaq,
+        cod_referencia: codRef,
+    }, f);
+
+    try {
+        const d = await apiFetch('oee_unificado_maq_ref_paros.php', params, _maqRefTempoAbort.signal);
+        renderChartMaqRefTempo(d.por_dia || [], d.paros || []);
+        wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (e) {
+        if (e.name === 'AbortError') return;
+        cont.innerHTML = '<div class="drill-down-empty">Error: ' + (e.message || e) + '</div>';
+    }
+}
+
+function renderChartMaqRefTempo(porDia, paros) {
+    const cont = $('#chart-maq-ref-tempo');
+    cont.innerHTML = '';
+    if (chartMaqRefTempo) { chartMaqRefTempo.destroy(); chartMaqRefTempo = null; }
+    if (!porDia.length) {
+        cont.innerHTML = '<div class="drill-down-empty">Sin paros para esta referencia en el rango</div>';
+        return;
+    }
+
+    // Acumulado a lo largo del tiempo (horas).
+    const cats = porDia.map(p => p.dia);
+    const dia  = porDia.map(p => +p.horas);
+    let acc = 0;
+    const acumulado = dia.map(h => (acc += h));
+
+    const options = {
+        chart: {
+            type: 'line',
+            height: 330,
+            background: 'transparent',
+            toolbar: { show: false },
+            fontFamily: 'Arial',
+            animations: { enabled: false },
+        },
+        series: [
+            { name: 'Horas/día',  type: 'column', data: dia },
+            { name: 'Acumulado',  type: 'line',   data: acumulado },
+        ],
+        xaxis: {
+            categories: cats,
+            labels: {
+                style: { colors: '#2d4d7a', fontSize: '11px' },
+                formatter: v => {
+                    // Mostramos dd/mm para no saturar
+                    if (typeof v !== 'string') return v;
+                    const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                    return m ? (m[3] + '/' + m[2]) : v;
+                },
+            },
+            title: { text: 'Día', style: { fontSize: '11px', color: '#5b6f86' } },
+        },
+        yaxis: [
+            {
+                title: { text: 'Horas paro (día)', style: { fontSize: '11px', color: '#2d4d7a' } },
+                labels: { style: { colors: '#2d4d7a', fontSize: '10px' }, formatter: v => v.toFixed(1) + 'h' },
+            },
+            {
+                opposite: true,
+                title: { text: 'Acumulado', style: { fontSize: '11px', color: '#c45a2c' } },
+                labels: { style: { colors: '#c45a2c', fontSize: '10px' }, formatter: v => v.toFixed(1) + 'h' },
+            },
+        ],
+        plotOptions: { bar: { columnWidth: '55%', borderRadius: 3, borderRadiusApplication: 'end' } },
+        colors: ['#3a6aa3', '#c45a2c'],
+        stroke: { width: [0, 3], curve: 'smooth' },
+        markers: { size: [0, 4], colors: ['#c45a2c'], strokeWidth: 0 },
+        dataLabels: { enabled: false },
+        grid: { borderColor: '#e0e8f0', strokeDashArray: 3 },
+        legend: { show: true, position: 'top', horizontalAlign: 'right', fontSize: '11px' },
+        tooltip: {
+            shared: true,
+            intersect: false,
+            x: {
+                formatter: (v, ctx) => {
+                    if (typeof ctx?.dataPointIndex !== 'number') return v;
+                    const d = porDia[ctx.dataPointIndex];
+                    if (!d) return v;
+                    const m = d.dia.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                    return m ? (m[3] + '/' + m[2] + '/' + m[1]) : d.dia;
+                },
+            },
+            y: { formatter: v => v.toFixed(2) + ' h' },
+        },
+    };
+    chartMaqRefTempo = new ApexCharts(cont, options);
+    chartMaqRefTempo.render();
+}
+
+function cerrarTemporalRef() {
+    const wrap = document.getElementById('maq-ref-tempo-wrap');
+    if (wrap) wrap.style.display = 'none';
+    if (chartMaqRefTempo) { try { chartMaqRefTempo.destroy(); } catch(_){} chartMaqRefTempo = null; }
+    if (_maqRefTempoAbort) { _maqRefTempoAbort.abort(); _maqRefTempoAbort = null; }
 }
 
 function cerrarDrillMaqMotivos() {
@@ -734,17 +997,24 @@ function cerrarDrillMaqMotivos() {
     $('#maq-motivo-por-hora-wrap').style.display = 'none';
     $('#maq-motivo-paros-wrap').style.display = 'none';
     $('#maq-evolucion-wrap').style.display = 'none';
+    // Bloque NUEVO: refs por máquina + temporal de la ref clicada
+    const refsWrap = document.getElementById('maq-refs-wrap');
+    if (refsWrap) refsWrap.style.display = 'none';
+    cerrarTemporalRef();
     if (chartMaqMotivos)     { chartMaqMotivos.destroy();     chartMaqMotivos     = null; }
     if (chartMaqMotivoDia)   { chartMaqMotivoDia.destroy();   chartMaqMotivoDia   = null; }
     if (chartMaqMotivoHora)  { chartMaqMotivoHora.destroy();  chartMaqMotivoHora  = null; }
     if (chartMaqMotivoParos) { chartMaqMotivoParos.destroy(); chartMaqMotivoParos = null; }
     if (chartMaqEvolucion)   { chartMaqEvolucion.destroy();   chartMaqEvolucion   = null; }
+    if (chartMaqRefs)        { chartMaqRefs.destroy();        chartMaqRefs        = null; }
     if (_maqMotivosAbort)     { _maqMotivosAbort.abort();     _maqMotivosAbort     = null; }
     if (_maqMotivoDiaAbort)   { _maqMotivoDiaAbort.abort();   _maqMotivoDiaAbort   = null; }
     if (_maqMotivoHoraAbort)  { _maqMotivoHoraAbort.abort();  _maqMotivoHoraAbort  = null; }
     if (_maqMotivoParosAbort) { _maqMotivoParosAbort.abort(); _maqMotivoParosAbort = null; }
     if (_maqEvolucionAbort)   { _maqEvolucionAbort.abort();   _maqEvolucionAbort   = null; }
+    if (_maqRefsAbort)        { _maqRefsAbort.abort();        _maqRefsAbort        = null; }
     _maqMotivosActivo = null;
+    _maqRefsCache = [];
 }
 
 // ───── Evolución D/R/C/OEE de la máquina seleccionada en el drill métrica ─────
@@ -885,10 +1155,10 @@ function renderChartMaqEvolucion(periodos, granularidad, nombreMaq) {
         grid: { borderColor: '#e0e8f0', strokeDashArray: 3 },
         annotations: {
             yaxis: [{
-                y: 75, borderColor: '#8c181a', strokeDashArray: 4,
+                y: 75, borderColor: '#3a6aa3', strokeDashArray: 4,
                 label: {
                     text: 'Objetivo OEE 75%',
-                    style: { background: '#8c181a', color: '#fff', fontSize: '10px' },
+                    style: { background: '#3a6aa3', color: '#fff', fontSize: '10px' },
                     position: 'right', offsetX: -5,
                 },
             }],
@@ -942,7 +1212,7 @@ function renderChartMaqMotivos(data, metrica) {
     // Acumulado en horas para usar en las etiquetas de la línea
     let _accH = 0;
     const cumH = vals.map(v => (_accH += (+v || 0)));
-    const color = METRICA_COLORS[metrica] || '#8c181a';
+    const color = METRICA_COLORS[metrica] || '#3a6aa3';
 
     const options = {
         chart: {
@@ -979,13 +1249,17 @@ function renderChartMaqMotivos(data, metrica) {
         colors: [color, '#ef4444'],
         stroke: { width: [0, 2], curve: 'smooth' },
         markers: { size: [0, 4], colors: ['#ef4444'], strokeWidth: 0 },
-        // Etiquetas SOLO sobre la línea de % Acumulado (índice 1): mostramos la
-        // suma ACUMULADA en horas (no el %) para que el valor sea directamente legible.
+        // Etiquetas EN AMBAS series:
+        //   · Barra (seriesIndex 0) → valor individual en horas.
+        //   · Línea (seriesIndex 1) → suma ACUMULADA en horas (no el %).
         dataLabels: {
             enabled: true,
-            enabledOnSeries: [1],
-            formatter: (_v, opts) => (cumH[opts.dataPointIndex] ?? 0).toFixed(1) + 'h',
-            style: { fontSize: '10px', fontWeight: 700, colors: ['#ef4444'] },
+            enabledOnSeries: [0, 1],
+            formatter: (val, opts) => {
+                if (opts.seriesIndex === 0) return val.toFixed(1) + 'h';
+                return (cumH[opts.dataPointIndex] ?? 0).toFixed(1) + 'h';
+            },
+            style: { fontSize: '10px', fontWeight: 700, colors: ['#1a2d4a'] },
             background: { enabled: true, foreColor: '#fff', borderRadius: 3, padding: 2, borderWidth: 0, opacity: 0.92 },
             offsetY: -8,
         },
@@ -1085,12 +1359,12 @@ function renderChartMaqMotivoPorDia(dias, motivo) {
             labels: { style: { colors: '#2d4d7a', fontSize: '10px' }, formatter: v => v.toFixed(1) + 'h' },
         },
         stroke: { curve: 'smooth', width: 3 },
-        colors: ['#8c181a'],
+        colors: ['#3a6aa3'],
         markers: { size: 6, hover: { sizeOffset: 3 } },
         dataLabels: {
             enabled: true,
             formatter: v => v > 0 ? v.toFixed(1) + 'h' : '',
-            style: { fontSize: '10px', fontWeight: 700, colors: ['#8c181a'] },
+            style: { fontSize: '10px', fontWeight: 700, colors: ['#3a6aa3'] },
             background: { enabled: true, foreColor: '#fff', borderRadius: 3, padding: 2, borderWidth: 0, opacity: 0.92 },
             offsetY: -8,
         },
@@ -1176,7 +1450,7 @@ function renderChartMaqMotivoPorHora(horas, motivo, dia) {
             labels: { style: { colors: '#2d4d7a', fontSize: '10px' }, formatter: v => v.toFixed(1) + 'h' },
         },
         plotOptions: { bar: { columnWidth: '70%', borderRadius: 2, borderRadiusApplication: 'end' } },
-        colors: ['#8c181a'],
+        colors: ['#3a6aa3'],
         dataLabels: { enabled: cats.length <= 14, formatter: v => v > 0 ? v.toFixed(1) + 'h' : '', style: { fontSize: '10px', colors: ['#ffffff'], fontWeight: 700 } },
         grid: { borderColor: '#e0e8f0', strokeDashArray: 3 },
         legend: { show: false },
@@ -1241,7 +1515,7 @@ function renderChartMaqMotivoParos(paros) {
     //  - Modo Referencia → agrupamos por máquina (cod_maquina)
     // Paros que comparten entidad heredan el mismo color, así se aprecia visualmente
     // qué paros pertenecen a la misma referencia (o máquina) sin tener que leer la etiqueta.
-    const PALETA = ['#8c181a', '#2d4d7a', '#c45a2c', '#2a7a4b', '#6b2d5b', '#3a6aa3', '#b8860b'];
+    const PALETA = ['#3a6aa3', '#2d4d7a', '#c45a2c', '#2a7a4b', '#6b2d5b', '#3a6aa3', '#b8860b'];
     const keyOf = p => esRef
         ? (p.cod_maquina || '?')
         : (p.cod_referencia || '__SIN_OF__');
@@ -1438,7 +1712,7 @@ function renderChartMotivoDet(data, metrica, motivoNombre) {
 // ───── Paso 3b (continuación): distribución horaria del motivo ─────
 
 const _HORA_OTRAS_COLOR  = '#9aa7b8';
-const _HORA_COLOR_PALETA = ['#8c181a', '#2d4d7a', '#c45a2c', '#6b2d5b', '#2a7a4b', '#3a6aa3'];
+const _HORA_COLOR_PALETA = ['#3a6aa3', '#2d4d7a', '#c45a2c', '#6b2d5b', '#2a7a4b', '#3a6aa3'];
 
 let _motivoHoraAbort = null;
 
@@ -1835,7 +2109,7 @@ async function cargarEvolucion(f) {
 }
 
 const EVO_SERIES = [
-    { key: 'oee',            name: 'OEE',            color: '#8c181a', type: 'area' },
+    { key: 'oee',            name: 'OEE',            color: '#3a6aa3', type: 'area' },
     { key: 'disponibilidad', name: 'Disponibilidad', color: '#2d4d7a', type: 'line' },
     { key: 'rendimiento',    name: 'Rendimiento',    color: '#c45a2c', type: 'line' },
     { key: 'calidad',        name: 'Calidad',        color: '#2a7a4b', type: 'line' },
@@ -1954,10 +2228,10 @@ function renderChartEvolucion(periodos, granularidad) {
         grid: { borderColor: '#e0e8f0', strokeDashArray: 3 },
         annotations: {
             yaxis: [{
-                y: 75, borderColor: '#8c181a', strokeDashArray: 4,
+                y: 75, borderColor: '#3a6aa3', strokeDashArray: 4,
                 label: {
                     text: 'Objetivo OEE 75%',
-                    style: { background: '#8c181a', color: '#fff', fontSize: '10px' },
+                    style: { background: '#3a6aa3', color: '#fff', fontSize: '10px' },
                     position: 'right',
                     offsetX: -5,
                 },
@@ -1985,7 +2259,7 @@ function renderChartEvolucion(periodos, granularidad) {
 // Construye bandas para fines de semana / festivos en la evolución diaria.
 // En granularidad WEEK / MONTH no aplica.
 //
-// Todos los tipos usan el rojo corporativo #8c181a como base, difuminado en
+// Todos los tipos usan el rojo corporativo #3a6aa3 como base, difuminado en
 // distintas intensidades vía rgba (la alfa va dentro del color para que
 // ApexCharts no la ignore como pasaba con el campo `opacity`). La banda
 // solo se dibuja si hay un período siguiente — así nunca se extiende más
@@ -2034,7 +2308,7 @@ function buildEvoXAxisAnnotations(periodos, granularidad) {
                 orientation: 'horizontal',
                 offsetY: -4,
                 style: {
-                    background: '#8c181a',
+                    background: '#3a6aa3',
                     color: '#fff',
                     fontSize: '9px',
                     fontWeight: 700,
@@ -2068,7 +2342,7 @@ function _evoLabelOnlyAnnotation(p) {
             orientation: 'horizontal',
             offsetY: -4,
             style: {
-                background: '#8c181a',
+                background: '#3a6aa3',
                 color: '#fff',
                 fontSize: '9px',
                 fontWeight: 700,
@@ -2217,7 +2491,7 @@ function _limpiarPeriodoFiltro() {
 // ============================================================
 
 const LS_TOP_INLINE = 'kh_oee_unificado_top_inline';
-const _TOP_PALETA  = ['#8c181a', '#c45a2c', '#2d4d7a', '#6b2d5b', '#2a7a4b', '#3a6aa3', '#a82124', '#1a2d4a'];
+const _TOP_PALETA  = ['#3a6aa3', '#c45a2c', '#2d4d7a', '#6b2d5b', '#2a7a4b', '#3a6aa3', '#5b8cc7', '#1a2d4a'];
 function topColor(i) { return _TOP_PALETA[i % _TOP_PALETA.length]; }
 
 // Dos bloques independientes ('maquinas' | 'motivos'). Cada uno tiene sus
@@ -2615,7 +2889,7 @@ function renderTopDetalleFecha(mode, fechas, titulo) {
         yaxis: { labels: { style: { colors: '#2d4d7a', fontSize: '10px' }, formatter: v => v.toFixed(1) + 'h' } },
         plotOptions: { bar: { columnWidth: '70%', borderRadius: 2 } },
         dataLabels: { enabled: cats.length <= 14, formatter: v => v.toFixed(1) + 'h', style: { fontSize: '10px', colors: ['#ffffff'], fontWeight: 700 } },
-        colors: ['#8c181a'],
+        colors: ['#3a6aa3'],
         grid: { borderColor: '#e0e8f0', strokeDashArray: 3 },
         legend: { show: false },
         tooltip: { y: { formatter: v => v.toFixed(2) + ' h' } },
@@ -2728,7 +3002,9 @@ document.addEventListener('DOMContentLoaded', () => {
             _maqExcl = new Set(saved.excl.filter(v => typeof v === 'string' && v));
         }
     } else {
-        setRange('today');
+        // Default: mes actual (día 1 → hoy). Se decidió que es el rango
+        // más útil para el panel principal de OEE.
+        setRange('month');
     }
     renderExclBadge();
     updateMaqExclToggleCount();
@@ -2843,6 +3119,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Export buttons — exportan SIEMPRE lo que está actualmente visible en pantalla
     $('#btn-export-xlsx').addEventListener('click', exportarXlsx);
     $('#btn-export-pdf').addEventListener('click', exportarPdf);
+    $('#btn-export-matriz').addEventListener('click', exportarMatriz);
 
     cargar();
 });
@@ -2899,4 +3176,16 @@ function exportarPdf() {
     const f = getFiltros();
     if (!f.desde || !f.hasta) { showToast('Selecciona un rango de fechas', 'error'); return; }
     window.location.href = `${API_BASE}/oee_unificado_export_pdf.php?${_buildExportParams(f)}`;
+}
+
+// Matriz: tabla cruzada motivos × máquina/referencia. Solo necesita los filtros
+// base (rango, turnos, exclusiones y sección activa); NO depende del drill.
+function exportarMatriz() {
+    const f = getFiltros();
+    if (!f.desde || !f.hasta) { showToast('Selecciona un rango de fechas', 'error'); return; }
+    const params = new URLSearchParams({ fecha_desde: f.desde, fecha_hasta: f.hasta });
+    if (f.turnos.length) params.set('turnos', f.turnos.join(','));
+    if (f.excl.length)   params.set('excl',   f.excl.join(','));
+    if (_seccionActiva)  params.set('seccion', _seccionActiva);
+    window.location.href = `${API_BASE}/oee_unificado_matriz_export.php?${params}`;
 }
