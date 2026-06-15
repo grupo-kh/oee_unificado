@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OEE Unificado</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#eef1f5;color:#1f2937}
+.wrap{max-width:1600px;margin:0 auto;padding:18px}
+header{background:#fff;padding:18px 20px;border-radius:10px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+h1{font-size:22px;margin-bottom:16px;color:#111827}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+.fg{display:flex;flex-direction:column;position:relative}
+label{font-size:11px;font-weight:600;color:#6b7280;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px}
+input[type=date],select,.btn{padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;background:#fff}
+input[type=date]:focus,select:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.12)}
+.turno-row{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+.chk{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:500}
+.chk input{width:16px;height:16px;cursor:pointer}
+.quick{display:flex;gap:6px;margin-left:auto}
+.quick button{padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px}
+.quick button:hover{background:#e5e7eb}
+.quick button.active{background:#2563eb;color:#fff;border-color:#2563eb}
+.btn{cursor:pointer;font-weight:600}
+.btn:hover{background:#f3f4f6}
+.btn-pri{background:#2563eb;color:#fff;border-color:#2563eb}
+.btn-pri:hover{background:#1d4ed8}
+.excl-toggle{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer}
+.excl-count{background:#2563eb;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;min-width:20px;text-align:center}
+.excl-panel{position:absolute;top:100%;left:0;right:0;margin-top:4px;background:#fff;border:1px solid #d1d5db;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.15);z-index:50;display:none;max-height:340px;overflow:hidden;flex-direction:column;width:300px}
+.excl-panel.open{display:flex}
+.excl-search{padding:8px;border:none;border-bottom:1px solid #eee;font-size:13px;width:100%}
+.excl-search:focus{outline:none}
+.excl-list{overflow-y:auto;padding:4px}
+.excl-grp{font-size:10px;font-weight:700;color:#9ca3af;padding:8px 8px 4px;text-transform:uppercase}
+.excl-item{display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;font-size:13px;border-radius:5px}
+.excl-item:hover{background:#f3f4f6}
+.excl-bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}
+.excl-chip{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:14px;padding:3px 10px;font-size:12px;display:flex;align-items:center;gap:6px}
+.excl-chip button{background:none;border:none;color:#b91c1c;cursor:pointer;font-size:14px;line-height:1}
+.excl-clear{font-size:12px;color:#6b7280;background:none;border:none;cursor:pointer;text-decoration:underline}
+.infobar{background:#fff;padding:14px 18px;border-radius:10px;margin-bottom:16px;display:flex;gap:22px;flex-wrap:wrap;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.info{display:flex;align-items:center;gap:7px}
+.info .l{font-size:11px;color:#9ca3af;text-transform:uppercase;font-weight:600}
+.info .v{font-size:14px;font-weight:700;color:#111827}
+.tag{background:#dbeafe;color:#1e40af;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700}
+.actions{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+.actions .btn{font-size:12px;padding:8px 12px}
+/* botones de módulos: cada uno con su color distintivo */
+.btn-hist{background:#eaf1fb;color:#1e40af;border-color:#bcd3f0}
+.btn-hist:hover{background:#d9e7f8}
+.btn-cof{background:#fdeee7;color:#9a4420;border-color:#f0c9b6}
+.btn-cof:hover{background:#fadfd1}
+.btn-topm{background:#e6f3ec;color:#1d5938;border-color:#aedcc1}
+.btn-topm:hover{background:#d3eadd}
+.btn-topmot{background:#efe9fb;color:#5b3aa6;border-color:#cdbcf0}
+.btn-topmot:hover{background:#e3d9f7}
+.btn-matriz{background:#2d4d7a;color:#fff;border-color:#24406a}
+.btn-matriz:hover{background:#24406a}
+/* tabla matriz (popup): cabecera y 1ª columna fijas, scroll horizontal */
+.mtx-wrap{overflow:auto;max-height:calc(100vh - 210px);border:1px solid #e5e7eb;border-radius:8px}
+.mtx{border-collapse:collapse;font-size:12px;white-space:nowrap}
+.mtx th,.mtx td{border:1px solid #eef0f3;padding:5px 9px;text-align:right}
+.mtx thead th{position:sticky;top:0;background:#2d4d7a;color:#fff;font-weight:700;z-index:2;text-align:center;white-space:normal;min-width:74px;max-width:120px}
+.mtx th.mtx-first,.mtx td.mtx-first{position:sticky;left:0;text-align:left;background:#fff;z-index:1;min-width:250px;max-width:250px;overflow:hidden;text-overflow:ellipsis}
+.mtx thead th.mtx-first{z-index:3;min-width:250px}
+.mtx tr.mtx-maq td{background:#dce6f4;font-weight:700}
+.mtx tr.mtx-maq td.mtx-first{background:#dce6f4;cursor:pointer;color:#1e40af}
+.mtx tr.mtx-maq td.mtx-first:hover{background:#cbdcf0;text-decoration:underline}
+.mtx td.mtx-ref{padding-left:24px;color:#374151;font-weight:500}
+.mtx tr.mtx-tot td{background:#2d4d7a;color:#fff;font-weight:700}
+.mtx td.mtx-disp{font-weight:700;color:#1d5938;text-align:center}
+.mtx tr.mtx-tot td.mtx-disp{color:#fff}
+/* popup a pantalla completa (Top máquinas / Top motivos) */
+.fullpop{position:fixed;inset:0;background:#fff;z-index:1500;display:flex;flex-direction:column;overflow:hidden}
+.fullpop-head{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid #eef0f3}
+.fullpop-head h2{font-size:20px;font-weight:700;color:#111827}
+.fullpop-head h2 small{font-weight:500;color:#9ca3af;font-size:13px;margin-left:8px}
+.fullpop-filters{display:flex;gap:16px;align-items:flex-end;padding:14px 24px;background:#f8fafc;border-bottom:1px solid #eef0f3;flex-wrap:wrap}
+.fullpop-filters label{display:flex;flex-direction:column;gap:5px;margin:0}
+.fullpop-body{flex:1;overflow-y:auto;padding:24px}
+.content{background:#fff;padding:20px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+/* KPIs compactos: tira horizontal etiqueta + valor */
+.kpis{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.kpi{flex:1;min-width:130px;padding:9px 14px;border-radius:8px;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.kpi .kl{font-size:11px;opacity:.9;text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+.kpi .kv{font-size:20px;font-weight:800;line-height:1}
+.kpi.d{background:linear-gradient(135deg,#2d4d7a,#1e3a5f)}
+.kpi.r{background:linear-gradient(135deg,#c45a2c,#9a4420)}
+.kpi.c{background:linear-gradient(135deg,#2a7a4b,#1d5938)}
+.kpi.o{background:linear-gradient(135deg,#3a6aa3,#2a4d78)}
+.toolbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #eef0f3}
+.seg{display:inline-flex;border:1px solid #d1d5db;border-radius:7px;overflow:hidden}
+.seg button{padding:8px 16px;border:none;background:#fff;font-size:13px;font-weight:600;cursor:pointer;color:#374151}
+.seg button+button{border-left:1px solid #d1d5db}
+.seg button.active{background:#2563eb;color:#fff}
+/* selector máquina/referencia: color distintivo granate */
+#porSeg{border-color:#8c181a}
+#porSeg button{color:#8c181a}
+#porSeg button.active{background:#8c181a;color:#fff}
+.sec-title{font-size:16px;font-weight:700;color:#111827;margin:0 auto 0 0}
+.bars{display:flex;flex-direction:column;gap:9px}
+.brow{display:flex;align-items:center;gap:12px;padding:4px;border-radius:6px;transition:background .12s}
+.brow.clickable{cursor:pointer}
+.brow.clickable:hover{background:#f9fafb}
+.bname{min-width:190px;max-width:190px;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btrack{flex:1;height:26px;background:#eef0f3;border-radius:5px;overflow:hidden;position:relative}
+.bfill{height:100%;border-radius:5px;min-width:2px;transition:width .3s}
+.bval{min-width:96px;text-align:right;font-size:13px;font-weight:700}
+.hint{font-size:12px;color:#9ca3af;margin-top:12px;font-style:italic}
+.loading{text-align:center;padding:40px;color:#9ca3af}
+.spinner{display:inline-block;width:34px;height:34px;border:3px solid #eef0f3;border-top-color:#2563eb;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:14px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error{background:#fef2f2;color:#b91c1c;padding:14px;border-radius:8px;border-left:4px solid #b91c1c}
+.empty{text-align:center;padding:40px;color:#9ca3af}
+/* módulo GENERAL (motivos de paro generales) — fondo más oscuro */
+.module-general{margin-top:18px;background:#e3ebf4;border:1px solid #93b2d4;border-radius:10px}
+.module-general .mg-head{padding:13px 18px;border-bottom:1px solid #bcd0e6;display:flex;align-items:center;gap:10px}
+.module-general .mg-title{font-size:15px;font-weight:700;color:#1e3a5f}
+.module-general .mg-title small{font-weight:500;color:#5a7596}
+.badge-gen{background:#1e3a5f;color:#fff;font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;letter-spacing:.6px}
+.module-general .mg-body{padding:16px 18px}
+/* paneles apilados debajo (en lugar de modales) */
+#panels{display:flex;flex-direction:column;gap:16px;margin-top:16px}
+.panel{background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.07);scroll-margin-top:12px;animation:slidein .2s ease}
+.panel.general{background:#e3ebf4;border-color:#93b2d4}
+.panel.general .phead{background:#d3e0ee;border-bottom-color:#bcd0e6}
+.panel.general .pbody{background:#e3ebf4;border-radius:0 0 12px 12px}
+.panel:last-child{border-color:#2563eb;box-shadow:0 4px 16px rgba(37,99,235,.16)}
+@keyframes slidein{from{opacity:.4;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.phead{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid #eef0f3}
+.ptitle{font-size:17px;font-weight:700;color:#111827}
+.ptitle small{display:block;font-size:12px;font-weight:500;color:#9ca3af;margin-top:2px}
+.pclose{background:#f3f4f6;border:none;padding:7px 12px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280}
+.pclose:hover{background:#fee2e2;color:#b91c1c}
+.pbody{padding:20px}
+.chartbox{position:relative;height:440px}
+.chartbox.tall{height:520px}
+.selgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.selcard{padding:24px 20px;border:2px solid #e5e7eb;border-radius:12px;cursor:pointer;text-align:center;transition:all .15s;background:#fff}
+.selcard:hover{border-color:#2563eb;background:#f8fafc;transform:translateY(-2px);box-shadow:0 8px 20px rgba(37,99,235,.12)}
+.selcard .ic{font-size:34px;margin-bottom:10px}
+.selcard .t{font-size:16px;font-weight:700;color:#111827;margin-bottom:6px}
+.selcard .d{font-size:12px;color:#6b7280}
+.evo-toggles{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.evo-tog{display:flex;align-items:center;gap:7px;font-size:13px;cursor:pointer;font-weight:600}
+.evo-dot{width:14px;height:14px;border-radius:50%}
+.subctrl{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding:12px;background:#f8fafc;border-radius:8px}
+.subctrl label{margin:0}
+.subctrl select,.subctrl input{min-width:150px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 12px;background:#f8fafc;border-bottom:2px solid #eef0f3;font-weight:700;color:#6b7280;font-size:12px;text-transform:uppercase}
+td{padding:9px 12px;border-bottom:1px solid #f3f4f6}
+tbody tr:hover{background:#f9fafb}
+/* módulo Paros individuales: etiquetas en color corporativo para distinguirlas */
+.mod-paros th{color:#8c181a;font-weight:700}
+.mod-paros .subctrl label{color:#8c181a;font-weight:700}
+.mod-paros .breadcrumb{color:#8c181a}
+.mod-paros .breadcrumb b{color:#8c181a}
+.mod-paros td{color:#6e6d6b}
+.breadcrumb{font-size:12px;color:#9ca3af;margin-bottom:14px}
+.breadcrumb b{color:#374151}
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
+.legend span{display:flex;align-items:center;gap:6px;font-size:12px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+/* popup detalle de OF */
+.of-pop{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px}
+.of-pop-card{background:#fff;border-radius:12px;max-width:580px;width:100%;box-shadow:0 24px 70px rgba(0,0,0,.4);overflow:hidden;animation:pop .15s ease}
+.of-pop-head{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #eef0f3}
+.of-pop-head h3{font-size:16px;font-weight:700;color:#1e3a5f}
+.of-pop-body{padding:8px 20px 18px}
+.of-pop-row{display:flex;gap:14px;padding:11px 2px;border-bottom:1px solid #f3f4f6}
+.of-pop-row:last-child{border-bottom:none}
+.of-pop-k{flex:0 0 160px;font-size:12px;font-weight:700;color:#8c181a;text-transform:uppercase;letter-spacing:.3px}
+.of-pop-v{flex:1;font-size:14px;color:#6e6d6b;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>OEE Unificado · Disponibilidad de Máquinas</h1>
+    <div class="filters">
+      <div class="fg"><label>Desde</label><input type="date" id="fDesde"></div>
+      <div class="fg"><label>Hasta</label><input type="date" id="fHasta"></div>
+      <div class="fg"><label>Sección</label>
+        <select id="fSeccion"><option value="VARILLAS">Varillas</option><option value="TROQUELADOS">Troquelados</option></select>
+      </div>
+      <div class="fg"><label>Excluir máquinas</label>
+        <div class="btn excl-toggle" id="exclToggle"><span>Seleccionar…</span><span class="excl-count" id="exclCount">0</span></div>
+        <div class="excl-panel" id="exclPanel">
+          <input type="search" class="excl-search" id="exclSearch" placeholder="Buscar máquina…">
+          <div class="excl-list" id="exclList"></div>
+        </div>
+      </div>
+    </div>
+    <div class="turno-row">
+      <span style="font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase">Turnos:</span>
+      <label class="chk"><input type="checkbox" class="turno" value="M" checked> Mañana</label>
+      <label class="chk"><input type="checkbox" class="turno" value="T" checked> Tarde</label>
+      <label class="chk"><input type="checkbox" class="turno" value="N" checked> Noche</label>
+      <div class="quick">
+        <button data-r="today">Hoy</button><button data-r="yesterday">Ayer</button>
+        <button data-r="week">Semana</button><button data-r="month">Mes</button>
+      </div>
+    </div>
+    <div class="excl-bar" id="exclBar" style="display:none">
+      <span style="font-size:12px;color:#6b7280;font-weight:600">Excluidas:</span>
+      <div id="exclChips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      <button class="excl-clear" id="exclClearAll">Quitar todas</button>
+    </div>
+  </header>
+
+  <div class="infobar">
+    <div class="info"><span class="l">Rango</span><span class="v" id="iRango">—</span></div>
+    <div class="info"><span class="l">Sección</span><span class="v tag" id="iSeccion">—</span></div>
+    <div class="info"><span class="l">Turnos</span><span class="v" id="iTurnos">—</span></div>
+    <div class="info"><span class="l">OFs</span><span class="v" id="iOfs">—</span></div>
+    <div class="info"><span class="l">Refs</span><span class="v" id="iRefs">—</span></div>
+    <div class="actions">
+      <button class="btn btn-hist" onclick="App.openHistograma()">📊 Histograma</button>
+      <button class="btn btn-cof" onclick="App.openCambiosOF()">🔄 Cambios en OF</button>
+      <button class="btn btn-topm" onclick="App.topModule('maquinas')">🏭 Top máquinas</button>
+      <button class="btn btn-topmot" onclick="App.topModule('motivos')">🔧 Top motivos</button>
+      <button class="btn btn-matriz" onclick="App.openMatriz()">🧮 Matriz</button>
+      <button class="btn btn-pri" onclick="App.exportExcel()">⬇️ Excel</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="kpis" id="kpis"></div>
+    <div class="toolbar">
+      <span class="sec-title" id="machTitle">Máquinas</span>
+      <div class="seg" id="metricSeg">
+        <button data-m="disponibilidad" class="active">Disponibilidad</button>
+        <button data-m="rendimiento">Rendimiento</button>
+        <button data-m="calidad">Calidad</button>
+        <button data-m="oee">OEE</button>
+      </div>
+      <div class="seg" id="porSeg">
+        <button data-p="maquina" class="active">Por máquina</button>
+        <button data-p="referencia">Por referencia</button>
+      </div>
+    </div>
+    <div id="machBody"><div class="loading"><div class="spinner"></div>Cargando…</div></div>
+    <div id="generalBody"></div>
+  </div>
+
+  <div id="panels"></div>
+</div>
+
+<script>
+const API='/PLAN_ATTAINMENT/api/';
+const COL={oee:'#3a6aa3',disponibilidad:'#2d4d7a',rendimiento:'#c45a2c',calidad:'#2a7a4b'};
+const PALETTE=['#3a6aa3','#c45a2c','#2a7a4b','#7c3aed','#0891b2','#b45309','#be185d','#4d7c0f','#9a3412','#1e40af','#0f766e','#a16207'];
+
+if(window.ChartDataLabels){
+  Chart.register(ChartDataLabels);
+  Chart.defaults.set('plugins.datalabels',{
+    anchor:'end',align:'top',offset:2,clamp:true,
+    font:{size:10,weight:'600'},color:'#374151',
+    formatter:v=>v==null||v===''?'':(Math.round(v*10)/10)
+  });
+}
+
+const State={
+  data:null, secciones:[], maquinasActivas:[],
+  metrica:'disponibilidad', por:'maquina', seccion:'VARILLAS',
+  excl:new Set()
+};
+
+const App={
+  init(){
+    const t=new Date().toISOString().slice(0,10);
+    fDesde.value=t; fHasta.value=t; State.seccion=fSeccion.value;
+    this.bind(); this.loadMain();
+  },
+  bind(){
+    fDesde.onchange=fHasta.onchange=()=>{this.clearQuick();this.loadMain();};
+    fSeccion.onchange=()=>{State.seccion=fSeccion.value;this.loadMain();};
+    document.querySelectorAll('.turno').forEach(c=>c.onchange=()=>this.loadMain());
+    document.querySelectorAll('.quick button').forEach(b=>b.onclick=()=>this.quickRange(b.dataset.r,b));
+    metricSeg.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+      metricSeg.querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active'); State.metrica=b.dataset.m;
+      porSeg.style.display=(State.metrica==='disponibilidad'||State.metrica==='oee')?'':'none';
+      if(porSeg.style.display==='none'){State.por='maquina';this.setPorActive();}
+      this.loadMachines();
+    });
+    porSeg.querySelectorAll('button').forEach(b=>b.onclick=()=>{State.por=b.dataset.p;this.setPorActive();this.loadMachines();});
+    exclToggle.onclick=e=>{e.stopPropagation();exclPanel.classList.toggle('open');};
+    exclPanel.onclick=e=>e.stopPropagation();
+    exclSearch.oninput=()=>this.renderExclList(exclSearch.value);
+    exclClearAll.onclick=()=>{State.excl.clear();this.renderExclChips();this.renderExclList(exclSearch.value);this.loadMain();};
+    document.onclick=()=>exclPanel.classList.remove('open');
+    // Escape: cierra el panel inferior (o el desplegable de excluir)
+    document.addEventListener('keydown',e=>{
+      if(e.key==='Escape'){
+        const pop=document.querySelector('.of-pop');
+        if(pop){pop.remove();return;}
+        const fps=document.querySelectorAll('.fullpop');
+        if(fps.length){fps[fps.length-1].remove();return;}
+        const last=panels.lastElementChild;
+        if(last){last.remove();const prev=panels.lastElementChild;if(prev)prev.scrollIntoView({behavior:'smooth',block:'start'});}
+        else exclPanel.classList.remove('open');
+      }
+    });
+  },
+  setPorActive(){porSeg.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x.dataset.p===State.por));},
+  clearQuick(){document.querySelectorAll('.quick button').forEach(b=>b.classList.remove('active'));},
+  quickRange(r,btn){
+    this.clearQuick(); btn.classList.add('active');
+    const t=new Date(),d=new Date();
+    if(r==='yesterday'){t.setDate(t.getDate()-1);d.setDate(d.getDate()-1);}
+    else if(r==='week'){d.setDate(d.getDate()-6);}
+    else if(r==='month'){d.setDate(d.getDate()-29);}
+    fDesde.value=d.toISOString().slice(0,10); fHasta.value=t.toISOString().slice(0,10);
+    this.loadMain();
+  },
+
+  turnos(){return [...document.querySelectorAll('.turno:checked')].map(c=>c.value);},
+  common(extra={}){
+    const p=new URLSearchParams();
+    p.set('fecha_desde',fDesde.value); p.set('fecha_hasta',fHasta.value);
+    const tu=this.turnos(); if(tu.length&&tu.length<3)p.set('turnos',tu.join(','));
+    if(State.excl.size)p.set('excl',[...State.excl].join(','));
+    for(const k in extra) if(extra[k]!=null&&extra[k]!=='') p.set(k,extra[k]);
+    return p;
+  },
+  async get(endpoint,params){
+    const r=await fetch(API+endpoint+'?'+params.toString());
+    const j=await r.json();
+    if(j.ok===false) throw new Error(j.error||j.message||'Error');
+    return j.data||j;
+  },
+
+  async loadMain(){
+    machBody.innerHTML='<div class="loading"><div class="spinner"></div>Cargando…</div>';
+    panels.innerHTML='';
+    try{
+      const d=await this.get('oee_unificado.php',this.common({seccion:State.seccion}));
+      State.data=d; State.secciones=d.secciones||[];
+      State.maquinasActivas=(d.global&&d.global.maquinas_activas)||[];
+      this.renderInfo(d); this.renderKpis(); this.renderExclList(exclSearch.value);
+      this.loadMachines();
+    }catch(e){machBody.innerHTML=`<div class="error">Error cargando datos: ${e.message}</div>`;}
+  },
+  renderInfo(d){
+    iRango.textContent=`${d.fecha_desde} a ${d.fecha_hasta}`;
+    iSeccion.textContent=State.seccion;
+    iTurnos.textContent=Array.isArray(d.turnos)&&d.turnos.length?d.turnos.join(', '):'M, T, N';
+    iOfs.textContent=(d.global&&d.global.num_ofs)??'—';
+    iRefs.textContent=(d.global&&d.global.num_refs)??'—';
+  },
+  renderKpis(){
+    const s=State.secciones.find(x=>x.seccion===State.seccion)||{};
+    kpis.innerHTML=`
+      <div class="kpi d"><span class="kl">Disponibilidad</span><span class="kv">${s.disponibilidad??0}%</span></div>
+      <div class="kpi r"><span class="kl">Rendimiento</span><span class="kv">${s.rendimiento??0}%</span></div>
+      <div class="kpi c"><span class="kl">Calidad</span><span class="kv">${s.calidad??0}%</span></div>
+      <div class="kpi o"><span class="kl">OEE</span><span class="kv">${s.oee??0}%</span></div>`;
+  },
+
+  async loadMachines(){
+    const esRef=State.por==='referencia';
+    machTitle.textContent=(esRef?'Referencias':'Máquinas')+' · '+this.metricLabel(State.metrica)+' · '+State.seccion;
+    machBody.innerHTML='<div class="loading"><div class="spinner"></div>Cargando…</div>';
+    generalBody.innerHTML='';
+    try{
+      const d=await this.get('oee_unificado_drill.php',
+        this.common({seccion:State.seccion,metrica:State.metrica,por:State.por}));
+      const items=d.maquinas||[];
+      if(!items.length){machBody.innerHTML='<div class="empty">Sin datos para esta selección</div>';}
+      else{
+        const unit=esRef?'h':'%';
+        const max=esRef?Math.max(...items.map(i=>i.valor),1):100;
+        const clickable=(State.metrica==='disponibilidad'||State.metrica==='oee');
+        machBody.innerHTML=this.barList(items,{
+          name:i=>i.maquina,val:i=>i.valor,unit,max,
+          color:i=>unit==='%'?this.semColor(i.valor):'#3a6aa3',clickable
+        })+(clickable?`<div class="hint">Haz clic en una ${esRef?'referencia':'máquina'} para analizarla (se abre debajo).</div>`:'');
+        if(clickable){
+          [...machBody.querySelectorAll('.brow')].forEach((row,ix)=>{
+            row.onclick=()=>esRef
+              ? this.refMotivos(items[ix].cod_maquina,items[ix].maquina)
+              : this.machineSelector(items[ix].cod_maquina,items[ix].maquina);
+          });
+        }
+      }
+      this.renderGeneralMotivos(d.motivos||[]);
+    }catch(e){machBody.innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+
+  /* ---------- módulo GENERAL: pareto de motivos de paro ---------- */
+  motivoValField(){return State.metrica==='calidad'?'unidades':'horas';},
+  motivoValLabel(){return State.metrica==='calidad'?'Unidades NOK':'Horas de paro';},
+  renderGeneralMotivos(motivos){
+    const esRef=State.por==='referencia';
+    if(!motivos.length){generalBody.innerHTML='';return;}
+    const vf=this.motivoValField();
+    generalBody.innerHTML=`
+      <div class="module-general">
+        <div class="mg-head">
+          <span class="badge-gen">GENERAL</span>
+          <span class="mg-title">Motivos de paro generales
+            <small>· ${State.seccion} · ${this.metricLabel(State.metrica)} · ${esRef?'por referencia':'por máquina'} · barras = ${this.motivoValLabel().toLowerCase()}, línea = % acumulado</small>
+          </span>
+        </div>
+        <div class="mg-body">
+          <div class="chartbox tall"><canvas class="cv"></canvas></div>
+          <div class="hint">Haz clic en un motivo para ver su desglose por ${esRef?'referencia':'máquina'} y su distribución horaria (se abre debajo).</div>
+        </div>
+      </div>`;
+    const cv=generalBody.querySelector('.cv');
+    let acc=0;
+    const labels=motivos.map(m=>m.motivo);
+    const vals=motivos.map(m=>m[vf]||0);
+    const acum=motivos.map(m=>m.pct_acum!=null?m.pct_acum:(acc+=(m.pct||0)));
+    this.chartDestroy(cv);
+    new Chart(cv,{data:{labels,datasets:[
+      {type:'bar',label:this.motivoValLabel(),data:vals,backgroundColor:'#2d4d7a',yAxisID:'y',order:2,
+        datalabels:{anchor:'end',align:'top',color:'#1e3a5f',formatter:v=>Math.round(v*10)/10}},
+      {type:'line',label:'% acumulado',data:acum,borderColor:'#c45a2c',backgroundColor:'#c45a2c',yAxisID:'y1',order:1,tension:0,pointRadius:4,
+        datalabels:{anchor:'end',align:'top',color:'#c45a2c',formatter:v=>Math.round(v)+'%'}}
+    ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:true}},
+      onClick:(e,els)=>{if(els.length)this.openMotivoGeneral(motivos[els[0].index].motivo);},
+      scales:{
+        x:{ticks:{maxRotation:60,minRotation:30,font:{size:10}}},
+        y:{position:'left',beginAtZero:true,grace:'12%',title:{display:true,text:this.motivoValLabel()}},
+        y1:{position:'right',beginAtZero:true,max:100,grid:{drawOnChartArea:false},title:{display:true,text:'% acumulado'}}
+      }}});
+  },
+  async openMotivoGeneral(motivo){
+    const esRef=State.por==='referencia';
+    const ent=esRef?'referencia':'máquina';
+    const ov=this.push('Motivo «'+motivo+'»',
+      `Desglose por ${ent} y distribución horaria · ${State.seccion} · ${this.metricLabel(State.metrica)}`,
+      this.loadingHtml(), true);
+    try{
+      const d=await this.get('oee_unificado_motivo_drill.php',
+        this.common({seccion:State.seccion,metrica:State.metrica,motivo,por:State.por}));
+      const det=d.detalle||[];
+      const ph=d.por_hora;
+      const vf=this.motivoValField();
+      const max=Math.max(...det.map(x=>x[vf]||0),1);
+      let html=`<div class="breadcrumb">Desglose del motivo <b>${motivo}</b> por ${ent} y distribución horaria global.</div>`;
+      html+=`<div style="font-size:13px;font-weight:700;color:#1e3a5f;margin:6px 0 10px">Por ${ent} <small style="font-weight:500;color:#5a7596">${esRef?'':'(clic en una máquina para ver su distribución horaria detallada)'}</small></div>`;
+      html+=this.barList(det,{name:x=>x.maquina,val:x=>x[vf]||0,unit:State.metrica==='calidad'?'u':'h',max,
+        color:()=>'#2d4d7a',clickable:!esRef});
+      html+=`<div style="font-size:13px;font-weight:700;color:#1e3a5f;margin:18px 0 6px">Distribución horaria del motivo · franja y duración por ${ent}</div>`;
+      html+=`<div class="hint" style="margin-top:0">Cada barra ocupa la franja horaria en la que la ${ent} estuvo parada por este motivo; su longitud = duración real.</div>`;
+      html+=ph?'<div class="cvh"></div>':'<div class="empty">Sin desglose horario disponible</div>';
+      this.body(ov).innerHTML=html;
+      if(!esRef){
+        [...this.body(ov).querySelectorAll('.brow')].forEach((row,ix)=>{
+          row.onclick=()=>this.motivoMaqHora(motivo,det[ix].cod_maquina,det[ix].maquina);
+        });
+      }
+      if(ph)this.hourlyChart(this.body(ov).querySelector('.cvh'),ph);
+    }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+  async motivoMaqHora(motivo,cod,name){
+    const ov=this.push('Distribución horaria · máquina '+name,
+      `Motivo «${motivo}» · ${State.seccion} · ${this.metricLabel(State.metrica)}`,
+      this.loadingHtml(), true);
+    try{
+      const d=await this.get('oee_unificado_motivo_drill.php',
+        this.common({seccion:State.seccion,metrica:State.metrica,motivo,por:State.por,cod_maquina:cod}));
+      const ph=d.por_hora;
+      let html=`<div class="breadcrumb">Distribución horaria del motivo <b>${motivo}</b> filtrada a la máquina <b>${name}</b>. Cada barra = franja horaria · duración del paro. <b>Haz clic en una barra</b> para ver la referencia causante.</div>`;
+      html+=ph?'<div class="cvh"></div>':'<div class="empty">Sin paros de este motivo para esta máquina en el rango/turnos seleccionados.</div>';
+      this.body(ov).innerHTML=html;
+      if(ph)this.hourlyChart(this.body(ov).querySelector('.cvh'),ph,(h1,h2)=>this.slotRefs(motivo,cod,name,h1,h2));
+    }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+  async slotRefs(motivo,cod,name,startH,endH){
+    const h1=Math.floor(startH), h2=Math.max(h1,Math.ceil(endH)-1);
+    const pad=x=>String(x).padStart(2,'0');
+    const ov=this.push('Referencia causante · '+name,`Motivo «${motivo}» · franja ${pad(h1)}:00–${pad(h2+1)}:00 · ${State.seccion}`,this.loadingHtml(),true);
+    try{
+      const d=await this.get('oee_unificado_motivo_maq_hora_refs.php',
+        this.common({seccion:State.seccion,motivo,cod_maquina:cod,hora_desde:h1,hora_hasta:h2}));
+      const refs=d.referencias||[];
+      if(!refs.length){this.body(ov).innerHTML='<div class="empty">Sin referencia identificada en esa franja</div>';return;}
+      const max=Math.max(...refs.map(r=>r.horas||0),1);
+      let html=`<div class="breadcrumb">Referencias fabricadas durante el motivo <b>${motivo}</b> en <b>${name}</b>, franja <b>${pad(h1)}:00–${pad(h2+1)}:00</b> (horas de paro atribuidas).</div>`;
+      html+=this.barList(refs,{name:r=>r.referencia,val:r=>r.horas||0,unit:'h',max,color:()=>'#8c181a',clickable:false});
+      html+='<table style="margin-top:16px"><thead><tr><th>Referencia</th><th>Código</th><th>Horas de paro</th><th>Minutos</th><th>Nº paros</th></tr></thead><tbody>';
+      refs.forEach(r=>html+=`<tr><td>${r.referencia}</td><td>${r.cod_referencia||'—'}</td><td>${(r.horas||0).toFixed(2)}</td><td>${(r.minutos||0).toFixed(1)}</td><td>${r.num_paros||0}</td></tr>`);
+      html+='</tbody></table>';
+      this.body(ov).innerHTML=html;
+    }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+  hourlyChart(elBox,ph,onSlot){
+    // Calidad (unidades): no es tiempo → barras apiladas por hora.
+    if(ph.unidad==='uds'){
+      elBox.innerHTML='<div class="chartbox tall"><canvas class="cvh2"></canvas></div>';
+      const el=elBox.querySelector('.cvh2');
+      const labels=ph.horas.map(r=>r.h+'h');
+      const ds=ph.maquinas.map((m,i)=>({
+        label:m.maquina,data:ph.horas.map(r=>r[m.cod_maquina]||0),
+        backgroundColor:PALETTE[i%PALETTE.length],stack:'s',
+        datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]>0,color:'#fff',font:{size:9,weight:'600'},formatter:v=>v>0?Math.round(v):''}
+      }));
+      this.chartDestroy(el);
+      new Chart(el,{type:'bar',data:{labels,datasets:ds},options:{
+        responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+        plugins:{legend:{position:'bottom'}},
+        scales:{x:{stacked:true,title:{display:true,text:'Hora del día'}},y:{stacked:true,beginAtZero:true,title:{display:true,text:'Unidades NOK'}}}}});
+      return;
+    }
+    // Horas: línea de tiempo (Gantt) — cada máquina una fila, barras = tramo horario · duración real.
+    const fmtDur=d=>d>=1?(Math.round(d*10)/10)+' h':Math.round(d*60)+' min';
+    const series=ph.maquinas.map(m=>{
+      const cod=m.cod_maquina;
+      const rows=ph.horas.filter(r=>(r[cod]||0)>0).map(r=>({h:r.h,v:r[cod]})).sort((a,b)=>a.h-b.h);
+      const segs=[];
+      rows.forEach(r=>{
+        const last=segs[segs.length-1];
+        if(last&&r.h===last.lastH+1){last.lastH=r.h;last.lastV=r.v;last.dur+=r.v;}
+        else segs.push({startH:r.h,lastH:r.h,lastV:r.v,dur:r.v});
+      });
+      return {name:m.maquina,data:segs.map(s=>{
+        const end=Math.round((s.lastH+s.lastV)*100)/100;
+        return {x:m.maquina,y:[s.startH,end],startH:s.startH,endH:end,dur:s.dur};
+      })};
+    }).filter(s=>s.data.length);
+    const nMaq=series.length;
+    const h=Math.min(900,Math.max(260,nMaq*56+130));
+    elBox.style.height='auto';
+    elBox.innerHTML='<div class="apxh"></div>';
+    this.apex(elBox.querySelector('.apxh'),{
+      chart:{type:'rangeBar',height:h,animations:{enabled:false},toolbar:{show:false},
+        events:onSlot?{dataPointSelection:(ev,cx,cfg)=>{const p=cfg.w.config.series[cfg.seriesIndex].data[cfg.dataPointIndex];onSlot(p.startH,p.endH);}}:{}},
+      series, colors:ph.maquinas.map((m,i)=>PALETTE[i%PALETTE.length]),
+      plotOptions:{bar:{horizontal:true,barHeight:'62%',rangeBarGroupRows:true,dataLabels:{position:'center'}}},
+      dataLabels:{enabled:true,formatter:(val,opts)=>{
+        const p=opts.w.config.series[opts.seriesIndex].data[opts.dataPointIndex];
+        return fmtDur(p.dur);
+      },style:{fontSize:'11px',fontWeight:600,colors:['#fff']}},
+      xaxis:{type:'numeric',min:0,max:24,tickAmount:12,title:{text:'Hora del día (0–24 h)'},labels:{formatter:v=>Math.round(v)+'h'}},
+      legend:{show:false},
+      tooltip:{custom:({seriesIndex,dataPointIndex,w})=>{
+        const p=w.config.series[seriesIndex].data[dataPointIndex];
+        const hh=x=>String(Math.floor(x)).padStart(2,'0')+':'+String(Math.round((x%1)*60)).padStart(2,'0');
+        return `<div style="padding:8px;font-size:12px"><b>${w.config.series[seriesIndex].name}</b><br>Tramo ${hh(p.startH)}–${hh(p.endH)}<br>Duración de paro: <b>${fmtDur(p.dur)}</b></div>`;
+      }}
+    });
+  },
+  metricLabel(m){return {disponibilidad:'Disponibilidad',rendimiento:'Rendimiento',calidad:'Calidad',oee:'OEE'}[m];},
+  semColor(v){return v>=75?'#2a7a4b':v>=60?'#c98a1a':'#b3402c';},
+  barList(items,o){
+    return '<div class="bars">'+items.map(i=>{
+      const v=o.val(i),w=Math.max(0,Math.min(100,(v/o.max)*100));
+      const disp=o.unit==='h'?(v.toFixed?v.toFixed(1):v)+' h'
+                 :o.unit==='%'?v+' %'
+                 :(v.toLocaleString?v.toLocaleString():v)+' '+(o.unit||'');
+      return `<div class="brow${o.clickable?' clickable':''}">
+        <div class="bname" title="${o.name(i)}">${o.name(i)}</div>
+        <div class="btrack"><div class="bfill" style="width:${w}%;background:${o.color(i)}"></div></div>
+        <div class="bval">${disp}</div></div>`;
+    }).join('')+'</div>';
+  },
+
+  /* ---------- paneles apilados ---------- */
+  push(title,sub,bodyHtml,general){
+    const ov=document.createElement('div');
+    ov.className='panel'+(general?' general':'');
+    const badge=general?'<span class="badge-gen">GENERAL</span> ':'';
+    ov.innerHTML=`<div class="phead">
+      <div class="ptitle">${badge}${title}${sub?`<small>${sub}</small>`:''}</div>
+      <button class="pclose">✕ Cerrar</button></div><div class="pbody">${bodyHtml}</div>`;
+    panels.appendChild(ov);
+    ov.querySelector('.pclose').onclick=()=>{
+      // cierra este panel y todos los abiertos debajo
+      const rm=[];let n=ov;while(n){rm.push(n);n=n.nextElementSibling;}
+      rm.forEach(x=>x.remove());
+      const prev=panels.lastElementChild;if(prev)prev.scrollIntoView({behavior:'smooth',block:'start'});
+    };
+    const focus=()=>ov.scrollIntoView({behavior:'smooth',block:'start'});
+    requestAnimationFrame(focus); setTimeout(focus,250);
+    return ov;
+  },
+  body(ov){return ov.querySelector('.pbody');},
+  loadingHtml(){return '<div class="loading"><div class="spinner"></div>Cargando…</div>';},
+
+  /* ---------- selector de máquina ---------- */
+  machineSelector(cod,name){
+    const ov=this.push('Máquina '+name+' · ¿qué quieres analizar?',State.seccion+' · '+this.metricLabel(State.metrica),`
+      <div class="selgrid">
+        <div class="selcard" data-a="evo"><div class="ic">📈</div><div class="t">Evolución</div><div class="d">D · R · C · OEE en el tiempo</div></div>
+        <div class="selcard" data-a="mot"><div class="ic">⏸️</div><div class="t">Motivos de paro</div><div class="d">Pareto de causas de parada</div></div>
+        <div class="selcard" data-a="hor"><div class="ic">🕒</div><div class="t">Horas de paro</div><div class="d">Por referencia fabricada</div></div>
+      </div>`);
+    ov.querySelectorAll('.selcard').forEach(c=>c.onclick=()=>{
+      const a=c.dataset.a;
+      if(a==='evo')this.drillEvolucion(cod,name);
+      else if(a==='mot')this.drillMotivos({por:'maquina',cod,name});
+      else this.drillHoras(cod,name);
+    });
+  },
+
+  /* ---------- (a) evolución (solo máquina) ---------- */
+  async drillEvolucion(cod,name){
+    const ov=this.push('Evolución de la máquina · '+name,State.seccion+' · Disponibilidad, Rendimiento, Calidad y OEE en el tiempo',this.loadingHtml());
+    try{
+      const d=await this.get('oee_unificado_evolucion.php',this.common({cod_maquina:cod,seccion:State.seccion}));
+      const per=d.periodos||[];
+      this.body(ov).innerHTML=`
+        <div class="evo-toggles">
+          ${['oee','disponibilidad','rendimiento','calidad'].map((s,i)=>`
+            <label class="evo-tog"><input type="checkbox" class="evos" value="${s}" ${i===0?'checked':''}>
+            <span class="evo-dot" style="background:${COL[s]}"></span>${this.metricLabel(s)}</label>`).join('')}
+        </div>
+        <div class="chartbox tall"><canvas class="cv"></canvas></div>
+        <div class="hint">Granularidad: ${d.granularidad||'—'}</div>`;
+      const cv=this.body(ov).querySelector('.cv');
+      const draw=()=>{
+        const sel=[...this.body(ov).querySelectorAll('.evos:checked')].map(c=>c.value);
+        this.line(cv,per.map(p=>p.label),sel.map(s=>({
+          label:this.metricLabel(s),data:per.map(p=>p[s]),borderColor:COL[s],
+          backgroundColor:COL[s]+'22',tension:.3,fill:s==='oee',datalabels:{color:COL[s]}})));
+      };
+      this.body(ov).querySelectorAll('.evos').forEach(c=>c.onchange=draw);
+      draw();
+    }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+
+  /* ---------- (b) motivos -> sub selector ---------- */
+  refMotivos(cod,name){ this.drillMotivos({por:'referencia',cod,name}); },
+  async drillMotivos(ctx){
+    const ent=ctx.por==='referencia'?'referencia':'máquina';
+    const titulo='Motivos de paro de la '+ent+' · '+ctx.name;
+    const ov=this.push(titulo,State.seccion+' · pareto de horas de paro · haz clic en un motivo para profundizar',this.loadingHtml());
+    try{
+      const extra={seccion:State.seccion,metrica:'disponibilidad'};
+      if(ctx.por==='referencia')extra.cod_referencia=ctx.cod; else {extra.por='maquina';extra.cod_maquina=ctx.cod;}
+      const d=await this.get('oee_unificado_drill.php',this.common(extra));
+      const mot=d.motivos||[];
+      if(!mot.length){this.body(ov).innerHTML='<div class="empty">Sin motivos de paro</div>';return;}
+      const max=Math.max(...mot.map(m=>m.horas||0),1);
+      this.body(ov).innerHTML=this.barList(mot,{name:m=>m.motivo,val:m=>m.horas||0,unit:'h',max,color:()=>'#c45a2c',clickable:true})
+        +'<div class="hint">Haz clic en un motivo para elegir la vista temporal.</div>';
+      [...this.body(ov).querySelectorAll('.brow')].forEach((row,ix)=>{
+        row.onclick=()=>this.motivoSelector(Object.assign({},ctx,{motivo:mot[ix].motivo}));
+      });
+    }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+  motivoSelector(ctx){
+    const ov=this.push('Motivo «'+ctx.motivo+'» · ¿cómo verlo?',ctx.name+' · '+State.seccion,`
+      <div class="selgrid">
+        <div class="selcard" data-a="dia"><div class="ic">📅</div><div class="t">Total horas por día</div><div class="d">Serie diaria del rango</div></div>
+        <div class="selcard" data-a="hora"><div class="ic">⏰</div><div class="t">Distribución horaria</div><div class="d">24 franjas de un día</div></div>
+        <div class="selcard" data-a="paros"><div class="ic">📋</div><div class="t">Paros individuales</div><div class="d">Eventos de una franja horaria</div></div>
+      </div>`);
+    ov.querySelectorAll('.selcard').forEach(c=>c.onclick=()=>{
+      const a=c.dataset.a;
+      if(a==='dia')this.motivoPorDia(ctx);
+      else if(a==='hora')this.motivoPorHora(ctx);
+      else this.motivoParos(ctx);
+    });
+  },
+  tempParams(ctx,extra){
+    const e=Object.assign({motivo:ctx.motivo,por:ctx.por},extra);
+    if(ctx.por==='referencia')e.cod_referencia=ctx.cod; else e.cod_maquina=ctx.cod;
+    return this.common(e);
+  },
+  async motivoPorDia(ctx){
+    const ov=this.push('Total horas por día · motivo «'+ctx.motivo+'»',`${ctx.name} · ${State.seccion}`,this.loadingHtml());
+    try{
+      const d=await this.get('oee_unificado_maq_motivo_temporal.php',this.tempParams(ctx,{mode:'por_dia'}));
+      const dias=d.dias||[];
+      this.body(ov).innerHTML=`<div class="breadcrumb"><b>${ctx.motivo}</b> — horas de paro por día. Clic en un punto para ver su distribución horaria.</div>
+        <div class="chartbox tall"><canvas class="cv"></canvas></div>`;
+      this.line(this.body(ov).querySelector('.cv'),dias.map(x=>x.dia),
+        [{label:'Horas',data:dias.map(x=>x.horas),borderColor:'#c45a2c',backgroundColor:'#c45a2c22',tension:.25,fill:true,datalabels:{color:'#c45a2c'}}],
+        ix=>this.motivoPorHora(ctx,dias[ix].dia));
+    }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+  async motivoPorHora(ctx,dia){
+    const ov=this.push('Distribución horaria · motivo «'+ctx.motivo+'»',`${ctx.name} · ${State.seccion}`,this.loadingHtml());
+    const run=async(day)=>{
+      this.body(ov).innerHTML=this.dayPicker(day)+this.loadingHtml(); this.bindDayPicker(ov,run);
+      try{
+        const d=await this.get('oee_unificado_maq_motivo_temporal.php',this.tempParams(ctx,{mode:'por_hora_dia',dia:day}));
+        const hrs=d.horas||[];
+        this.body(ov).innerHTML=this.dayPicker(day)+
+          `<div class="breadcrumb">Día <b>${day}</b> — horas de paro por franja. Clic en una franja para ver los paros individuales.</div>
+          <div class="chartbox tall"><canvas class="cv"></canvas></div>`;
+        this.bindDayPicker(ov,run);
+        this.bar(this.body(ov).querySelector('.cv'),hrs.map(h=>h.hora+'h'),hrs.map(h=>h.horas),'#2d4d7a',ix=>this.motivoParos(ctx,day,hrs[ix].hora));
+      }catch(e){this.body(ov).innerHTML=this.dayPicker(day)+`<div class="error">${e.message}</div>`;this.bindDayPicker(ov,run);}
+    };
+    run(dia||fDesde.value);
+  },
+  async motivoParos(ctx,dia,hora){
+    const ov=this.push('Paros individuales · motivo «'+ctx.motivo+'»',`${ctx.name} · ${State.seccion}`,this.loadingHtml());
+    ov.classList.add('mod-paros');
+    const esRef=ctx.por==='referencia';
+    const run=async(day,hr)=>{
+      this.body(ov).innerHTML=this.dayHourPicker(day,hr)+this.loadingHtml(); this.bindDayHourPicker(ov,run);
+      try{
+        const d=await this.get('oee_unificado_maq_motivo_temporal.php',this.tempParams(ctx,{mode:'paros',dia:day,hora:hr}));
+        const paros=d.paros||[];
+        let tbl='<table><thead><tr><th>Inicio</th><th>Fin</th>'+(esRef?'<th>Máquina</th>':'<th>Referencia</th>')+'<th>Minutos</th></tr></thead><tbody>';
+        if(!paros.length)tbl+='<tr><td colspan="4" style="text-align:center;color:#9ca3af">Sin paros en esta franja</td></tr>';
+        paros.forEach(p=>tbl+=`<tr><td>${p.fecha_ini||'—'}</td><td>${p.fecha_fin||'—'}</td><td>${esRef?(p.maquina||'—'):(p.referencia||'—')}</td><td>${(p.minutos!=null?(+p.minutos).toFixed(1):'—')}</td></tr>`);
+        tbl+='</tbody></table>';
+        this.body(ov).innerHTML=this.dayHourPicker(day,hr)+`<div class="breadcrumb">Día <b>${day}</b> · franja <b>${hr}:00–${hr}:59</b></div>`+tbl;
+        this.bindDayHourPicker(ov,run);
+      }catch(e){this.body(ov).innerHTML=this.dayHourPicker(day,hr)+`<div class="error">${e.message}</div>`;this.bindDayHourPicker(ov,run);}
+    };
+    run(dia||fDesde.value,hora!=null?hora:8);
+  },
+  dayPicker(day){return `<div class="subctrl"><label>Día:</label><input type="date" class="dpDay" value="${day}" min="${fDesde.value}" max="${fHasta.value}"></div>`;},
+  bindDayPicker(ov,cb){const el=ov.querySelector('.dpDay');if(el)el.onchange=()=>cb(el.value);},
+  dayHourPicker(day,hr){
+    let opts='';for(let i=0;i<24;i++)opts+=`<option value="${i}" ${i===hr?'selected':''}>${i}:00–${i}:59</option>`;
+    return `<div class="subctrl"><label>Día:</label><input type="date" class="dhDay" value="${day}" min="${fDesde.value}" max="${fHasta.value}">
+      <label>Franja:</label><select class="dhHour">${opts}</select></div>`;
+  },
+  bindDayHourPicker(ov,cb){
+    const d=ov.querySelector('.dhDay'),h=ov.querySelector('.dhHour');
+    if(d)d.onchange=()=>cb(d.value,+h.value); if(h)h.onchange=()=>cb(d.value,+h.value);
+  },
+
+  /* ---------- (c) horas de paro -> ref -> acumulado ---------- */
+  async drillHoras(cod,name){
+    const ov=this.push('Horas de paro de la máquina '+name+' · por referencia fabricada',State.seccion+' · clic en una referencia para ver el acumulado de paro',this.loadingHtml());
+    try{
+      const d=await this.get('oee_unificado_maq_refs.php',this.common({cod_maquina:cod}));
+      const refs=d.referencias||[];
+      if(!refs.length){this.body(ov).innerHTML='<div class="empty">Sin referencias con paros</div>';return;}
+      const max=Math.max(...refs.map(r=>r.horas_paro||0),1);
+      this.body(ov).innerHTML=this.barList(refs,{name:r=>r.referencia||r.cod_referencia,val:r=>r.horas_paro||0,unit:'h',max,color:()=>'#c45a2c',clickable:true})
+        +'<div class="hint">Haz clic en una referencia para ver el acumulado de paro.</div>';
+      [...this.body(ov).querySelectorAll('.brow')].forEach((row,ix)=>{
+        row.onclick=()=>this.refAcumulado(cod,refs[ix].cod_referencia,refs[ix].referencia||refs[ix].cod_referencia);
+      });
+    }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+  async refAcumulado(cod,codRef,refName){
+    const ov=this.push('Acumulado de paro · referencia '+refName,State.seccion+' · horas de paro por día y curva acumulada',this.loadingHtml());
+    try{
+      const d=await this.get('oee_unificado_maq_ref_paros.php',this.common({cod_maquina:cod,cod_referencia:codRef}));
+      const pd=d.por_dia||[]; let acc=0; const cum=pd.map(x=>Math.round((acc+=x.horas)*10)/10);
+      this.body(ov).innerHTML='<div class="chartbox tall"><canvas class="cv"></canvas></div>';
+      const el=this.body(ov).querySelector('.cv'); this.chartDestroy(el);
+      new Chart(el,{data:{labels:pd.map(x=>x.dia),datasets:[
+        {type:'bar',label:'Horas/día',data:pd.map(x=>x.horas),backgroundColor:'#c45a2c',yAxisID:'y',datalabels:{anchor:'end',align:'top',color:'#c45a2c'}},
+        {type:'line',label:'Acumulado',data:cum,borderColor:'#3a6aa3',backgroundColor:'#3a6aa322',tension:.25,yAxisID:'y1',datalabels:{anchor:'end',align:'top',color:'#3a6aa3'}}
+      ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+        scales:{y:{position:'left',beginAtZero:true,title:{display:true,text:'Horas/día'}},y1:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},title:{display:true,text:'Acumulado'}}}}});
+    }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+
+  /* ---------- Chart.js helpers (por elemento) ---------- */
+  chartDestroy(el){if(el){const ex=Chart.getChart(el);if(ex)ex.destroy();}},
+  line(el,labels,datasets,onPoint){
+    this.chartDestroy(el);
+    return new Chart(el,{type:'line',data:{labels,datasets},options:{
+      responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:true}},
+      onClick:onPoint?(e,els)=>{if(els.length)onPoint(els[0].index);}:undefined,
+      scales:{y:{beginAtZero:true,grace:'12%'}}}});
+  },
+  bar(el,labels,data,color,onBar){
+    this.chartDestroy(el);
+    return new Chart(el,{type:'bar',data:{labels,datasets:[{data,backgroundColor:color,datalabels:{anchor:'end',align:'top',color:'#374151'}}]},options:{
+      responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      onClick:onBar?(e,els)=>{if(els.length)onBar(els[0].index);}:undefined,
+      scales:{y:{beginAtZero:true,grace:'14%'}}}});
+  },
+  apex(el,opts){
+    opts.chart=opts.chart||{};
+    opts.chart.redrawOnParentResize=false;
+    opts.chart.redrawOnWindowResize=false;
+    // Evita el zoom con la rueda del ratón (cambiaba el tamaño al hacer scroll)
+    opts.chart.zoom=Object.assign({allowMouseWheelZoom:false},opts.chart.zoom||{});
+    const ch=new ApexCharts(el,opts);ch.render();return ch;
+  },
+  ts(s){return s?new Date(String(s).replace(' ','T')).getTime():null;},
+
+  /* ---------- exclude machines ---------- */
+  renderExclList(filter){
+    const q=(filter||'').toLowerCase(),grp={};
+    State.maquinasActivas.forEach(m=>{(grp[m.seccion]=grp[m.seccion]||[]).push(m);});
+    let html='';
+    Object.keys(grp).sort().forEach(sec=>{
+      const items=grp[sec].filter(m=>m.maquina.toLowerCase().includes(q)||m.cod_maquina.toLowerCase().includes(q));
+      if(!items.length)return;
+      html+=`<div class="excl-grp">${sec}</div>`;
+      items.forEach(m=>html+=`<label class="excl-item"><input type="checkbox" value="${m.cod_maquina}" ${State.excl.has(m.cod_maquina)?'checked':''}> ${m.maquina}</label>`);
+    });
+    exclList.innerHTML=html||'<div class="excl-grp">Sin resultados</div>';
+    exclList.querySelectorAll('input').forEach(cb=>cb.onchange=()=>{
+      if(cb.checked)State.excl.add(cb.value);else State.excl.delete(cb.value);
+      this.renderExclChips(); this.loadMainDebounced();
+    });
+  },
+  renderExclChips(){
+    exclCount.textContent=State.excl.size;
+    const look={};State.maquinasActivas.forEach(m=>look[m.cod_maquina]=m.maquina);
+    if(!State.excl.size){exclBar.style.display='none';return;}
+    exclBar.style.display='flex';
+    exclChips.innerHTML=[...State.excl].map(c=>`<span class="excl-chip">${look[c]||c}<button data-c="${c}">×</button></span>`).join('');
+    exclChips.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+      State.excl.delete(b.dataset.c);this.renderExclChips();this.renderExclList(exclSearch.value);this.loadMain();
+    });
+  },
+  loadMainDebounced(){clearTimeout(this._t);this._t=setTimeout(()=>this.loadMain(),350);},
+
+  /* ---------- HISTOGRAMA (ApexCharts rangeBar / Gantt) ---------- */
+  async openHistograma(){
+    const ov=this.push('Histograma de motivos','Cronograma de paros por máquina',this.loadingHtml());
+    try{
+      const d=await this.get('oee_unificado_hist_maquina.php',this.common({}));
+      const ev=d.eventos||[];
+      if(!ev.length){this.body(ov).innerHTML='<div class="empty">Sin paros en el rango</div>';return;}
+      const byMot={};
+      ev.forEach(e=>{(byMot[e.motivo]=byMot[e.motivo]||[]).push(e);});
+      const motivos=Object.keys(byMot);
+      const series=motivos.map(m=>({name:m,data:byMot[m].map(e=>({
+        x:e.maquina,y:[this.ts(e.inicio),this.ts(e.fin)],inicio:e.inicio,fin:e.fin,segundos:e.segundos}))}));
+      const nMaq=new Set(ev.map(e=>e.maquina)).size;
+      const h=Math.min(1500,Math.max(420,nMaq*48+140));
+      this.body(ov).innerHTML=`<div class="breadcrumb">Total horas de paro: <b>${(d.total_horas||0).toFixed(1)} h</b> · ${ev.length} paros · ${nMaq} máquinas${d.eventos_limitados?' (limitado a 5000)':''}</div><div class="apx"></div>`;
+      this.apex(this.body(ov).querySelector('.apx'),{
+        chart:{type:'rangeBar',height:h,animations:{enabled:false},toolbar:{show:true,tools:{zoom:true,pan:true,reset:true,zoomin:true,zoomout:true,download:true}},zoom:{enabled:true,type:'x'}},
+        series, colors:motivos.map((m,i)=>PALETTE[i%PALETTE.length]),
+        plotOptions:{bar:{horizontal:true,barHeight:'80%',rangeBarGroupRows:true}},
+        xaxis:{type:'datetime'}, dataLabels:{enabled:false}, legend:{position:'bottom'},
+        tooltip:{custom:({seriesIndex,dataPointIndex,w})=>{
+          const p=w.config.series[seriesIndex].data[dataPointIndex];
+          return `<div style="padding:8px;font-size:12px"><b>${w.config.series[seriesIndex].name}</b><br>${p.x}<br>${p.inicio} → ${p.fin}<br><b>${(p.segundos/60).toFixed(1)} min</b></div>`;
+        }}
+      });
+    }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+
+  /* ---------- CAMBIOS EN OF ---------- */
+  async openCambiosOF(){
+    const ov=this.push('Cambios en OF','Ranking por máquina · clic para ver el detalle',this.loadingHtml());
+    try{
+      const d=await this.get('oee_unificado_cambios_of.php',this.common({}));
+      const rows=(d.por_maquina||[]).filter(m=>m.n_cambios>0);
+      if(!rows.length){this.body(ov).innerHTML='<div class="empty">Sin cambios de OF en el rango</div>';return;}
+      this.body(ov).innerHTML=`<div class="breadcrumb">Total cambios: <b>${d.total_cambios||0}</b> · Total horas: <b>${(d.total_horas||0).toFixed(1)} h</b></div><div class="apx"></div>`;
+      const self=this;
+      this.apex(this.body(ov).querySelector('.apx'),{
+        chart:{type:'bar',height:Math.max(380,rows.length*34+120),animations:{enabled:false},toolbar:{show:false},
+          events:{dataPointSelection:(e,ctx,cfg)=>{const m=rows[cfg.dataPointIndex];self.cambiosDetalle(m.cod_maquina,m.desc_maquina);}}},
+        series:[{name:'Cambios',data:rows.map(m=>m.n_cambios)}], colors:['#2563eb'],
+        plotOptions:{bar:{horizontal:true,barHeight:'70%'}},
+        dataLabels:{enabled:true,offsetX:22,style:{colors:['#111']},formatter:v=>v},
+        xaxis:{categories:rows.map(m=>m.desc_maquina),title:{text:'Nº de cambios'}},
+        tooltip:{y:{formatter:(v,o)=>{const m=rows[o.dataPointIndex];return `${v} cambios · ${(m.minutos_total||0).toFixed(0)} min total · ${(m.minutos_medio||0).toFixed(1)} min medio`;}}}
+      });
+    }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+  async cambiosDetalle(cod,name){
+    const ov=this.push('Detalle de cambios · '+name,'Duración por cambio (cronológico)',this.loadingHtml());
+    try{
+      const d=await this.get('oee_unificado_cambios_of.php',this.common({cod_maquina:cod}));
+      const det=d.detalle||[];
+      if(!det.length){this.body(ov).innerHTML='<div class="empty">Sin detalle</div>';return;}
+      const motCol=new Map();let ci=0;
+      const data=det.map((p,i)=>{
+        if(!motCol.has(p.motivo))motCol.set(p.motivo,PALETTE[ci++%PALETTE.length]);
+        return {x:'#'+(i+1),y:Math.round(p.segundos/60*10)/10,fillColor:motCol.get(p.motivo),meta:p};
+      });
+      this.body(ov).innerHTML='<div class="hint" style="margin-top:0">Haz clic en cualquier cambio para ver el detalle completo de su OF.</div><div class="apx"></div><div class="legend lg"></div>';
+      const self=this;
+      this.apex(this.body(ov).querySelector('.apx'),{
+        chart:{type:'bar',height:460,animations:{enabled:false},toolbar:{show:true,tools:{download:true,zoomin:true,zoomout:true,reset:true}},zoom:{enabled:false},
+          events:{dataPointSelection:(e,ctx,cfg)=>{self.showOfDetail(data[cfg.dataPointIndex].meta);}}},
+        series:[{name:'Minutos',data}],
+        plotOptions:{bar:{horizontal:false,columnWidth:'55%'}},
+        dataLabels:{enabled:true,formatter:v=>v+'m',style:{fontSize:'10px'}},
+        xaxis:{type:'category',title:{text:'Cambios (1 = más antiguo) · clic para detalle'}},
+        yaxis:{title:{text:'Minutos'}}, legend:{show:false},
+        tooltip:{custom:({dataPointIndex,w})=>{
+          const p=w.config.series[0].data[dataPointIndex].meta;
+          return `<div style="padding:8px;font-size:12px"><b>${p.motivo}</b><br>${p.inicio} → ${p.fin}<br><b>${(p.segundos/60).toFixed(1)} min</b><br>OF: ${p.cod_of||'—'} · Ref: ${p.desc_producto||p.cod_producto||'—'}<br><i>(clic para detalle)</i></div>`;
+        }}
+      });
+      this.body(ov).querySelector('.lg').innerHTML=[...motCol.entries()].map(([m,c])=>`<span><i style="background:${c}"></i>${m}</span>`).join('');
+    }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+
+  /* ---------- Top máquinas / Top motivos (popup pantalla completa) ---------- */
+  topModule(kind){
+    const isMaq=kind==='maquinas';
+    const accent=isMaq?'#8c181a':'#6e6d6b';
+    const st={seccion:State.seccion, excl:new Set(), maqs:[]};
+    const ov=document.createElement('div'); ov.className='fullpop';
+    const lbl=t=>`<span style="font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase">${t}</span>`;
+    const nOpts=[3,5,8,10,15,20].map(n=>`<option value="${n}" ${n===5?'selected':''}>Top ${n}</option>`).join('');
+    const secOpts=['VARILLAS','TROQUELADOS'].map(s=>`<option value="${s}" ${s===st.seccion?'selected':''}>${s.charAt(0)+s.slice(1).toLowerCase()}</option>`).join('');
+    ov.innerHTML=`
+      <div class="fullpop-head">
+        <h2>${isMaq?'🏭 Top máquinas con más paro':'🔧 Top motivos de paro'}<small class="tHsec">Disponibilidad · ${st.seccion}</small></h2>
+        <button class="mclose2">✕ Cerrar</button>
+      </div>
+      <div class="fullpop-filters">
+        <label>${lbl('Sección')}<select class="tSec">${secOpts}</select></label>
+        <label>${lbl('Desde')}<input type="date" class="tD" value="${fDesde.value}"></label>
+        <label>${lbl('Hasta')}<input type="date" class="tH" value="${fHasta.value}"></label>
+        <label>${lbl('Cantidad')}<select class="tN">${nOpts}</select></label>
+        <div style="position:relative">${lbl('Excluir máquinas')}
+          <button class="btn tExclBtn" style="min-width:150px;display:flex;justify-content:space-between;gap:8px">Seleccionar… <span class="excl-count tExclN">0</span></button>
+          <div class="excl-panel tExclPanel">
+            <input type="search" class="excl-search tExclSearch" placeholder="Buscar máquina…">
+            <div class="excl-list tExclList"></div>
+          </div>
+        </div>
+        <button class="btn btn-pri tApply">Aplicar filtro</button>
+        <button class="btn tXlsx" style="background:${isMaq?'#f7e9e9':'#eeeeed'};color:${accent};border-color:${isMaq?'#e0bdbd':'#cfcecb'}">⬇️ Exportar XLSX</button>
+      </div>
+      <div class="fullpop-body"><div class="tTop"></div><div class="tDet" style="margin-top:26px"></div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('.mclose2').style.cssText='background:#f3f4f6;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280';
+    ov.querySelector('.mclose2').onclick=()=>ov.remove();
+    const D=ov.querySelector('.tD'),H=ov.querySelector('.tH'),N=ov.querySelector('.tN'),SEC=ov.querySelector('.tSec');
+    const topEl=ov.querySelector('.tTop'),detEl=ov.querySelector('.tDet');
+    const exclBtn=ov.querySelector('.tExclBtn'),exclPanel=ov.querySelector('.tExclPanel'),
+          exclList=ov.querySelector('.tExclList'),exclSearch=ov.querySelector('.tExclSearch'),exclN=ov.querySelector('.tExclN');
+    const params=extra=>{
+      const p=new URLSearchParams();
+      p.set('fecha_desde',D.value); p.set('fecha_hasta',H.value); p.set('seccion',st.seccion);
+      const tu=this.turnos(); if(tu.length&&tu.length<3)p.set('turnos',tu.join(','));
+      if(st.excl.size)p.set('excl',[...st.excl].join(','));
+      for(const k in extra)p.set(k,extra[k]);
+      return p;
+    };
+    const renderMaqList=()=>{
+      const q=(exclSearch.value||'').toLowerCase();
+      const items=st.maqs.filter(m=>m.maquina.toLowerCase().includes(q)||m.cod_maquina.toLowerCase().includes(q));
+      exclList.innerHTML=items.map(m=>`<label class="excl-item"><input type="checkbox" value="${m.cod_maquina}" ${st.excl.has(m.cod_maquina)?'checked':''}> ${m.maquina}</label>`).join('')||'<div class="excl-grp">Sin resultados</div>';
+      exclList.querySelectorAll('input').forEach(cb=>cb.onchange=()=>{
+        if(cb.checked)st.excl.add(cb.value);else st.excl.delete(cb.value);
+        exclN.textContent=st.excl.size;
+      });
+    };
+    const loadMaqList=async()=>{
+      exclList.innerHTML='<div class="excl-grp">Cargando…</div>';
+      try{
+        const d=await this.get('oee_unificado_top_analisis.php',params({mode:'maquinas_seccion'}));
+        st.maqs=d.maquinas||[]; renderMaqList();
+      }catch(e){exclList.innerHTML='<div class="excl-grp">Error al cargar</div>';}
+    };
+    const loadDetail=async item=>{
+      detEl.innerHTML=this.loadingHtml();
+      try{
+        const extra=isMaq?{mode:'detalle_fecha_maquina',cod_maquina:item.cod_maquina}:{mode:'detalle_fecha_motivo',motivo:item.motivo};
+        const d=await this.get('oee_unificado_top_analisis.php',params(extra));
+        const f=d.fechas||[]; const name=isMaq?item.maquina:item.motivo;
+        detEl.innerHTML=`<div style="font-size:15px;font-weight:700;color:#111827;margin-bottom:10px">Horas de paro por día · ${name}</div>`
+          +(f.length?'<div class="chartbox tall"><canvas class="cvd"></canvas></div>':'<div class="empty">Sin datos por día</div>');
+        if(f.length)this.bar(detEl.querySelector('.cvd'),f.map(x=>x.fecha),f.map(x=>x.horas),accent);
+        detEl.scrollIntoView({behavior:'smooth',block:'nearest'});
+      }catch(e){detEl.innerHTML=`<div class="error">${e.message}</div>`;}
+    };
+    const load=async()=>{
+      topEl.innerHTML=this.loadingHtml(); detEl.innerHTML='';
+      try{
+        const d=await this.get('oee_unificado_top_analisis.php',params({mode:kind,top_n:N.value}));
+        const items=isMaq?(d.maquinas||[]):(d.motivos||[]);
+        if(!items.length){topEl.innerHTML='<div class="empty">Sin datos para el filtro seleccionado</div>';return;}
+        const max=Math.max(...items.map(i=>i.horas||0),1);
+        topEl.innerHTML=`<div style="font-size:15px;font-weight:700;color:#111827;margin-bottom:10px">${isMaq?'Máquinas':'Motivos'} con más horas de paro <small style="font-weight:500;color:#9ca3af">(clic para ver el detalle por día)</small></div>`
+          +this.barList(items,{name:i=>isMaq?i.maquina:i.motivo,val:i=>i.horas||0,unit:'h',max,color:()=>accent,clickable:true});
+        [...topEl.querySelectorAll('.brow')].forEach((row,ix)=>{row.onclick=()=>loadDetail(items[ix]);});
+      }catch(e){topEl.innerHTML=`<div class="error">${e.message}</div>`;}
+    };
+    // eventos
+    exclBtn.onclick=e=>{e.preventDefault();exclPanel.classList.toggle('open');};
+    exclSearch.oninput=renderMaqList;
+    SEC.onchange=()=>{
+      st.seccion=SEC.value; st.excl.clear(); exclN.textContent='0';
+      ov.querySelector('.tHsec').textContent='Disponibilidad · '+st.seccion;
+      loadMaqList(); load();
+    };
+    ov.querySelector('.tApply').onclick=load;
+    ov.querySelector('.tXlsx').onclick=()=>window.open(API+'oee_unificado_top_export.php?'+params({fmt:'xlsx',mode:kind,top_n:N.value}).toString());
+    loadMaqList(); load();
+  },
+
+  showOfDetail(p){
+    if(!p)return;
+    const min=(p.segundos||0)/60;
+    const dur=min>=60?(min/60).toFixed(1)+' h':Math.round(min)+' min';
+    const rows=[
+      ['Orden de fabricación', p.cod_of||'—'],
+      ['Referencia / producto', p.desc_producto||p.cod_producto||'—'],
+      ['Código de producto', p.cod_producto||'—'],
+      ['Motivo del cambio', p.motivo||'—'],
+      ['Inicio', p.inicio||'—'],
+      ['Fin', p.fin||'—'],
+      ['Duración', dur]
+    ];
+    const ov=document.createElement('div'); ov.className='of-pop';
+    ov.innerHTML=`<div class="of-pop-card">
+      <div class="of-pop-head"><h3>Detalle del cambio de OF</h3><button class="mclose">×</button></div>
+      <div class="of-pop-body">${rows.map(r=>`<div class="of-pop-row"><div class="of-pop-k">${r[0]}</div><div class="of-pop-v">${r[1]}</div></div>`).join('')}</div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('.mclose').onclick=()=>ov.remove();
+    ov.onclick=e=>{if(e.target===ov)ov.remove();};
+  },
+
+  exportExcel(){window.open(API+'oee_unificado_export.php?'+this.common({seccion:State.seccion,metrica:'disponibilidad',por:'maquina'}).toString());},
+
+  /* ---------- Matriz (motivos × máquina/referencia) ---------- */
+  exportMatriz(){window.open(API+'oee_unificado_matriz_export.php?'+this.common({seccion:State.seccion}).toString());},
+  async openMatriz(){
+    const ov=document.createElement('div'); ov.className='fullpop';
+    ov.innerHTML=`
+      <div class="fullpop-head">
+        <h2>🧮 Matriz motivos × máquina/referencia<small>${State.seccion} · ${fDesde.value} a ${fHasta.value} · horas de paro</small></h2>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-matriz mtxXlsx">⬇️ Excel</button>
+          <button class="mtxClose">✕ Cerrar</button>
+        </div>
+      </div>
+      <div class="fullpop-body"><div class="mtxBody">${this.loadingHtml()}</div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('.mtxClose').style.cssText='background:#f3f4f6;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280';
+    ov.querySelector('.mtxClose').onclick=()=>ov.remove();
+    ov.querySelector('.mtxXlsx').onclick=()=>this.exportMatriz();
+    const body=ov.querySelector('.mtxBody');
+    try{
+      const d=await this.get('oee_unificado_matriz_export.php',this.common({seccion:State.seccion,format:'json'}));
+      body.innerHTML=this.matrizTabla(d);
+      [...body.querySelectorAll('.mtx-maq td.mtx-first')].forEach(td=>{
+        td.onclick=()=>this.histMaquina(td.dataset.cod,td.dataset.name,td.dataset.disp);
+      });
+    }catch(e){body.innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+  matrizTabla(d){
+    const mots=d.motivos||[]; const maqs=d.maquinas||[];
+    if(!maqs.length)return '<div class="empty">Sin paros para el filtro seleccionado</div>';
+    const f2=v=>(v==null||v===0)?'':(Math.round(v*100)/100).toFixed(2);
+    const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    let h='<div class="mtx-wrap"><table class="mtx"><thead><tr>';
+    h+='<th class="mtx-first">Máquina / Referencia</th>';
+    mots.forEach(m=>h+=`<th>${esc(m)}</th>`);
+    h+='<th>TOTAL (h)</th><th>Disp. %</th></tr></thead><tbody>';
+    maqs.forEach(mq=>{
+      const disp=mq.disponibilidad==null?'':mq.disponibilidad;
+      h+=`<tr class="mtx-maq"><td class="mtx-first" data-cod="${esc(mq.cod_maquina)}" data-name="${esc(mq.maquina)}" data-disp="${disp}" title="Clic para ver el histograma de esta máquina">${esc(mq.maquina)}</td>`;
+      mots.forEach(m=>h+=`<td>${f2(mq.por_motivo[m])}</td>`);
+      h+=`<td>${f2(mq.total)}</td><td class="mtx-disp">${disp===''?'':disp+'%'}</td></tr>`;
+      (mq.referencias||[]).forEach(r=>{
+        h+=`<tr><td class="mtx-first mtx-ref" title="${esc(r.referencia)}">${esc(r.referencia)}</td>`;
+        mots.forEach(m=>h+=`<td>${f2(r.por_motivo[m])}</td>`);
+        h+=`<td>${f2(r.total)}</td><td class="mtx-disp"></td></tr>`;
+      });
+    });
+    h+='<tr class="mtx-tot"><td class="mtx-first">TOTAL</td>';
+    mots.forEach(m=>h+=`<td>${f2(d.total_por_motivo[m])}</td>`);
+    h+=`<td>${f2(d.total_general)}</td><td class="mtx-disp"></td></tr>`;
+    h+='</tbody></table></div>';
+    return h;
+  },
+  async histMaquina(cod,name,disp){
+    const ov=document.createElement('div'); ov.className='fullpop';
+    const dispTxt=(disp===''||disp==null||disp==='null')?'':` · Disponibilidad ${disp}%`;
+    ov.innerHTML=`
+      <div class="fullpop-head">
+        <h2>📊 Histograma · ${name}<small>Horas de paro por referencia${dispTxt}</small></h2>
+        <button class="hmClose">✕ Cerrar</button>
+      </div>
+      <div class="fullpop-body"><div class="hmBody">${this.loadingHtml()}</div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('.hmClose').style.cssText='background:#f3f4f6;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280';
+    ov.querySelector('.hmClose').onclick=()=>ov.remove();
+    const body=ov.querySelector('.hmBody');
+    try{
+      const d=await this.get('oee_unificado_maq_refs.php',this.common({cod_maquina:cod}));
+      const refs=d.referencias||[];
+      if(!refs.length){body.innerHTML='<div class="empty">Sin referencias con paros</div>';return;}
+      const max=Math.max(...refs.map(r=>r.horas_paro||0),1);
+      body.innerHTML=this.barList(refs,{name:r=>r.referencia||r.cod_referencia,val:r=>r.horas_paro||0,unit:'h',max,color:()=>'#c45a2c',clickable:true})
+        +'<div class="hint">Haz clic en una referencia para ver el acumulado de paro por día.</div>'
+        +'<div class="hmDet" style="margin-top:20px"></div>';
+      const det=body.querySelector('.hmDet');
+      [...body.querySelectorAll('.brow')].forEach((row,ix)=>{
+        row.onclick=()=>this.histRefDetalle(det,cod,refs[ix].cod_referencia,refs[ix].referencia||refs[ix].cod_referencia);
+      });
+    }catch(e){body.innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+  async histRefDetalle(det,cod,codRef,refName){
+    det.innerHTML=this.loadingHtml();
+    try{
+      const d=await this.get('oee_unificado_maq_ref_paros.php',this.common({cod_maquina:cod,cod_referencia:codRef}));
+      const pd=d.por_dia||[]; let acc=0; const cum=pd.map(x=>Math.round((acc+=x.horas)*10)/10);
+      det.innerHTML=`<div style="font-size:15px;font-weight:700;color:#111827;margin-bottom:10px">Acumulado de paro · ${refName}</div>`
+        +(pd.length?'<div class="chartbox tall"><canvas class="cvhd"></canvas></div>':'<div class="empty">Sin datos por día</div>');
+      if(pd.length){
+        const el=det.querySelector('.cvhd'); this.chartDestroy(el);
+        new Chart(el,{data:{labels:pd.map(x=>x.dia),datasets:[
+          {type:'bar',label:'Horas/día',data:pd.map(x=>x.horas),backgroundColor:'#c45a2c',yAxisID:'y',datalabels:{anchor:'end',align:'top',color:'#c45a2c'}},
+          {type:'line',label:'Acumulado',data:cum,borderColor:'#3a6aa3',backgroundColor:'#3a6aa322',tension:.25,yAxisID:'y1',datalabels:{anchor:'end',align:'top',color:'#3a6aa3'}}
+        ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+          scales:{y:{position:'left',beginAtZero:true,title:{display:true,text:'Horas/día'}},y1:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},title:{display:true,text:'Acumulado'}}}}});
+      }
+      det.scrollIntoView({behavior:'smooth',block:'nearest'});
+    }catch(e){det.innerHTML=`<div class="error">${e.message}</div>`;}
+  }
+};
+App.init();
+</script>
+</body>
+</html>
