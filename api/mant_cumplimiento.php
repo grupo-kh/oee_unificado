@@ -196,7 +196,15 @@ try {
             $perMesAcc[$m]['numer']++;
             $perMesAcc[$m]['recuperaciones']++;
         } else {
+            // FILTRO POR RANGO (criterio coherente entre principal y detalle):
+            // la tarea entra SOLO si su fpo (mes programado) cae en el rango
+            // Y, si tiene fi (intervención), su fi también cae en el rango.
+            // Así no aparecen tareas planificadas para junio que se hicieron
+            // en mayo cuando el rango es solo junio, ni viceversa — y el
+            // cumplimiento por mes coincide con el detalle de ese mes.
             if ($fpoRec === '' || $fpoRec < $fdesde || $fpoRec > $fhasta) continue;
+            $fiRec = (string)($rec['fecha_intervencion'] ?? '');
+            if ($fiRec !== '' && ($fiRec < $fdesde || $fiRec > $fhasta)) continue;
             $m = substr($fpoRec, 0, 7);
             if (!isset($perMesAcc[$m])) $perMesAcc[$m] = ['denom'=>0,'numer'=>0,'completadas'=>0,'no_realizadas'=>0,'recuperaciones'=>0,'vencidas_sin_marcar'=>0,'pendientes_futuras'=>0,'anticipadas'=>0];
 

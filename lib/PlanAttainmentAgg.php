@@ -102,10 +102,20 @@ class PlanAttainmentAgg
      * Devuelve para un día+turno el detalle plan/prod por (maquina, articulo).
      * Cachea salvo el día en curso. Claves: "MAQUINA|ARTICULO".
      */
+    // Memoización in-process: dentro de una misma request HTTP, los distintos
+    // endpoints del dashboard llaman muchas veces a (fecha, turno). Servimos
+    // el primero desde disco y los siguientes desde RAM (cero I/O).
+    private static array $memDayShift    = [];
+    private static array $memDayShiftExt = [];
+
     public static function dayShiftDetail(string $fechaYMD, string $turno): array
     {
         if (!isset(self::SHIFT_WINDOWS[$turno])) {
             return ['plan' => [], 'prod' => []];
+        }
+        $memKey = "{$fechaYMD}|{$turno}";
+        if (isset(self::$memDayShift[$memKey])) {
+            return self::$memDayShift[$memKey];
         }
         $hoy = date('Y-m-d');
         $isPast = ($fechaYMD < $hoy);
@@ -117,6 +127,7 @@ class PlanAttainmentAgg
             $cached = json_decode(file_get_contents($cacheFile), true);
             if (is_array($cached) && isset($cached['plan'], $cached['prod'])
                 && is_array($cached['plan'])) {
+                self::$memDayShift[$memKey] = $cached;
                 return $cached;
             }
         }
@@ -152,6 +163,7 @@ class PlanAttainmentAgg
 
         $result = ['plan' => $plan, 'prod' => $prod];
         @file_put_contents($cacheFile, json_encode($result));
+        self::$memDayShift[$memKey] = $result;
         return $result;
     }
 
@@ -465,6 +477,10 @@ class PlanAttainmentAgg
         if (!isset(self::SHIFT_WINDOWS[$turno])) {
             return ['plan' => [], 'prod' => []];
         }
+        $memKey = "{$fechaYMD}|{$turno}";
+        if (isset(self::$memDayShiftExt[$memKey])) {
+            return self::$memDayShiftExt[$memKey];
+        }
         $hoy = date('Y-m-d');
         $isPast = ($fechaYMD < $hoy);
         $maxAge = $isPast ? PHP_INT_MAX : 120; // 2 min para hoy
@@ -474,6 +490,7 @@ class PlanAttainmentAgg
         if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $maxAge) {
             $cached = json_decode(file_get_contents($cacheFile), true);
             if (is_array($cached) && isset($cached['plan'], $cached['prod']) && is_array($cached['plan'])) {
+                self::$memDayShiftExt[$memKey] = $cached;
                 return $cached;
             }
         }
@@ -504,6 +521,7 @@ class PlanAttainmentAgg
 
         $result = ['plan' => $plan, 'prod' => $prod];
         @file_put_contents($cacheFile, json_encode($result));
+        self::$memDayShiftExt[$memKey] = $result;
         return $result;
     }
 

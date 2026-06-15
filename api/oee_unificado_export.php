@@ -46,16 +46,73 @@ function _calcDRCExport(float $M, float $MT, float $MOT, float $MOKT, float $PP,
 }
 
 function styleHeader($ws, string $range): void {
+    // Antes era rojo oscuro (8C181A / 6D1214). Lo dejamos en el mismo azul
+    // que usa la app para títulos y bloques: tono "marina" coherente con
+    // el resto de pantallas. Si quieres un azul aún más claro, sube el LRV.
     $ws->getStyle($range)->getFont()->setBold(true)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('FFFFFFFF'));
-    $ws->getStyle($range)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('8C181A');
+    $ws->getStyle($range)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('2D4D7A');
     $ws->getStyle($range)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-    $ws->getStyle($range)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('6D1214');
+    $ws->getStyle($range)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('1A2D4A');
 }
 
 function autoWidth($ws, int $colCount): void {
     for ($i = 1; $i <= $colCount; $i++) {
         $ws->getColumnDimension(Coordinate::stringFromColumnIndex($i))->setAutoSize(true);
     }
+}
+
+/**
+ * Desglose Motivo → Máquina → Referencia (horas de paro) para Disponibilidad/OEE.
+ * Atribuye los segundos de paro al producto que la máquina fabricaba (his_prod_paro →
+ * his_fase → his_of → cfg_producto). Devuelve un árbol:
+ *   [ motivo => [ maquina => [ {referencia, horas}, ... ] ] ]
+ */
+function _exportMotivoMaqRef(string $fdesde, string $fhasta, array $turnos, array $codMaqs): array {
+    if (empty($codMaqs)) return [];
+    $where = [
+        "CAST(hp.Dia_productivo AS DATE) BETWEEN ? AND ?",
+        "cp.Cod_paro <> 11",
+        "hpp.Fecha_fin IS NOT NULL",
+    ];
+    $params = [$fdesde, $fhasta];
+    if (!empty($turnos)) {
+        $ph = implode(',', array_fill(0, count($turnos), '?'));
+        $where[] = "ct.Cod_turno IN ($ph)";
+        $params = array_merge($params, $turnos);
+    }
+    $codMaqs = array_values($codMaqs);
+    $ph = implode(',', array_fill(0, count($codMaqs), '?'));
+    $where[] = "mq.Cod_maquina IN ($ph)";
+    $params = array_merge($params, $codMaqs);
+
+    $sql = "
+        SELECT cp.Desc_paro       AS motivo,
+               mq.Desc_maquina    AS maquina,
+               prod.Cod_producto  AS cod_ref,
+               MAX(prod.Desc_producto) AS desc_ref,
+               SUM(DATEDIFF(SECOND, hpp.Fecha_ini, hpp.Fecha_fin)) AS segundos
+        FROM his_prod_paro hpp
+        INNER JOIN cfg_paro     cp   ON cp.Id_paro      = hpp.Id_paro
+        INNER JOIN his_prod     hp   ON hp.Id_his_prod  = hpp.Id_his_prod
+        INNER JOIN cfg_maquina  mq   ON mq.Id_maquina   = hp.Id_maquina
+        INNER JOIN cfg_turno    ct   ON ct.Id_turno     = hp.Id_turno
+        LEFT  JOIN his_fase     fa   ON fa.Id_his_fase  = hp.Id_his_fase
+        LEFT  JOIN his_of       o    ON o.Id_his_of     = fa.Id_his_of
+        LEFT  JOIN cfg_producto prod ON prod.Id_producto = o.Id_producto
+        WHERE " . implode(' AND ', $where) . "
+        GROUP BY cp.Desc_paro, mq.Desc_maquina, prod.Cod_producto
+        HAVING SUM(DATEDIFF(SECOND, hpp.Fecha_ini, hpp.Fecha_fin)) > 0
+        ORDER BY cp.Desc_paro, mq.Desc_maquina, segundos DESC
+    ";
+    $rows = fetchAll('mapex', $sql, $params);
+    $out = [];
+    foreach ($rows as $r) {
+        $mot = (string)$r['motivo'];
+        $maq = (string)($r['maquina'] ?: '—');
+        $ref = (string)($r['desc_ref'] ?: ($r['cod_ref'] ?: '(sin referencia)'));
+        $out[$mot][$maq][] = ['referencia' => $ref, 'horas' => round(((int)$r['segundos']) / 3600, 2)];
+    }
+    return $out;
 }
 
 /**
@@ -72,7 +129,7 @@ function writeFilterHeader($ws, array $ctx, string $sheetTitle, int $cols): int 
     // Fila 1: título de la hoja
     $ws->setCellValue('A1', "OEE Unificado · $sheetTitle");
     $ws->mergeCells("A1:{$rightCol}1");
-    $ws->getStyle('A1')->getFont()->setBold(true)->setSize(13)->getColor()->setRGB('8C181A');
+    $ws->getStyle('A1')->getFont()->setBold(true)->setSize(13)->getColor()->setRGB('2D4D7A');
     $ws->getStyle('A1')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
     $ws->getRowDimension(1)->setRowHeight(22);
 
@@ -107,7 +164,7 @@ function writeFilterHeader($ws, array $ctx, string $sheetTitle, int $cols): int 
     $ws->mergeCells("A2:{$rightCol}2");
     $ws->getStyle('A2')->getFont()->setSize(10)->getColor()->setRGB('2D4D7A');
     $ws->getStyle('A2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()
-        ->setRGB(!empty($ctx['periodoLabel']) ? 'FFF3C4' : 'FDF5F5');
+        ->setRGB(!empty($ctx['periodoLabel']) ? 'FFF3C4' : 'EEF3F8');
     $ws->getStyle('A2')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER)->setWrapText(true);
     $ws->getRowDimension(2)->setRowHeight(!empty($ctx['periodoLabel']) ? 36 : 22);
 
@@ -131,7 +188,7 @@ function _renderPortada($ws, array $ctx): void {
     $ws->setCellValue('A1', 'INFORME OEE UNIFICADO');
     $ws->mergeCells('A1:B1');
     $ws->getStyle('A1')->getFont()->setBold(true)->setSize(20)->getColor()->setRGB('FFFFFF');
-    $ws->getStyle('A1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('8C181A');
+    $ws->getStyle('A1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('2D4D7A');
     $ws->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER)
         ->setVertical(Alignment::VERTICAL_CENTER);
     $ws->getRowDimension(1)->setRowHeight(36);
@@ -622,6 +679,34 @@ try {
 
             // Hoja 6: Pareto motivos
             $codMaqsSeccion = array_map(fn($m) => $m['cod_maquina'], $secMaqs);
+
+            // Para las hojas cruzadas / agrupadas queremos mostrar TODAS las
+            // máquinas configuradas en la sección, incluso si en el periodo
+            // no tuvieron producción/paros. Los nombres en
+            // PlanAttainmentAgg::MAQUINA_TO_SECCION_EXT a veces coinciden con
+            // Cod_maquina y a veces con Desc_maquina (depende de cómo esté
+            // dada de alta en MAPEX), así que buscamos en cfg_maquina por
+            // las dos columnas para no perder máquinas.
+            $nombresSeccionFull = [];
+            foreach (PlanAttainmentAgg::MAQUINA_TO_SECCION_EXT as $desc => $sec) {
+                if ($sec === $seccion) $nombresSeccionFull[] = $desc;
+            }
+            $codMaqsSeccionFull = $codMaqsSeccion; // arranque: las que ya conocemos
+            if (!empty($nombresSeccionFull)) {
+                $phF = implode(',', array_fill(0, count($nombresSeccionFull), '?'));
+                $rowsF = fetchAll('mapex',
+                    "SELECT Cod_maquina FROM cfg_maquina
+                     WHERE Cod_maquina IN ($phF) OR Desc_maquina IN ($phF)",
+                    array_merge($nombresSeccionFull, $nombresSeccionFull)
+                );
+                foreach ($rowsF as $rF) {
+                    $c = (string)($rF['Cod_maquina'] ?? '');
+                    if ($c !== '' && !in_array($c, $codMaqsSeccionFull, true)
+                        && !in_array($c, $excl, true)) {
+                        $codMaqsSeccionFull[] = $c;
+                    }
+                }
+            }
             require_once __DIR__ . '/oee_unificado_drill.php_motivos.php';
 
             $motivos = [];
@@ -651,6 +736,285 @@ try {
                 $row3++;
             }
             autoWidth($ws3, 4);
+
+            // ─── Hojas 6b y 6c: tablas cruzadas Motivo × Máquina y
+            // Máquina × Motivo. Solo cuando la métrica es disponibilidad u OEE
+            // (los motivos de paro vienen de Cod_paro). Para calidad/rendimiento
+            // los "motivos" son defectos o referencias y no aplica este cruce.
+            if (in_array($metrica, ['disponibilidad','oee'], true)) {
+                $cruz = _exportMotivosParosCruzados($fdesde, $fhasta, $turnos, $codMaqsSeccionFull);
+
+                if (!empty($cruz['motivos']) && !empty($cruz['maquinas'])) {
+
+                    // ----- Hoja: Motivo × Máquina (filas=motivos, cols=máquinas) -----
+                    $wsMM = $book->createSheet();
+                    $tMM = preg_replace('/[\\\\\\/\\?\\*\\[\\]:]/u', '_', "Motivo x Maquina $metricaLabel");
+                    if (mb_strlen($tMM) > 31) $tMM = mb_substr($tMM, 0, 31);
+                    $wsMM->setTitle($tMM);
+
+                    $colCountMM = 1 + count($cruz['maquinas']) + 1; // Motivo + máquinas + Total
+                    $rowMM = writeFilterHeader($wsMM, $ctx, "Motivo × Máquina (horas) · $seccion", $colCountMM);
+
+                    // Cabecera (usamos el nombre visible — Desc_maquina —
+                    // para que coincida con lo que el usuario ve en pantalla)
+                    $wsMM->setCellValue("A$rowMM", 'Motivo');
+                    foreach ($cruz['maquinas'] as $i => $maq) {
+                        $wsMM->setCellValue([$i + 2, $rowMM], $cruz['nombres'][$maq] ?? $maq);
+                    }
+                    $wsMM->setCellValue([$colCountMM, $rowMM], 'Total (h)');
+                    $lastColMM = Coordinate::stringFromColumnIndex($colCountMM);
+                    styleHeader($wsMM, "A$rowMM:{$lastColMM}$rowMM");
+                    $rowMM++;
+
+                    // Datos
+                    foreach ($cruz['motivos'] as $mot) {
+                        $wsMM->setCellValue("A$rowMM", $mot);
+                        foreach ($cruz['maquinas'] as $i => $maq) {
+                            $h = $cruz['matriz'][$mot][$maq] ?? 0;
+                            if ($h > 0) {
+                                $wsMM->setCellValue([$i + 2, $rowMM], $h);
+                            }
+                        }
+                        $wsMM->setCellValue([$colCountMM, $rowMM], $cruz['tot_motivo'][$mot] ?? 0);
+                        $rowMM++;
+                    }
+                    // Fila TOTAL por máquina
+                    $wsMM->setCellValue("A$rowMM", 'TOTAL por máquina (h)');
+                    foreach ($cruz['maquinas'] as $i => $maq) {
+                        $wsMM->setCellValue([$i + 2, $rowMM], $cruz['tot_maq'][$maq] ?? 0);
+                    }
+                    $wsMM->setCellValue([$colCountMM, $rowMM], $cruz['tot_global'] ?? 0);
+                    $wsMM->getStyle("A$rowMM:{$lastColMM}$rowMM")->getFont()->setBold(true);
+                    $wsMM->getStyle("A$rowMM:{$lastColMM}$rowMM")->getFill()
+                        ->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F0F4F8');
+                    autoWidth($wsMM, $colCountMM);
+                    $wsMM->freezePane('B' . ($rowMM - count($cruz['motivos'])));
+
+                    // ----- Hoja: Máquina × Motivo (filas=máquinas, cols=motivos) -----
+                    $wsMxM = $book->createSheet();
+                    $tMxM = preg_replace('/[\\\\\\/\\?\\*\\[\\]:]/u', '_', "Maquina x Motivo $metricaLabel");
+                    if (mb_strlen($tMxM) > 31) $tMxM = mb_substr($tMxM, 0, 31);
+                    $wsMxM->setTitle($tMxM);
+
+                    $colCountMxM = 1 + count($cruz['motivos']) + 1; // Máquina + motivos + Total
+                    $rowMxM = writeFilterHeader($wsMxM, $ctx, "Máquina × Motivo (horas) · $seccion", $colCountMxM);
+
+                    $wsMxM->setCellValue("A$rowMxM", 'Máquina');
+                    foreach ($cruz['motivos'] as $i => $mot) {
+                        $wsMxM->setCellValue([$i + 2, $rowMxM], $mot);
+                    }
+                    $wsMxM->setCellValue([$colCountMxM, $rowMxM], 'Total (h)');
+                    $lastColMxM = Coordinate::stringFromColumnIndex($colCountMxM);
+                    styleHeader($wsMxM, "A$rowMxM:{$lastColMxM}$rowMxM");
+                    $rowMxM++;
+
+                    foreach ($cruz['maquinas'] as $maq) {
+                        $wsMxM->setCellValue("A$rowMxM", $cruz['nombres'][$maq] ?? $maq);
+                        foreach ($cruz['motivos'] as $i => $mot) {
+                            $h = $cruz['matriz'][$mot][$maq] ?? 0;
+                            if ($h > 0) {
+                                $wsMxM->setCellValue([$i + 2, $rowMxM], $h);
+                            }
+                        }
+                        $wsMxM->setCellValue([$colCountMxM, $rowMxM], $cruz['tot_maq'][$maq] ?? 0);
+                        $rowMxM++;
+                    }
+                    $wsMxM->setCellValue("A$rowMxM", 'TOTAL por motivo (h)');
+                    foreach ($cruz['motivos'] as $i => $mot) {
+                        $wsMxM->setCellValue([$i + 2, $rowMxM], $cruz['tot_motivo'][$mot] ?? 0);
+                    }
+                    $wsMxM->setCellValue([$colCountMxM, $rowMxM], $cruz['tot_global'] ?? 0);
+                    $wsMxM->getStyle("A$rowMxM:{$lastColMxM}$rowMxM")->getFont()->setBold(true);
+                    $wsMxM->getStyle("A$rowMxM:{$lastColMxM}$rowMxM")->getFill()
+                        ->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F0F4F8');
+                    autoWidth($wsMxM, $colCountMxM);
+                    $wsMxM->freezePane('B' . ($rowMxM - count($cruz['maquinas'])));
+
+                    // ─── Hoja agrupable: Motivo (padre) → Máquinas (hijas) ───
+                    // Cada motivo es una fila resumen. Debajo, sus máquinas
+                    // como filas agrupadas (outline level 1) que arrancan
+                    // colapsadas: el usuario pulsa el [+] del margen izquierdo
+                    // de Excel para desplegarlas.
+                    $wsAgM = $book->createSheet();
+                    $tAgM = preg_replace('/[\\\\\\/\\?\\*\\[\\]:]/u', '_',
+                        "Motivos agrupado $metricaLabel");
+                    if (mb_strlen($tAgM) > 31) $tAgM = mb_substr($tAgM, 0, 31);
+                    $wsAgM->setTitle($tAgM);
+                    // Summary arriba del grupo (motivo padre arriba de sus
+                    // máquinas) — comportamiento natural en Excel.
+                    $wsAgM->getSheetView()->setShowZeros(false);
+                    $wsAgM->setShowSummaryBelow(false);
+
+                    $rowAgM = writeFilterHeader($wsAgM, $ctx,
+                        "Motivos (desplegable) · $seccion", 4);
+                    $headersAgM = ['Motivo / Máquina', 'Horas', '% sobre total', '% sobre motivo'];
+                    foreach ($headersAgM as $i => $h) {
+                        $wsAgM->setCellValue([$i + 1, $rowAgM], $h);
+                    }
+                    styleHeader($wsAgM, "A$rowAgM:D$rowAgM");
+                    $rowAgM++;
+
+                    $totalGlobalM = $cruz['tot_global'] ?: 0;
+                    foreach ($cruz['motivos'] as $mot) {
+                        $totMot = $cruz['tot_motivo'][$mot] ?? 0;
+                        $pctTot = $totalGlobalM > 0 ? round($totMot / $totalGlobalM * 100, 2) : 0;
+                        // Fila padre: motivo
+                        $wsAgM->setCellValue("A$rowAgM", $mot);
+                        $wsAgM->setCellValue("B$rowAgM", $totMot);
+                        $wsAgM->setCellValue("C$rowAgM", $pctTot);
+                        $wsAgM->setCellValue("D$rowAgM", 100);
+                        $wsAgM->getStyle("A$rowAgM:D$rowAgM")->getFont()->setBold(true);
+                        $wsAgM->getStyle("A$rowAgM:D$rowAgM")->getFill()
+                            ->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E7EEF6');
+                        $rowAgM++;
+
+                        // Filas hijas: máquinas con horas en este motivo,
+                        // ordenadas DESC. Si ninguna, salta el grupo.
+                        $detalle = [];
+                        foreach ($cruz['maquinas'] as $maq) {
+                            $h = $cruz['matriz'][$mot][$maq] ?? 0;
+                            if ($h > 0) $detalle[$maq] = $h;
+                        }
+                        arsort($detalle);
+                        foreach ($detalle as $maq => $h) {
+                            $pctG = $totalGlobalM > 0 ? round($h / $totalGlobalM * 100, 2) : 0;
+                            $pctM = $totMot       > 0 ? round($h / $totMot       * 100, 2) : 0;
+                            $nombreMaq = $cruz['nombres'][$maq] ?? $maq;
+                            $wsAgM->setCellValue("A$rowAgM", '    ' . $nombreMaq);
+                            $wsAgM->setCellValue("B$rowAgM", $h);
+                            $wsAgM->setCellValue("C$rowAgM", $pctG);
+                            $wsAgM->setCellValue("D$rowAgM", $pctM);
+                            // Indentado + agrupado (oculto inicialmente)
+                            $wsAgM->getStyle("A$rowAgM")->getFont()->getColor()->setRGB('5A6B80');
+                            $wsAgM->getRowDimension($rowAgM)
+                                ->setOutlineLevel(1)
+                                ->setVisible(false)
+                                ->setCollapsed(true);
+                            $rowAgM++;
+                        }
+                    }
+                    autoWidth($wsAgM, 4);
+                    // Congelamos justo debajo de la fila de cabecera (fila 5)
+                    // para que al hacer scroll vertical siga visible.
+                    $wsAgM->freezePane('A5');
+
+                    // ─── Hoja agrupable: Máquina (padre) → Motivos (hijos) ───
+                    $wsAgMx = $book->createSheet();
+                    $tAgMx = preg_replace('/[\\\\\\/\\?\\*\\[\\]:]/u', '_',
+                        "Maquinas agrupado $metricaLabel");
+                    if (mb_strlen($tAgMx) > 31) $tAgMx = mb_substr($tAgMx, 0, 31);
+                    $wsAgMx->setTitle($tAgMx);
+                    $wsAgMx->getSheetView()->setShowZeros(false);
+                    $wsAgMx->setShowSummaryBelow(false);
+
+                    $rowAgMx = writeFilterHeader($wsAgMx, $ctx,
+                        "Máquinas (desplegable) · $seccion", 4);
+                    $headersAgMx = ['Máquina / Motivo', 'Horas', '% sobre total', '% sobre máquina'];
+                    foreach ($headersAgMx as $i => $h) {
+                        $wsAgMx->setCellValue([$i + 1, $rowAgMx], $h);
+                    }
+                    styleHeader($wsAgMx, "A$rowAgMx:D$rowAgMx");
+                    $rowAgMx++;
+
+                    // Máquinas ordenadas por total DESC para que las más
+                    // problemáticas aparezcan arriba al abrir la hoja.
+                    $maqsOrden = $cruz['maquinas'];
+                    usort($maqsOrden, fn($a, $b) =>
+                        ($cruz['tot_maq'][$b] ?? 0) <=> ($cruz['tot_maq'][$a] ?? 0));
+
+                    foreach ($maqsOrden as $maq) {
+                        $totMaq = $cruz['tot_maq'][$maq] ?? 0;
+                        $pctTot = $totalGlobalM > 0 ? round($totMaq / $totalGlobalM * 100, 2) : 0;
+                        // Fila padre: máquina (nombre visible)
+                        $wsAgMx->setCellValue("A$rowAgMx", $cruz['nombres'][$maq] ?? $maq);
+                        $wsAgMx->setCellValue("B$rowAgMx", $totMaq);
+                        $wsAgMx->setCellValue("C$rowAgMx", $pctTot);
+                        $wsAgMx->setCellValue("D$rowAgMx", $totMaq > 0 ? 100 : 0);
+                        $wsAgMx->getStyle("A$rowAgMx:D$rowAgMx")->getFont()->setBold(true);
+                        $wsAgMx->getStyle("A$rowAgMx:D$rowAgMx")->getFill()
+                            ->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E7EEF6');
+                        $rowAgMx++;
+
+                        // Hijos: motivos de paro de esta máquina, DESC
+                        $detalle = [];
+                        foreach ($cruz['motivos'] as $mot) {
+                            $h = $cruz['matriz'][$mot][$maq] ?? 0;
+                            if ($h > 0) $detalle[$mot] = $h;
+                        }
+                        arsort($detalle);
+                        foreach ($detalle as $mot => $h) {
+                            $pctG = $totalGlobalM > 0 ? round($h / $totalGlobalM * 100, 2) : 0;
+                            $pctM = $totMaq       > 0 ? round($h / $totMaq       * 100, 2) : 0;
+                            $wsAgMx->setCellValue("A$rowAgMx", '    ' . $mot);
+                            $wsAgMx->setCellValue("B$rowAgMx", $h);
+                            $wsAgMx->setCellValue("C$rowAgMx", $pctG);
+                            $wsAgMx->setCellValue("D$rowAgMx", $pctM);
+                            $wsAgMx->getStyle("A$rowAgMx")->getFont()->getColor()->setRGB('5A6B80');
+                            $wsAgMx->getRowDimension($rowAgMx)
+                                ->setOutlineLevel(1)
+                                ->setVisible(false)
+                                ->setCollapsed(true);
+                            $rowAgMx++;
+                        }
+                    }
+                    autoWidth($wsAgMx, 4);
+
+                    // ─── Hoja: Motivo → Máquina → Referencia (desglose por referencia) ───
+                    // Bajo cada motivo, sus máquinas (nivel 1) y, dentro, las
+                    // referencias fabricadas durante ese paro con su tiempo (nivel 2).
+                    $mmr = _exportMotivoMaqRef($fdesde, $fhasta, $turnos, $codMaqsSeccionFull);
+                    if (!empty($mmr)) {
+                        $wsRef = $book->createSheet();
+                        $tRef = preg_replace('/[\\\\\\/\\?\\*\\[\\]:]/u', '_', "Motivo-Maq-Ref $metricaLabel");
+                        if (mb_strlen($tRef) > 31) $tRef = mb_substr($tRef, 0, 31);
+                        $wsRef->setTitle($tRef);
+                        $wsRef->getSheetView()->setShowZeros(false);
+                        $wsRef->setShowSummaryBelow(false);
+
+                        $rowR = writeFilterHeader($wsRef, $ctx, "Motivo → Máquina → Referencia (horas) · $seccion", 3);
+                        foreach (['Motivo / Máquina / Referencia', 'Horas', '% sobre motivo'] as $i => $h) {
+                            $wsRef->setCellValue([$i + 1, $rowR], $h);
+                        }
+                        styleHeader($wsRef, "A$rowR:C$rowR");
+                        $rowR++;
+
+                        foreach ($mmr as $mot => $maqs) {
+                            $totMot = 0.0;
+                            foreach ($maqs as $refs) foreach ($refs as $rr) $totMot += $rr['horas'];
+                            $totMot = round($totMot, 2);
+                            // Fila padre: motivo
+                            $wsRef->setCellValue("A$rowR", $mot);
+                            $wsRef->setCellValue("B$rowR", $totMot);
+                            $wsRef->setCellValue("C$rowR", 100);
+                            $wsRef->getStyle("A$rowR:C$rowR")->getFont()->setBold(true);
+                            $wsRef->getStyle("A$rowR:C$rowR")->getFill()
+                                ->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E7EEF6');
+                            $rowR++;
+                            foreach ($maqs as $maq => $refs) {
+                                $totMaq = 0.0; foreach ($refs as $rr) $totMaq += $rr['horas']; $totMaq = round($totMaq, 2);
+                                // Fila nivel 1: máquina
+                                $wsRef->setCellValue("A$rowR", '   ' . $maq);
+                                $wsRef->setCellValue("B$rowR", $totMaq);
+                                $wsRef->setCellValue("C$rowR", $totMot > 0 ? round($totMaq / $totMot * 100, 2) : 0);
+                                $wsRef->getStyle("A$rowR")->getFont()->setBold(true)->getColor()->setRGB('2D4D7A');
+                                $wsRef->getRowDimension($rowR)->setOutlineLevel(1)->setVisible(false)->setCollapsed(true);
+                                $rowR++;
+                                foreach ($refs as $rr) {
+                                    // Fila nivel 2: referencia
+                                    $wsRef->setCellValue("A$rowR", '         ' . $rr['referencia']);
+                                    $wsRef->setCellValue("B$rowR", $rr['horas']);
+                                    $wsRef->setCellValue("C$rowR", $totMot > 0 ? round($rr['horas'] / $totMot * 100, 2) : 0);
+                                    $wsRef->getStyle("A$rowR")->getFont()->getColor()->setRGB('5A6B80');
+                                    $wsRef->getRowDimension($rowR)->setOutlineLevel(2)->setVisible(false)->setCollapsed(true);
+                                    $rowR++;
+                                }
+                            }
+                        }
+                        autoWidth($wsRef, 3);
+                        $wsRef->freezePane('A5');
+                    }
+                }
+            }
 
             // Hoja 7: Motivo seleccionado (por máquina + por hora)
             if ($motivo) {

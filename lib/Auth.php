@@ -101,6 +101,27 @@ class Auth
     }
 
     /**
+     * Login simplificado para la app móvil del operario: solo número
+     * (4 a 6 cifras), sin contraseña. NO valida contra catálogo: cualquier
+     * código aceptado se guarda como el operario responsable de las
+     * intervenciones que registre desde la app.
+     *
+     * Esto permite usar la app con códigos asignados por el responsable
+     * sin necesidad de mantener el catálogo mant_operarios sincronizado.
+     */
+    public static function loginCodigoLibre(string $codigo): bool
+    {
+        self::start();
+        $codigo = trim($codigo);
+        if (!preg_match('/^\d{4,6}$/', $codigo)) return false;
+        // Rate-limit suave por IP para evitar abuso.
+        $ip = self::clientIp();
+        if (self::isRateLimited($ip)) return false;
+        self::completarLogin($ip, $codigo, 'operario');
+        return true;
+    }
+
+    /**
      * Una vez verificadas las credenciales, regenera la sesión, limpia el
      * rate-limit y guarda los datos del usuario logueado.
      */

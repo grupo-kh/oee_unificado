@@ -339,7 +339,7 @@ function _exportCumplXlsx(array $global, array $perMesAcc, string $filtrosTxt, s
 function _exportCumplPdf(array $global, array $perMesAcc, string $filtrosTxt, string $baseStem): void
 {
     $pct = (float)$global['cumplimiento'];
-    $colorPct = $pct >= 90 ? '#166534' : ($pct >= 70 ? '#b45309' : '#8c181a');
+    $colorPct = $pct >= 90 ? '#166534' : ($pct >= 70 ? '#b45309' : '#c8102e');
 
     ob_start(); ?>
 <!DOCTYPE html>
@@ -361,7 +361,7 @@ function _exportCumplPdf(array $global, array $perMesAcc, string $filtrosTxt, st
                      margin: 0 4pt; font-weight: bold; font-size: 10pt; }
     .pill-ok   { background: #e8f3ea; color: #166534; }
     .pill-prev { background: #eef3f8; color: #2d4d7a; }
-    .pill-atr  { background: #fdecec; color: #8c181a; }
+    .pill-atr  { background: #fdecec; color: #c8102e; }
     .filter-bar { background: #eef3f8; border: 1px solid #c8d2dd; padding: 6pt 8pt;
                   font-size: 9pt; margin: 6pt 0 12pt; border-radius: 3pt; color: #2d4d7a; }
     table.data { width: 100%; border-collapse: collapse; margin: 4pt 0 0; }
@@ -373,7 +373,7 @@ function _exportCumplPdf(array $global, array $perMesAcc, string $filtrosTxt, st
     table.data td.l { text-align: left; font-weight: bold; }
     .cell-ok   { background: #e8f3ea; color: #166534; font-weight: bold; }
     .cell-med  { background: #fff4db; color: #92400e; font-weight: bold; }
-    .cell-bad  { background: #fdecec; color: #8c181a; font-weight: bold; }
+    .cell-bad  { background: #fdecec; color: #c8102e; font-weight: bold; }
     .empty { font-style: italic; color: #888; margin: 8pt 0; text-align: center; }
     .leyenda { font-size: 8.5pt; color: #5a6b80; margin-top: 8pt; font-style: italic; }
 </style></head>

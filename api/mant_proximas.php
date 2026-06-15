@@ -5,6 +5,7 @@ require_once __DIR__ . '/../lib/Auth.php';
 require_once __DIR__ . '/../lib/MaintenancePlanStore.php';
 require_once __DIR__ . '/../lib/MaintenanceCompletionStore.php';
 require_once __DIR__ . '/../lib/MaintenancePeriodicidadStore.php';
+require_once __DIR__ . '/../lib/MaintenanceProximasMetrics.php';
 
 Auth::requireLoginApi();
 
@@ -59,24 +60,34 @@ try {
     $marcadasIdx = MaintenanceCompletionStore::loadIndexed();
     $perOverrideIdx = MaintenancePeriodicidadStore::loadIndexed();
 
-    // Pre-filtrar las tareas YA marcadas antes de consolidar — así una
-    // tarea de RACK ya marcada no se cuenta como sub-tarea pendiente
-    // dentro de la fila consolidada.
-    $proximasFiltradas = array_values(array_filter(
-        $data['proximas'],
-        function($p) use ($marcadasIdx) {
+    // Tratamiento diferenciado según el tipo de máquina:
+    //
+    //  · RACK / PLATAFORMA / TROLEY (consolidables): el operario hace TODAS
+    //    las micro-tareas de una vez en una sola visita. Las agrupamos en
+    //    una única fila "Revisión completa · N tareas" con UN solo botón
+    //    "Marcar las N hechas". Antes de consolidar quitamos las sub-tareas
+    //    que YA están marcadas en mant_completions — así la fila consolidada
+    //    sólo contiene lo que realmente queda por hacer. Si están todas
+    //    marcadas la máquina simplemente no aparece.
+    //
+    //  · Resto de máquinas (no consolidables, p.ej. R2108): mantenemos
+    //    una fila por tarea, incluyendo las ya marcadas. Estas últimas se
+    //    pintan con el badge "✓ HECHA" gracias al flag `ya_marcada` que
+    //    se añade más abajo en el bucle de construcción de $rows.
+    $proximasPrep = [];
+    foreach ($data['proximas'] as $p) {
+        $desc = (string)($p['desc_maquina'] ?? '');
+        if (MaintenancePlanStore::esConsolidable($desc)) {
             $idMark = MaintenanceCompletionStore::buildId(
                 (string)$p['orden'], (string)$p['tarea'], (string)($p['proxima_revision'] ?? '')
             );
-            return !isset($marcadasIdx[$idMark]);
+            if (isset($marcadasIdx[$idMark])) continue;  // sub-tarea ya hecha
         }
-    ));
-
-    // Consolidar racks / plataformas: las N micro-tareas de un mismo rack o
-    // plataforma con la misma periodicidad se funden en una sola fila
-    // "Revisión completa". Útil para no generar muchas acciones pequeñas
-    // separadas por días en una misma máquina (las del grupo SECUENCIA).
-    $proximas = MaintenancePlanStore::consolidateSecuenciaProximas($proximasFiltradas);
+        $proximasPrep[] = $p;
+    }
+    // consolidateSecuenciaProximas() agrupa SÓLO los items consolidables;
+    // los no-consolidables pasan tal cual a través de su rama passThrough.
+    $proximas = MaintenancePlanStore::consolidateSecuenciaProximas($proximasPrep);
 
     // El rango efectivo es [$fdesde, $fhasta]. Ya no usamos $dias.
     $rows = [];
@@ -110,30 +121,24 @@ try {
         $px = $eff['proxima_revision'] ?? null;
         if ($px === null) continue;
 
-        // Si la revisión ya fue marcada como hecha desde la web, omitirla.
-        // Para identificar la marca usamos la fecha próxima ORIGINAL del Excel,
-        // no la recalculada (la marca se hizo sobre la programada en su día).
+        // Si ya quedo completada para la fecha programada original, no debe
+        // aparecer en el grid inferior: ya vive en historico y el plan se
+        // reprograma en mant_marcar_hecha.php.
         $idMark = MaintenanceCompletionStore::buildId(
             (string)$p['orden'], (string)$p['tarea'], (string)$p['proxima_revision']
         );
-        if (isset($marcadasIdx[$idMark])) continue;
+        $marca = $marcadasIdx[$idMark] ?? null;
+        $yaMarcada = $marca !== null;
+        $tipoMarca = $yaMarcada ? (string)($marca['tipo'] ?? '') : null;
+        $marcaCompletada = MaintenanceProximasMetrics::isCompletedMark($marca);
+        if ($marcaCompletada) continue;
 
         if ($cm && $eff['cod_maquina_mant'] !== $cm) continue;
         if ($pe && $eff['periodicidad']     !== $pe) continue;
 
-        $diff = (int)round((strtotime($px) - strtotime($hoy)) / 86400);
-
-        if ($solo) {
-            if ($diff >= 0) continue;
-        } else {
-            // Filtramos por rango efectivo [fdesde, fhasta]. La proxima_revision
-            // debe caer dentro del rango. Las vencidas (px < hoy) se incluyen
-            // siempre si fdesde ≤ hoy.
-            if ($px < $fdesde || $px > $fhasta) continue;
-        }
-
         // Vencida con GAP por periodicidad. Una tarea solo se marca vencida
         // cuando lleva más de N días retrasada según su cadencia.
+        $diff = (int)round((strtotime($px) - strtotime($hoy)) / 86400);
         $perEff = (string)($eff['periodicidad'] ?? '');
         $gap    = $gapVencida($perEff);
         // Estados:
@@ -149,48 +154,40 @@ try {
         } elseif ($diff <= 10) {
             $estado = 'urgente';
         }
+
+        if ($solo) {
+            if ($estado !== 'vencida' || $marcaCompletada) continue;
+        } else {
+            // Filtramos por rango efectivo [fdesde, fhasta]. La proxima_revision
+            // debe caer dentro del rango. Las vencidas (px < hoy) se incluyen
+            // siempre si fdesde ≤ hoy.
+            if ($px < $fdesde || $px > $fhasta) continue;
+        }
+
         $rows[] = $eff + [
             'dias_restantes' => $diff,
             'gap_vencida'    => $gap,
             'estado'         => $estado,
+            'ya_marcada'     => $yaMarcada,
+            'tipo_marca'     => $tipoMarca,
+            'marca_completada' => $marcaCompletada,
         ];
     }
 
     usort($rows, fn($a, $b) => strcmp((string)$a['proxima_revision'], (string)$b['proxima_revision']));
 
-    $vencidas = 0; $enPlazo = 0; $urgentes = 0;
-    $countByMaq = [];
-    foreach ($rows as $r) {
-        if ($r['estado'] === 'vencida') $vencidas++;
-        elseif ($r['estado'] === 'urgente') $urgentes++;
-        else $enPlazo++;
+    $summary = MaintenanceProximasMetrics::summarizeRows($rows);
+    $total = $summary['total'];
+    $vencidas = $summary['vencidas'];
+    $urgentes = $summary['urgentes'];
+    $enPlazo = $summary['en_plazo'];
+    $pctEnPlazo = $summary['pct_en_plazo'];
 
-        $cm2 = $r['cod_maquina_mant'];
-        if ($cm2 === '') continue;
-        if (!isset($countByMaq[$cm2])) {
-            $countByMaq[$cm2] = [
-                'cod_maquina_mant' => $cm2,
-                'desc_maquina'     => $r['desc_maquina'],
-                'total'            => 0,
-                'vencidas'         => 0,
-                'urgentes'         => 0,
-            ];
-        }
-        $countByMaq[$cm2]['total']++;
-        if ($r['estado'] === 'vencida') $countByMaq[$cm2]['vencidas']++;
-        elseif ($r['estado'] === 'urgente') $countByMaq[$cm2]['urgentes']++;
-    }
-    $total = count($rows);
-    $pctEnPlazo = $total > 0 ? round(($enPlazo + $urgentes) / $total * 100, 2) : 0;
-
-    // Top 10 máquinas, ordenadas por (vencidas desc, urgentes desc, total desc).
-    $topMaquinas = array_values($countByMaq);
-    usort($topMaquinas, function($a, $b) {
-        if ($a['vencidas'] !== $b['vencidas']) return $b['vencidas'] - $a['vencidas'];
-        if ($a['urgentes'] !== $b['urgentes']) return $b['urgentes'] - $a['urgentes'];
-        return $b['total'] - $a['total'];
-    });
-    $topMaquinas = array_slice($topMaquinas, 0, 10);
+    // TODAS las máquinas que tienen al menos una tarea en el rango filtrado,
+    // ordenadas por (vencidas desc, urgentes desc, total desc). Antes se
+    // limitaba a 10 con array_slice — el usuario necesita ver todas las
+    // máquinas con pendientes para no perder ninguna.
+    $topMaquinas = $summary['top_maquinas'];
 
     $maquinas = [];
     foreach ($maquinasSet as $cod => $desc) {
@@ -220,6 +217,8 @@ try {
         'operarios'        => $operarios,
         'operarios_activos'=> $operariosActivos,
         'total_marcadas'   => count($marcadasIdx),
+        'total_hechas'     => $summary['total_hechas'],
+        'total_no_realizadas' => $summary['total_no_realizadas'],
         'fichero_actualizado' => date('Y-m-d H:i:s', $data['file_mtime']),
     ]);
 

@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/Db.php';
 require_once __DIR__ . '/MaintenanceExcelReader.php';
+require_once __DIR__ . '/MaintenancePeriodicidadStore.php';
+require_once __DIR__ . '/CalendarioLaboral.php';
 
 /**
  * Plan vigente de mantenimiento preventivo (sustituye la hoja PROXIMAS REV.
@@ -43,6 +45,11 @@ class MaintenancePlanStore
                        periodicidad, tarea, desc_tarea, activa,
                        to_char(ultima_revision,  'YYYY-MM-DD') AS ultima_revision,
                        to_char(proxima_revision, 'YYYY-MM-DD') AS proxima_revision,
+                       tiempo_estimado,
+                       to_char(fecha_pausado,     'YYYY-MM-DD') AS fecha_pausado,
+                       to_char(fecha_bloqueo_ini, 'YYYY-MM-DD') AS fecha_bloqueo_ini,
+                       to_char(fecha_bloqueo_fin, 'YYYY-MM-DD') AS fecha_bloqueo_fin,
+                       alta_baja,
                        EXTRACT(EPOCH FROM updated_at)::bigint  AS upd_ts
                   FROM mant_plan
                  WHERE fecha_pausado IS NULL
@@ -122,7 +129,55 @@ class MaintenancePlanStore
         return (int)($r['c'] ?? 0);
     }
 
-    /** Vacía la tabla (uso administrativo, p. ej. antes de re-cargar desde Excel). */
+    /** Calcula la siguiente revision y la mueve al siguiente dia laborable si cae en no habil. */
+    public static function calcularProximaRevisionLaborable(string $fechaIntervencion, string $periodicidad): ?string
+    {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaIntervencion)) return null;
+        $dias = MaintenancePeriodicidadStore::diasPorPeriodicidad($periodicidad);
+        if ($dias === null) return null;
+        $ts = strtotime($fechaIntervencion . ' +' . $dias . ' days');
+        if ($ts === false) return null;
+        return CalendarioLaboral::ajustarADiaHabil(date('Y-m-d', $ts), 'posterior');
+    }
+
+    /** Avanza el plan tras una revision completada. */
+    public static function avanzarRevisionTrasCompletada(
+        string $orden,
+        string $tarea,
+        string $fechaIntervencion,
+        string $periodicidad
+    ): ?array {
+        $proxima = self::calcularProximaRevisionLaborable($fechaIntervencion, $periodicidad);
+        if ($proxima === null) return null;
+
+        if (!self::usePg()) {
+            return [
+                'ultima_revision'  => $fechaIntervencion,
+                'proxima_revision' => $proxima,
+            ];
+        }
+
+        $updated = Db::pgExec("
+            UPDATE mant_plan
+               SET ultima_revision = :ultima_revision,
+                   proxima_revision = :proxima_revision
+             WHERE orden = :orden
+               AND tarea = :tarea
+        ", [
+            ':ultima_revision'  => $fechaIntervencion,
+            ':proxima_revision' => $proxima,
+            ':orden'            => $orden,
+            ':tarea'            => $tarea,
+        ]);
+        if ($updated < 1) return null;
+
+        return [
+            'ultima_revision'  => $fechaIntervencion,
+            'proxima_revision' => $proxima,
+        ];
+    }
+
+    /** Vacia la tabla (uso administrativo, p. ej. antes de re-cargar desde Excel). */
     public static function truncate(): void
     {
         if (!self::usePg()) return;
@@ -136,17 +191,18 @@ class MaintenancePlanStore
      * mant_maquinas como fuente de la verdad: las máquinas sin tareas
      * también aparecen.
      */
-    public static function listMaquinasConContador(): array
+    public static function listMaquinasConContador(string $modo = 'activas'): array
     {
         if (!self::usePg()) {
             throw new RuntimeException('listMaquinasConContador requiere modo PostgreSQL');
         }
-        // Una máquina "está activa" si tiene al menos una tarea con
-        // alta_baja = 'ALTA' y activa = 'A' (las pausadas siguen contando
-        // como activas: se reanudan más adelante). Las máquinas creadas
-        // desde la web (is_user_added) siempre se muestran aunque aún no
-        // tengan tareas, para poder editarlas.
-        return Db::pgFetchAll("
+        // $modo:
+        //   'todas'    → cualquier máquina (las pausadas también)
+        //   'activas'  → excluye las que tienen TODAS las tareas pausadas
+        //                (sigue mostrando máquinas con tareas mixtas)
+        //   'pausadas' → cualquier máquina con al menos UNA tarea pausada
+        //                (paused_count > 0). Ya no requiere todo pausado.
+        $rows = Db::pgFetchAll("
             SELECT m.cod_maquina_mant,
                    m.desc_maquina,
                    m.is_user_added,
@@ -173,6 +229,22 @@ class MaintenancePlanStore
                 )
              ORDER BY m.desc_maquina
         ");
+        if ($modo === 'todas') return $rows;
+
+        // Filtramos en PHP para mantener la consulta principal estable.
+        //   - 'pausadas' → cualquier máquina con al menos UNA tarea pausada.
+        //   - 'activas'  → máquinas que NO están totalmente pausadas (sí
+        //                  aparecen las mixtas: tienen tareas activas).
+        return array_values(array_filter($rows, function ($r) use ($modo) {
+            $task   = (int)($r['task_count']   ?? 0);
+            $paused = (int)($r['paused_count'] ?? 0);
+            if ($modo === 'pausadas') {
+                return $paused > 0;
+            }
+            // 'activas': excluye solo las que están completamente pausadas.
+            $totalmentePausada = ($task > 0 && $paused === $task);
+            return !$totalmentePausada;
+        }));
     }
 
     /** Crea una máquina nueva en el catálogo. */

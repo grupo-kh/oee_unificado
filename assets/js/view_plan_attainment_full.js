@@ -360,7 +360,7 @@ function refreshActiveFilterBar() {
 
     // Reflejar selección en cabeceras
     if (m1Title) {
-        const txtBase = 'Plan Attainment Global';
+        const txtBase = 'Cumplimiento Global Producción';
         const suf = _selSeccion ? ' · ' + _selSeccion : '';
         m1Title.firstChild.nodeValue = txtBase + suf;
     }
@@ -520,45 +520,96 @@ function initPaFiltros(onChange) {
     });
 }
 
+// ───── Cache cliente con TTL ─────────────────────────────────────────
+// Memoriza las respuestas por (endpoint + params) para que alternar filtros
+// ya consultados sea instantáneo. El botón "Refrescar" vacía todo y fuerza
+// un re-fetch real. Datos del día actual: TTL 30 s; datos completamente
+// del pasado: TTL 5 min (no van a cambiar).
+const _paCache = new Map();
+let _paForceNextFetch = false;
+
+function _paCacheKey(endpoint, params) {
+    const ordered = {};
+    Object.keys(params || {}).sort().forEach(k => { ordered[k] = params[k]; });
+    return endpoint + '?' + JSON.stringify(ordered);
+}
+function _paCacheTTL(params) {
+    const hoy = _paFmtDate(new Date());
+    const hasta = (params && (params.fecha_hasta || params.fecha)) || '';
+    if (!hasta || hasta >= hoy) return 30 * 1000;
+    return 5 * 60 * 1000;
+}
+async function paApiFetch(endpoint, params, signal) {
+    const key = _paCacheKey(endpoint, params);
+    const now = Date.now();
+    if (!_paForceNextFetch) {
+        const hit = _paCache.get(key);
+        if (hit && (now - hit.ts) < hit.ttl) return hit.data;
+    }
+    const data = await apiFetch(endpoint, params, signal);
+    _paCache.set(key, { data, ts: now, ttl: _paCacheTTL(params) });
+    return data;
+}
+function paInvalidarCache() {
+    _paCache.clear();
+    _paForceNextFetch = true;
+}
+
 // ───── Loaders ───────────────────────────────────────────────────────
+// Optimización: en lugar de 4 fetches (gauge / seccion / evolucion / maquinas)
+// hacemos UNA sola llamada al endpoint combinado pa_dashboard.php, que
+// internamente comparte la cache in-memory de dayShiftDetail (en lugar de
+// recalcular 4 veces lo mismo). El despacho de los 4 bloques se hace en
+// pintarDashboard().
 
-async function cargarGauge(signal) {
+async function cargarDashboard(signal) {
+    // Para el gauge usamos paApiParams() (respeta drill-down de fecha);
+    // para evolución usamos siempre el rango completo de la cabecera porque
+    // la línea temporal pierde sentido sobre un solo día.
     const p = paApiParams();
-    const data = await apiFetch('plan_attainment.php', { ...p, seccion: _selSeccion }, signal);
-    _gaugeMeta = data.meta || null;
-    renderGauge(data.plan_attainment);
-    $('#m-disp').textContent = data.disponibilidad.toFixed(1) + '%';
-    $('#m-rend').textContent = data.rendimiento.toFixed(1) + '%';
-    $('#m-cal').textContent  = data.calidad.toFixed(1) + '%';
-    $('#m-oee').textContent  = data.oee.toFixed(1) + '%';
-}
-
-async function cargarSeccion(signal) {
-    const p = paApiParams();
-    // Importante: NO mandamos seccion aquí, queremos seguir viendo las 2 barras
-    // (con la seleccionada destacada) para poder cambiar/quitar el filtro.
-    const data = await apiFetch('por_seccion.php', p, signal);
-    renderSeccion(data.rows || []);
-}
-
-async function cargarEvolucion(signal) {
-    // Evolución usa SIEMPRE el rango configurado en la cabecera
-    // (ignora el drill-down _selFecha, que solo aplica a los módulos diarios).
     const f = getPaFiltros();
-    const data = await apiFetch('evolucion.php', {
-        fecha_desde: f.fecha_desde,
-        fecha_hasta: f.fecha_hasta,
-        turnos:      f.turnos.join(','),
-        seccion:     _selSeccion,
-    }, signal);
-    renderEvolucion(data.rows || []);
+
+    // Si hay drill-down de fecha → el dashboard se calcula para ese día
+    // único; para evolución hacemos un fetch aparte con el rango completo
+    // (pero sigue siendo solo 1 llamada extra, no 3).
+    const dashboard = await paApiFetch('pa_dashboard.php',
+        { ...p, seccion: _selSeccion }, signal);
+
+    let evolucionRows = dashboard.evolucion || [];
+    if (_selFecha) {
+        // El dashboard se pidió para 1 día, pero la evolución necesita el
+        // rango original; pedimos el bloque evolución aparte.
+        const evo = await paApiFetch('pa_dashboard.php', {
+            fecha_desde: f.fecha_desde,
+            fecha_hasta: f.fecha_hasta,
+            turnos:      f.turnos.join(','),
+            seccion:     _selSeccion,
+        }, signal);
+        evolucionRows = evo.evolucion || [];
+    }
+
+    return { ...dashboard, evolucion: evolucionRows };
 }
 
-async function cargarMaquinas(signal) {
-    const p = paApiParams();
-    const data = await apiFetch('por_maquina.php', p, signal);
-    let rows = data.rows || [];
-    // Filtrado por sección (cliente — la API devuelve seccion en cada fila)
+function pintarDashboard(data) {
+    // 1) Gauge + 4 métricas OEE
+    const g = data.gauge || {};
+    _gaugeMeta = g.meta || null;
+    renderGauge(g.plan_attainment ?? 0);
+    $('#m-disp').textContent = (g.disponibilidad ?? 0).toFixed(1) + '%';
+    $('#m-rend').textContent = (g.rendimiento   ?? 0).toFixed(1) + '%';
+    $('#m-cal').textContent  = (g.calidad       ?? 0).toFixed(1) + '%';
+    $('#m-oee').textContent  = (g.oee           ?? 0).toFixed(1) + '%';
+
+    // 2) Por sección (NO filtramos client-side: queremos ver las 2 barras
+    //    para poder cambiar/quitar el filtro)
+    renderSeccion(data.por_seccion || []);
+
+    // 3) Evolución
+    renderEvolucion(data.evolucion || []);
+
+    // 4) Por máquina (filtramos client-side por sección si procede)
+    let rows = data.por_maquina || [];
     if (_selSeccion) {
         rows = rows.filter(r => (r.seccion || '').toUpperCase() === _selSeccion);
     }
@@ -723,7 +774,7 @@ async function cargarDetalle(signal) {
     try {
         const results = await Promise.all(
             listaCombos.map(c =>
-                apiFetch('grid.php', { fecha: c.fecha, turno: c.turno }, signal)
+                paApiFetch('grid.php', { fecha: c.fecha, turno: c.turno }, signal)
                     .then(d => ({ combo: c, data: d }))
                     .catch(e => ({ combo: c, error: e }))
             )
@@ -844,30 +895,40 @@ async function cargarTodo() {
 
     paShowLoading(true);
 
-    // 2) Lanzar los 4 módulos superiores en paralelo. allSettled para que
-    //    el fallo de uno no aborte la pintura de los demás. Cada módulo
-    //    se renderiza en cuanto su fetch resuelve (render incremental).
-    const results = await Promise.allSettled([
-        cargarGauge(sig),
-        cargarSeccion(sig),
-        cargarEvolucion(sig),
-        cargarMaquinas(sig),
-    ]);
-
-    // Si nos abortaron antes de terminar, otra cargarTodo ya está corriendo.
-    if (sig.aborted) return;
-
-    // Reportar errores reales (no AbortError) en un solo toast resumido.
-    const errs = results
-        .filter(r => r.status === 'rejected' && r.reason?.name !== 'AbortError')
-        .map(r => r.reason?.message || String(r.reason));
-    if (errs.length) showToast('Error: ' + errs[0], 'error');
+    // 2) UNA sola petición al endpoint combinado pa_dashboard.php — devuelve
+    //    los 4 bloques (gauge/seccion/evolucion/maquinas) tras una única
+    //    iteración del rango (con memoización in-process de dayShiftDetail).
+    try {
+        const data = await cargarDashboard(sig);
+        if (sig.aborted) return;
+        pintarDashboard(data);
+    } catch (e) {
+        if (sig.aborted || e?.name === 'AbortError') return;
+        showToast('Error: ' + (e?.message || e), 'error');
+    }
 
     paShowLoading(false);
 
-    // 3) Módulo 5: vuelve a estado perezoso. Si está en pantalla, el
+    // 3) Una vez consumido el ciclo, los siguientes fetches (incluido el
+    //    módulo 5) vuelven a comportamiento normal: usar cache si vale.
+    _paForceNextFetch = false;
+
+    // 4) Módulo 5: vuelve a estado perezoso. Si está en pantalla, el
     //    IntersectionObserver disparará la recarga automáticamente.
     resetDetallePerezoso();
+}
+
+// Acción del botón "Refrescar": vacía cache y recarga todos los módulos.
+// Si el módulo 5 ya estaba cargado y visible, se recarga también.
+function onRefrescarClick() {
+    paInvalidarCache();
+    const m5 = document.getElementById('pa-module-5');
+    const detalleEstabaCargado = !!_paDetalleLoaded;
+    cargarTodo().then(() => {
+        if (detalleEstabaCargado) {
+            cargarDetalleConAbort();
+        }
+    });
 }
 
 // ───── Init ──────────────────────────────────────────────────────────
@@ -883,6 +944,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     attachInfoIcon('#info-icon', () => _gaugeMeta);
     $('#pa-clear-filter')?.addEventListener('click', onClearFilter);
+    $('#pa-refresh-btn')?.addEventListener('click', onRefrescarClick);
     // Delegación: cualquier ✕ dentro de chips
     $('#pa-active-filter-chips')?.addEventListener('click', (e) => {
         const btn = e.target.closest('.pa-chip-x');

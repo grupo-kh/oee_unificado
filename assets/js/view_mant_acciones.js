@@ -196,9 +196,13 @@ async function apiCall(action, opts = {}) {
 async function cargarMaquinas() {
     showLoader(true);
     try {
-        const d = await apiCall('maquinas');
+        // Modo: 'activas' (default) | 'pausadas' (vista exclusiva para
+        // técnico desde mant_acciones_pausadas.php).
+        const modo = (window.__ACCIONES_MODO || 'activas');
+        const d = await apiCall('maquinas', { query: { modo } });
         _accMaquinas = d.maquinas || [];
-        document.getElementById('acc-counter').textContent = _accMaquinas.length + ' máquinas';
+        const sufijo = modo === 'pausadas' ? ' máquinas pausadas' : ' máquinas';
+        document.getElementById('acc-counter').textContent = _accMaquinas.length + sufijo;
         renderMaquinas();
     } catch (e) {
         showToast('Error: ' + e.message, 'error');
@@ -459,10 +463,16 @@ async function abrirModalTareas(cod, desc) {
     showModal('acc-modal');
 
     try {
-        const d = await apiCall('tareas', { query: { cod } });
+        // En el modo "pausadas" solo queremos ver las tareas pausadas de
+        // la máquina, no las activas — pasamos el modo al endpoint.
+        const modo  = (window.__ACCIONES_MODO || 'activas');
+        const query = { cod };
+        if (modo === 'pausadas') query.modo = 'pausadas';
+        const d = await apiCall('tareas', { query });
         _accTareas         = d.tareas || [];
         _accPeriodicidades = d.periodicidades || [];
-        document.getElementById('acc-tareas-count').textContent = _accTareas.length + ' tareas';
+        const sufijoTar = modo === 'pausadas' ? ' tareas pausadas' : ' tareas';
+        document.getElementById('acc-tareas-count').textContent = _accTareas.length + sufijoTar;
         renderTareas();
     } catch (e) {
         showToast('Error: ' + e.message, 'error');
@@ -1098,6 +1108,26 @@ document.addEventListener('DOMContentLoaded', () => {
         window.location.href = ACC_API.replace('mant_acciones.php', 'mant_acciones_export.php')
             + '?cod=' + encodeURIComponent(_accMaquinaActiva.cod);
     });
+    // ⏱ Ver tiempos: abre popup con el tiempo del plan completo de esta máquina
+    document.getElementById('acc-tiempos-btn')?.addEventListener('click', () => {
+        if (!_accMaquinaActiva) { showToast('Selecciona una máquina primero', 'error'); return; }
+        abrirAccTiemposModal(_accMaquinaActiva.cod, _accMaquinaActiva.desc);
+    });
+    // ⬇ Tiempos XLSX: descarga el Excel de tiempos solo de esta máquina
+    document.getElementById('acc-tiempos-xlsx-btn')?.addEventListener('click', () => {
+        if (!_accMaquinaActiva) { showToast('Selecciona una máquina primero', 'error'); return; }
+        window.open('../api/mant_proximas_tiempos_export.php?cod_maquina_mant='
+            + encodeURIComponent(_accMaquinaActiva.cod), '_blank', 'noopener');
+    });
+    // Cerrar el popup de tiempos
+    document.getElementById('acc-tiempos-modal-close')?.addEventListener('click', cerrarAccTiemposModal);
+    document.getElementById('acc-tiempos-modal-backdrop')?.addEventListener('click', cerrarAccTiemposModal);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const m = document.getElementById('acc-tiempos-modal');
+            if (m && m.style.display !== 'none') cerrarAccTiemposModal();
+        }
+    });
     document.getElementById('acc-edit-machine-btn').addEventListener('click', abrirFormularioEdicionMaquina);
     document.getElementById('acc-delete-machine-btn').addEventListener('click', borrarMaquina);
 
@@ -1130,3 +1160,132 @@ document.addEventListener('DOMContentLoaded', () => {
 
     cargarMaquinas();
 });
+
+/* ════════════ Popup · Tiempos por máquina (solo plan completo) ════════════
+   Muestra el tiempo total estimado de TODAS las tareas activas de esta
+   máquina. No incluye "pendiente ahora" porque desde Acciones por Máquina
+   lo que interesa es el coste total del plan, no lo que toca hoy.
+═══════════════════════════════════════════════════════════════════════ */
+function _accFmtMin(min) {
+    min = parseInt(min, 10) || 0;
+    if (min <= 0) return '0 min';
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    if (h === 0) return min + ' min';
+    if (m === 0) return h + ' h';
+    return h + ' h ' + m + ' min';
+}
+
+function abrirAccTiemposModal(codMaq, descMaq) {
+    const modal = document.getElementById('acc-tiempos-modal');
+    if (!modal) return;
+    document.getElementById('acc-tiempos-modal-title').textContent = descMaq + ' · ' + codMaq;
+    const body = document.getElementById('acc-tiempos-modal-body');
+    body.innerHTML = '<div class="mant-empty">Cargando…</div>';
+    modal.style.display = '';
+    modal.setAttribute('aria-hidden', 'false');
+
+    fetch('../api/mant_proximas_tiempos.php?cod_maquina_mant=' + encodeURIComponent(codMaq),
+          { cache: 'no-store' })
+        .then(r => r.json())
+        .then(j => {
+            if (!j.ok) throw new Error(j.error || 'Error');
+            const m = (j.data.maquinas && j.data.maquinas[0]) || null;
+            if (!m) {
+                body.innerHTML = '<div class="mant-empty">Sin tareas activas en esta máquina.</div>';
+                return;
+            }
+            body.innerHTML = _renderAccTiemposHtml(m);
+        })
+        .catch(e => {
+            body.innerHTML = '<div class="mant-empty" style="color:#c8102e">Error: ' + escHtml(e.message || e) + '</div>';
+        });
+}
+
+function _renderAccTiemposHtml(m) {
+    const planH = _accFmtMin(m.plan_total_minutos);
+
+    // Botón descarga XLSX de esta máquina
+    const xlsxUrl = '../api/mant_proximas_tiempos_export.php?cod_maquina_mant='
+                  + encodeURIComponent(m.cod_maquina_mant);
+    const downloadBtn = `
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+            <a href="${xlsxUrl}" target="_blank" rel="noopener"
+               style="display:inline-flex;align-items:center;gap:6px;background:#10b981;color:#fff;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;box-shadow:0 1px 3px rgba(16,185,129,0.30)">
+                ⬇ Descargar XLSX de esta máquina
+            </a>
+        </div>
+    `;
+
+    // Tarjeta única "Plan completo" (no mostramos pendiente desde aquí)
+    const stats = `
+        <div style="background:#eef3f8;border-left:4px solid #1a4a7a;padding:14px 18px;border-radius:6px;margin-bottom:16px">
+            <div style="font-size:11px;font-weight:700;color:#1a4a7a;text-transform:uppercase;letter-spacing:0.4px">Tiempo total para el plan completo</div>
+            <div style="font-size:28px;font-weight:800;color:#1a2d4a;margin-top:4px">${escHtml(planH)}</div>
+            <div style="font-size:13px;color:#5b6f86">${m.plan_total_tareas} tarea${m.plan_total_tareas === 1 ? '' : 's'} preventiva${m.plan_total_tareas === 1 ? '' : 's'} activa${m.plan_total_tareas === 1 ? '' : 's'}</div>
+        </div>
+    `;
+
+    // Desglose por periodicidad (solo plan)
+    let perBlock = '';
+    const pers = Object.keys(m.por_periodicidad || {});
+    if (pers.length) {
+        const rows = pers.map(p => {
+            const d = m.por_periodicidad[p];
+            return `<tr>
+                <td style="font-weight:700;color:#1a4a7a">${escHtml(p)}</td>
+                <td>${d.plan_n}</td>
+                <td>${escHtml(_accFmtMin(d.plan_min))}</td>
+            </tr>`;
+        }).join('');
+        perBlock = `
+            <h4 style="font-size:13px;color:#1a2d4a;margin:14px 0 6px;text-transform:uppercase;letter-spacing:0.5px">Desglose por periodicidad</h4>
+            <table class="mant-table tiempos-tbl-per" style="margin-bottom:14px">
+                <thead><tr>
+                    <th>Periodicidad</th>
+                    <th>Tareas</th>
+                    <th>Tiempo total</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        `;
+    }
+
+    // Lista de tareas activas (sin columna "Estado", solo plan)
+    let tareasBlock = '';
+    if (Array.isArray(m.tareas) && m.tareas.length) {
+        const rows = m.tareas.map(t => {
+            const pxStr = t.proxima_revision
+                ? (t.proxima_revision.split('-').reverse().join('/'))
+                : '—';
+            return `<tr>
+                <td><strong>${escHtml(t.tarea)}</strong></td>
+                <td><span class="mant-pill mant-pill-${(t.periodicidad||'').toLowerCase()}">${escHtml(t.periodicidad)}</span></td>
+                <td>${escHtml(t.desc_tarea)}</td>
+                <td style="font-weight:600">${t.tiempo_min ? t.tiempo_min + ' min' : '—'}</td>
+                <td>${pxStr}</td>
+            </tr>`;
+        }).join('');
+        tareasBlock = `
+            <h4 style="font-size:13px;color:#1a2d4a;margin:14px 0 6px;text-transform:uppercase;letter-spacing:0.5px">Tareas activas (${m.tareas.length})</h4>
+            <table class="mant-table tiempos-tbl-task">
+                <thead><tr>
+                    <th>Tarea</th>
+                    <th>Periodicidad</th>
+                    <th>Descripción</th>
+                    <th>Estimado</th>
+                    <th>Próxima</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        `;
+    }
+    return downloadBtn + stats + perBlock + tareasBlock;
+}
+
+function cerrarAccTiemposModal() {
+    const modal = document.getElementById('acc-tiempos-modal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+}

@@ -41,13 +41,13 @@ try {
     ?>
     <style>
         body { font-family: DejaVuSans, sans-serif; color:#1a2d4a; font-size: 10pt; }
-        h1 { color:#8C181A; font-size:14pt; margin:0 0 6px 0; }
-        h2.section { color:#8C181A; font-size:13pt; margin:18px 0 6px 0; border-bottom:1px solid #d4a0a1; padding-bottom:3px; }
-        .meta { background:#fdf5f5; border:1px solid #f0d0d0; color:#2d4d7a; padding:6px 10px; border-radius:4px; margin:0 0 10px 0; font-size:9pt; }
-        .meta strong { color:#8C181A; }
+        h1 { color:#3a6aa3; font-size:14pt; margin:0 0 6px 0; }
+        h2.section { color:#3a6aa3; font-size:13pt; margin:18px 0 6px 0; border-bottom:1px solid #d4a0a1; padding-bottom:3px; }
+        .meta { background:#eef3f8; border:1px solid #f0d0d0; color:#2d4d7a; padding:6px 10px; border-radius:4px; margin:0 0 10px 0; font-size:9pt; }
+        .meta strong { color:#3a6aa3; }
         table.hist, table.cmp { width:100%; border-collapse:collapse; font-size:9pt; }
         table.hist thead th, table.cmp thead th {
-            background:#8C181A; color:#fff; border:1px solid #6D1214; padding:5px 6px; text-align:center;
+            background:#3a6aa3; color:#fff; border:1px solid #1a4a7a; padding:5px 6px; text-align:center;
         }
         table.hist tbody td, table.cmp tbody td { border:1px solid #e6c8c8; padding:4px 6px; }
         table.hist tbody td.num, table.cmp tbody td.num { text-align:right; font-variant-numeric:tabular-nums; }
@@ -59,9 +59,9 @@ try {
         .panel td {
             border:1px solid #c89191; padding:6px 10px; font-size:9pt; vertical-align:top;
         }
-        .panel .t { font-weight:700; font-size:8.5pt; text-transform:uppercase; color:#6D1214; letter-spacing:.3px; }
+        .panel .t { font-weight:700; font-size:8.5pt; text-transform:uppercase; color:#1a4a7a; letter-spacing:.3px; }
         .panel .v { font-size:13pt; font-weight:700; color:#1a2d4a; }
-        .panel .sub { font-size:8pt; color:#6D1214; margin-top:2px; }
+        .panel .sub { font-size:8pt; color:#1a4a7a; margin-top:2px; }
         .panel td.best  { border-color:#10b981; } .panel td.best  .v { color:#10b981; }
         .panel td.worst { border-color:#f59e0b; } .panel td.worst .v { color:#f59e0b; }
         .panel td.avg   { border-color:#3a6aa3; } .panel td.avg   .v { color:#3a6aa3; }
@@ -139,7 +139,7 @@ try {
             </div>
 
             <?php if (count($ranking) > 1): ?>
-                <h3 style="color:#6D1214; font-size:10pt; margin:8px 0 4px 0;">Ranking de máquinas (sumando todas las OFs del rango)</h3>
+                <h3 style="color:#1a4a7a; font-size:10pt; margin:8px 0 4px 0;">Ranking de máquinas (sumando todas las OFs del rango)</h3>
                 <table class="cmp" style="margin-bottom:10px;">
                     <thead>
                         <tr>
@@ -206,9 +206,9 @@ try {
             $pNok = $tAll > 0 ? $tNok / $tAll * 100 : 0;
             $isBest = ($idx === 0 && count($ranking) > 1);
         ?>
-            <h3 style="color:#1a2d4a; font-size:11pt; margin:14px 0 4px 0; background:#fdf5f5; border-left:4px solid <?= $isBest ? '#10b981' : '#8c181a' ?>; padding:4px 8px;">
+            <h3 style="color:#1a2d4a; font-size:11pt; margin:14px 0 4px 0; background:#eef3f8; border-left:4px solid <?= $isBest ? '#10b981' : '#3a6aa3' ?>; padding:4px 8px;">
                 Máquina: <strong><?= _refHistH($m['maquina']) ?></strong> <?= $isBest ? '🏅' : '' ?>
-                <span style="font-weight:400; font-size:9pt; color:#6d1214;">
+                <span style="font-weight:400; font-size:9pt; color:#1a4a7a;">
                     · <?= count($cells) ?> OF<?= count($cells) === 1 ? '' : 's' ?>
                 </span>
             </h3>
@@ -249,7 +249,7 @@ try {
                     </tr>
                 </thead>
                 <tbody>
-                    <tr style="background:#fdf5f5; font-weight:700;">
+                    <tr style="background:#eef3f8; font-weight:700;">
                         <td class="num"><?= _refHistFmtF($maxV) ?></td>
                         <td class="num"><?= _refHistFmtF($minV) ?></td>
                         <td class="num"><?= _refHistFmtF($avgV) ?></td>

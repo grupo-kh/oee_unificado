@@ -7,6 +7,13 @@ let _fHasta = '';
 let _selMaq = '';
 let _selOp  = '';
 let _selPer = '';
+// Modo de visualización de tareas pausadas en el listado por máquina:
+//   'ocultas' (default) — no se renderizan
+//   'solo'              — se muestran SOLO las pausadas
+let _modoPausadas = 'ocultas';
+// Filtro rápido activo (para resaltar el botón). Valores: '', 'semana', 'mes',
+// 'mes_ant', 'pausadas'.
+let _quickActive = '';
 
 function getQueryParam(name) {
     const u = new URLSearchParams(window.location.search);
@@ -30,18 +37,42 @@ function escHtml(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+function _fmtDateISO(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+}
+
 function defaultFechas() {
-    // Por defecto el histórico arranca el 1 de enero del año en curso.
-    // Útil para que el usuario vea de un vistazo las intervenciones del año.
+    // Por defecto el histórico arranca el día 1 del mes en curso hasta hoy.
     const hoy = new Date();
-    const desde = new Date(hoy.getFullYear(), 0, 1); // 1 enero año en curso
-    const fmt = d => {
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        return `${y}-${m}-${dd}`;
+    const desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    return { desde: _fmtDateISO(desde), hasta: _fmtDateISO(hoy) };
+}
+
+// Rangos para los botones de filtro rápido.
+function rangoSemanaActual() {
+    // Lunes de la semana actual → hoy.
+    const hoy = new Date();
+    const dow = hoy.getDay();              // 0=dom, 1=lun, …, 6=sáb
+    const diff = (dow === 0 ? -6 : 1 - dow); // lunes
+    const lun = new Date(hoy);
+    lun.setDate(hoy.getDate() + diff);
+    return { desde: _fmtDateISO(lun), hasta: _fmtDateISO(hoy) };
+}
+function rangoMesActual() {
+    const hoy = new Date();
+    return {
+        desde: _fmtDateISO(new Date(hoy.getFullYear(), hoy.getMonth(), 1)),
+        hasta: _fmtDateISO(hoy),
     };
-    return { desde: fmt(desde), hasta: fmt(hoy) };
+}
+function rangoMesAnterior() {
+    const hoy = new Date();
+    const ini = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+    const fin = new Date(hoy.getFullYear(), hoy.getMonth(), 0); // último día mes anterior
+    return { desde: _fmtDateISO(ini), hasta: _fmtDateISO(fin) };
 }
 
 function populate(selId, items, valueKey, textKey, current, placeholder) {
@@ -56,6 +87,30 @@ function populate(selId, items, valueKey, textKey, current, placeholder) {
             o.value = it[valueKey];
             o.textContent = textKey ? (it[textKey] + ' (' + it[valueKey] + ')') : it[valueKey];
         }
+        sel.appendChild(o);
+    });
+    sel.value = current || '';
+}
+
+// Desplegable de operarios: formato "CODIGO - Nombre" (código primero para
+// identificación rápida). Acepta objetos {numero, nombre} o strings sueltos.
+function populateOperarios(selId, items, current) {
+    const sel = document.getElementById(selId);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— Todos —</option>';
+    (items || []).forEach(it => {
+        let codigo = '';
+        let nombre = '';
+        if (typeof it === 'string') {
+            codigo = it;
+        } else if (it && typeof it === 'object') {
+            codigo = String(it.numero || it.codigo || '');
+            nombre = String(it.nombre || '');
+        }
+        if (codigo === '') return;
+        const o = document.createElement('option');
+        o.value = codigo;
+        o.textContent = nombre !== '' ? (codigo + ' - ' + nombre) : codigo;
         sel.appendChild(o);
     });
     sel.value = current || '';
@@ -126,6 +181,15 @@ function _renderInterventionsHtml(interventions, ctx) {
     }).join('');
 }
 
+// Aplica el modo de pausadas:
+//   - 'ocultas' → quita las tareas con t.pausada=true
+//   - 'solo'    → conserva SOLO las tareas pausadas
+function _filtrarPausadas(tasks) {
+    if (!Array.isArray(tasks)) return [];
+    if (_modoPausadas === 'solo')    return tasks.filter(t =>  t.pausada);
+    /* ocultas */                    return tasks.filter(t => !t.pausada);
+}
+
 function _renderTasksHtml(tasks, machineCtx) {
     return tasks.map(t => {
         // Contexto que el popup necesita para mostrar de qué tarea/máquina hablamos
@@ -149,11 +213,15 @@ function _renderTasksHtml(tasks, machineCtx) {
             : `<span class="mant-cod">${escHtml(t.desc_tarea || t.desc_grupo || '')}</span>`;
         const visitWord = isConsol ? 'visita' : 'intervención';
         const visitWordPl = isConsol ? 'visitas' : 'intervenciones';
+        const pausadaBadge = t.pausada
+            ? ` <span class="mant-pausada-badge" title="Tarea pausada el ${escHtml(t.fecha_pausado || '')}">PAUSADA</span>`
+            : '';
+        const blockExtra = t.pausada ? ' mant-task-pausada' : '';
         return `
-            <div class="mant-task-block${isConsol ? ' mant-task-consolidada' : ''}">
+            <div class="mant-task-block${isConsol ? ' mant-task-consolidada' : ''}${blockExtra}">
                 <div class="mant-task-title">
                     <span class="mant-pill mant-pill-${(t.periodicidad||'').toLowerCase()}">${escHtml(t.periodicidad || '—')}</span>
-                    ${titleStrong}
+                    ${titleStrong}${pausadaBadge}
                     ${descHtml}
                     <span class="mant-task-count">· ${t.total_intervenciones} ${t.total_intervenciones === 1 ? visitWord : visitWordPl}</span>
                 </div>
@@ -166,23 +234,32 @@ function _renderTasksHtml(tasks, machineCtx) {
 }
 
 function _renderMachineCard(m, autoOpen, extraClass) {
+    // Aplicamos el filtro de pausadas a las tareas que mostramos en el
+    // desplegable. Esto NO afecta al export XLSX (que toma sus datos del
+    // endpoint directamente, sin pasar por este filtro).
+    const tasksFiltered = _filtrarPausadas(m.tasks);
+    if (!tasksFiltered.length) return '';
     return `
         <div class="mant-machine-card${autoOpen ? ' open' : ''}${extraClass ? ' ' + extraClass : ''}" data-cod="${escHtml(m.cod_maquina_mant)}">
             <div class="mant-machine-header" data-toggle>
                 <span class="mant-toggle">${autoOpen ? '▼' : '▶'}</span>
                 <strong>${escHtml(m.desc_maquina)}</strong>
                 <span class="mant-cod">(${escHtml(m.cod_maquina_mant)})</span>
-                <span class="mant-machine-count">${m.total_intervenciones} intervención${m.total_intervenciones === 1 ? '' : 'es'} · ${m.total_tareas} tarea${m.total_tareas === 1 ? '' : 's'}</span>
+                <span class="mant-machine-count">${m.total_intervenciones} intervención${m.total_intervenciones === 1 ? '' : 'es'} · ${tasksFiltered.length} tarea${tasksFiltered.length === 1 ? '' : 's'}</span>
             </div>
             <div class="mant-machine-body" ${autoOpen ? '' : 'style="display:none"'}>
-                ${_renderTasksHtml(m.tasks, m)}
+                ${_renderTasksHtml(tasksFiltered, m)}
             </div>
         </div>
     `;
 }
 
 function _renderFamilyCard(m, autoOpen) {
-    const childrenHtml = m.children.map(c => _renderMachineCard(c, false, 'mant-machine-card-child')).join('');
+    const childrenHtml = m.children
+        .map(c => _renderMachineCard(c, false, 'mant-machine-card-child'))
+        .filter(h => h !== '')
+        .join('');
+    if (!childrenHtml) return '';
     return `
         <div class="mant-machine-card mant-family-card${autoOpen ? ' open' : ''}" data-family="${escHtml(m.family_key)}">
             <div class="mant-machine-header" data-toggle>
@@ -212,12 +289,18 @@ const _TOP_GROUP_META = {
     TROLEYS: { title: 'TROLEYS', subtitle: 'Carretillas (custodias, puertas, parabrisas / lunetas)', badge: 'GRUPO', color: '#166534' },
 };
 
+// Caché del último listado recibido del API: lo usamos para re-renderizar
+// localmente cuando el usuario toggle-a el filtro de pausadas, sin volver
+// a pedir datos al servidor.
+let _lastMachines = [];
+
 // Render del histórico agrupado en grupos top-level RACKS y TROLEYS. El
 // resto de máquinas se muestran en la raíz sin agrupar (cada una con su
 // propia tarjeta plegable, como antes).
 function renderMachines(machines) {
     const wrap = $('#mant-machines-wrap');
     if (!wrap) return;
+    _lastMachines = machines || [];
     // Reset del índice antes de cada render
     _histInterventionsById = new Map();
     if (!machines || !machines.length) {
@@ -337,11 +420,12 @@ async function cargarVista() {
         const d = await apiFetch('mant_historico.php', params);
 
         populate('machine-selector',     d.maquinas       || [], 'cod_maquina_mant', 'desc_maquina', _selMaq, '— Todas —');
-        populate('operario-selector',    d.operarios      || [], null, null, _selOp,  '— Todos —');
+        populateOperarios('operario-selector', d.operarios || [], _selOp);
         populate('periodicidad-selector', d.periodicidades || [], null, null, _selPer, '— Todas —');
 
         const okMaq = !_selMaq || (d.maquinas || []).some(m => m.cod_maquina_mant === _selMaq);
-        const okOp  = !_selOp  || (d.operarios || []).includes(_selOp);
+        const opCodes = (d.operarios || []).map(o => (typeof o === 'string' ? o : (o.numero || '')));
+        const okOp  = !_selOp  || opCodes.includes(_selOp);
         const okPer = !_selPer || (d.periodicidades || []).includes(_selPer);
         if (!okMaq) { _selMaq = ''; $('#machine-selector').value = ''; updateUrlParams({ cod_maquina_mant: '' }); }
         if (!okOp)  { _selOp  = ''; $('#operario-selector').value = ''; updateUrlParams({ operario: '' }); }
@@ -397,6 +481,27 @@ function onClearFilters() {
     $('#operario-selector').value = '';
     $('#periodicidad-selector').value = '';
     updateUrlParams({ cod_maquina_mant: '', operario: '', periodicidad: '' });
+    cargarVista();
+}
+
+// Pinta el botón rápido activo (resaltado) y desactiva los demás.
+function _resaltarBotonRapido(key) {
+    document.querySelectorAll('.mant-quick-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.quick === key);
+    });
+}
+
+function onQuickFilter(key) {
+    let r;
+    if      (key === 'semana')  r = rangoSemanaActual();
+    else if (key === 'mes_ant') r = rangoMesAnterior();
+    else                        r = rangoMesActual(); // 'mes'
+    _fDesde = r.desde; _fHasta = r.hasta;
+    $('#f-desde').value = _fDesde;
+    $('#f-hasta').value = _fHasta;
+    updateUrlParams({ fecha_desde: _fDesde, fecha_hasta: _fHasta });
+    _quickActive = key;
+    _resaltarBotonRapido(_quickActive);
     cargarVista();
 }
 
@@ -562,6 +667,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnXlsx = $('#btn-export-xlsx');
     if (btnCsv)  btnCsv.addEventListener('click',  () => exportarHistorico('csv'));
     if (btnXlsx) btnXlsx.addEventListener('click', () => exportarHistorico('xlsx'));
+
+    // Botones de filtro rápido (Semana / Mes / Mes anterior / Pausadas)
+    document.querySelectorAll('.mant-quick-btn').forEach(b => {
+        b.addEventListener('click', () => onQuickFilter(b.dataset.quick));
+    });
+    // Por defecto resaltamos "Mes actual" al cargar (es el rango por defecto)
+    _quickActive = 'mes';
+    _resaltarBotonRapido(_quickActive);
 
     // Listeners del popup de edición (solo se disparan si existen los elementos
     // — los elementos están envueltos en role-tecnico-only por CSS).

@@ -9,6 +9,26 @@ $mantUserRole = Auth::role();
 $mantUserName = Auth::user();
 include __DIR__ . '/../includes/header.php';
 ?>
+<style>
+    .mant-quick-filters { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .mant-quick-label   { font-size:12px; color:#5b6f86; font-weight:600; }
+    .mant-quick-btn {
+        background:#eef2f6; border:1px solid #c5d2e0; color:#2d4d7a;
+        padding:6px 12px; font-size:12px; font-weight:600;
+        border-radius:4px; cursor:pointer; transition:all .15s;
+    }
+    .mant-quick-btn:hover { background:#dbe7f3; border-color:#a3b8d1; }
+    .mant-quick-btn.active { background:#2d4d7a; color:#fff; border-color:#2d4d7a; }
+    .mant-quick-btn-pausadas { background:#fff8e6; border-color:#f0c674; color:#7a5b1b; }
+    .mant-quick-btn-pausadas:hover { background:#fde9c5; border-color:#d6a542; }
+    .mant-quick-btn-pausadas.active { background:#c8102e; color:#fff; border-color:#c8102e; }
+    .mant-task-pausada { opacity:.85; background:#fff7ed; border-left:3px solid #f0c674; }
+    .mant-pausada-badge {
+        display:inline-block; background:#c8102e; color:#fff;
+        padding:1px 6px; border-radius:3px; font-size:10px; font-weight:700;
+        margin-left:6px; letter-spacing:.3px;
+    }
+</style>
 
 <main class="view-main">
     <div class="view-card">
@@ -28,6 +48,12 @@ include __DIR__ . '/../includes/header.php';
                         <label>Hasta</label>
                         <input type="date" id="f-hasta" class="machine-selector">
                     </div>
+                </div>
+                <div class="mant-filters-group mant-quick-filters">
+                    <span class="mant-quick-label">Filtro rápido:</span>
+                    <button type="button" class="mant-quick-btn" data-quick="semana">Semana actual</button>
+                    <button type="button" class="mant-quick-btn" data-quick="mes">Mes actual</button>
+                    <button type="button" class="mant-quick-btn" data-quick="mes_ant">Mes anterior</button>
                 </div>
                 <div class="mant-filters-group mant-filters-selects">
                     <div class="mant-filter">

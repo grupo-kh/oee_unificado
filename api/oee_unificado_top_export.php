@@ -418,16 +418,16 @@ try {
     $html = '<html><head><style>
         body { font-family: Arial, sans-serif; font-size: 11px; color:#1a2d4a; }
         h1   { background:#1a2d4a; color:#fff; padding:8px 12px; margin:0 0 6px 0; font-size:16px; }
-        h2   { background:#8c181a; color:#fff; padding:5px 10px; margin:14px 0 4px 0; font-size:12px; page-break-after: avoid; }
+        h2   { background:#3a6aa3; color:#fff; padding:5px 10px; margin:14px 0 4px 0; font-size:12px; page-break-after: avoid; }
         .meta { color:#2d4d7a; margin-bottom:10px; font-size:11px; }
         table { width:100%; border-collapse: collapse; }
         th, td { border:1px solid #b0bec9; padding:5px 8px; }
         th { background:#e6ecf3; font-weight:bold; text-align:center; }
         td.num { text-align:right; font-variant-numeric: tabular-nums; }
-        td.rank { text-align:center; font-weight:bold; color:#8c181a; }
+        td.rank { text-align:center; font-weight:bold; color:#3a6aa3; }
         .empty-row { text-align:center; font-style:italic; color:#6b7d99; }
         .bar-wrap { width:100%; height:14px; background:#eef2f7; border:1px solid #d5dfe8; padding:0; }
-        .bar-fill { height:14px; background:#8c181a; }
+        .bar-fill { height:14px; background:#3a6aa3; }
         .hist-section { page-break-inside: avoid; margin-bottom: 10px; }
     </style></head><body>';
     $html .= '<h1>' . htmlspecialchars($titulo, ENT_QUOTES) . '</h1>';

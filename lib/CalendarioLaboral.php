@@ -70,6 +70,15 @@ class CalendarioLaboral
 
     private static ?array $festivosIdx = null;
 
+    /**
+     * Excepciones BD cargadas perezosamente:
+     *   ['YYYY-MM-DD' => 'NO_LABORABLE' | 'LABORABLE_EXTRA']
+     *
+     * Una vez cargadas, cualquier modificación desde la UI debe invocar
+     * resetExcepcionesCache() para forzar la recarga en peticiones futuras.
+     */
+    private static ?array $excepciones = null;
+
     private static function idx(): array
     {
         if (self::$festivosIdx === null) {
@@ -79,12 +88,56 @@ class CalendarioLaboral
     }
 
     /**
-     * true si $iso (YYYY-MM-DD) es lunes-viernes y NO está en la lista
-     * de festivos.
+     * Carga las excepciones desde mant_calendario_excepciones (si la tabla
+     * existe y PostgreSQL está activo). Es resiliente: si la migración 015
+     * todavía no se ha aplicado, devuelve array vacío sin lanzar.
+     */
+    private static function excepciones(): array
+    {
+        if (self::$excepciones !== null) return self::$excepciones;
+        self::$excepciones = [];
+        if (!defined('MANT_USE_PG') || MANT_USE_PG !== true) return self::$excepciones;
+        try {
+            // Db está disponible si MANT_USE_PG=true. Cargamos require_once por seguridad.
+            if (!class_exists('Db')) require_once __DIR__ . '/Db.php';
+            $rows = Db::pgFetchAll(
+                "SELECT to_char(fecha, 'YYYY-MM-DD') AS f, tipo FROM mant_calendario_excepciones"
+            );
+            foreach ($rows as $r) {
+                self::$excepciones[(string)$r['f']] = (string)$r['tipo'];
+            }
+        } catch (Throwable $e) {
+            // tabla no existente o BD caída → sin excepciones, seguimos con reglas básicas
+            self::$excepciones = [];
+        }
+        return self::$excepciones;
+    }
+
+    /**
+     * Limpia la caché de excepciones. Debe llamarse desde el store cuando
+     * se crea/edita/borra una excepción para que las peticiones siguientes
+     * vean el cambio sin esperar a un reinicio de PHP.
+     */
+    public static function resetExcepcionesCache(): void
+    {
+        self::$excepciones = null;
+    }
+
+    /**
+     * true si $iso (YYYY-MM-DD) es día hábil para mantenimiento.
+     *
+     * Lógica (las excepciones BD mandan sobre las reglas por defecto):
+     *   1. Si BD dice LABORABLE_EXTRA → es hábil (incluso si es sábado/festivo CV).
+     *   2. Si BD dice NO_LABORABLE     → no es hábil (incluso si es L-V normal).
+     *   3. En otro caso, regla por defecto: L-V + no en festivos CV hardcoded.
      */
     public static function esDiaHabil(string $iso): bool
     {
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $iso)) return false;
+        $excIdx = self::excepciones();
+        if (isset($excIdx[$iso])) {
+            return $excIdx[$iso] === 'LABORABLE_EXTRA';
+        }
         $ts = strtotime($iso);
         if ($ts === false) return false;
         $dow = (int) date('N', $ts);  // 1=lun … 7=dom

@@ -177,15 +177,15 @@ try {
 <html lang="es">
 <head><meta charset="UTF-8"><style>
     body { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 9pt; color: #1a2d4a; }
-    h1 { color: #8c181a; font-size: 16pt; margin: 0 0 4pt; }
-    h2 { color: #8c181a; font-size: 12pt; margin: 14pt 0 6pt; border-bottom: 1px solid #d4a0a1; padding-bottom: 3pt; }
+    h1 { color: #3a6aa3; font-size: 16pt; margin: 0 0 4pt; }
+    h2 { color: #3a6aa3; font-size: 12pt; margin: 14pt 0 6pt; border-bottom: 1px solid #d4a0a1; padding-bottom: 3pt; }
     h2.first { margin-top: 4pt; }
-    .filter-bar { background: #fdf5f5; border: 1px solid #d4a0a1; padding: 6pt 8pt; font-size: 9pt; margin-bottom: 10pt; border-radius: 3pt; }
-    .filter-bar b { color: #8c181a; }
+    .filter-bar { background: #eef3f8; border: 1px solid #d4a0a1; padding: 6pt 8pt; font-size: 9pt; margin-bottom: 10pt; border-radius: 3pt; }
+    .filter-bar b { color: #3a6aa3; }
     table.data { width: 100%; border-collapse: collapse; margin: 4pt 0 0; }
-    table.data th { background: #8c181a; color: #fff; padding: 4pt 6pt; font-weight: bold; font-size: 9pt; text-align: center; border: 1px solid #6d1214; }
+    table.data th { background: #3a6aa3; color: #fff; padding: 4pt 6pt; font-weight: bold; font-size: 9pt; text-align: center; border: 1px solid #1a4a7a; }
     table.data td { padding: 3pt 6pt; border: 1px solid #d8d8d8; font-size: 9pt; }
-    table.data tr.global td { background: #fdf5f5; font-weight: bold; }
+    table.data tr.global td { background: #eef3f8; font-weight: bold; }
     table.data td.r { text-align: right; }
     table.data td.c { text-align: center; }
     .two-cols { width: 100%; }
@@ -195,7 +195,7 @@ try {
     .meses-grid td { font-size: 8pt; padding: 2pt 3pt; }
     .seccion-info { font-size: 8pt; color: #2d4d7a; margin: -2pt 0 4pt; font-style: italic; }
     /* Portada / resumen visual */
-    .portada { border: 2pt solid #8c181a; border-radius: 4pt; padding: 12pt 14pt; margin: 6pt 0 14pt; }
+    .portada { border: 2pt solid #3a6aa3; border-radius: 4pt; padding: 12pt 14pt; margin: 6pt 0 14pt; }
     .portada h1 { font-size: 20pt; text-align: center; margin: 0 0 8pt; }
     .portada .stamp { text-align: center; color: #5a6b80; font-style: italic; font-size: 9pt; margin-bottom: 12pt; }
     .portada .block { margin-bottom: 10pt; }

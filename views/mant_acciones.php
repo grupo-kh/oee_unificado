@@ -7,21 +7,43 @@ if (!Auth::isTecnico()) {
     exit;
 }
 
-$pageTitle    = 'Mantenimiento · Acciones por Máquina';
+// Modo de listado: 'activas' (default) o 'pausadas' (acceso exclusivo
+// para técnico — el tile correspondiente solo aparece con rol técnico).
+$modo = (string)($_GET['modo'] ?? 'activas');
+if (!in_array($modo, ['activas','pausadas'], true)) $modo = 'activas';
+
+$pageTitle    = $modo === 'pausadas'
+    ? 'Mantenimiento · Máquinas pausadas'
+    : 'Mantenimiento · Acciones por Máquina';
 $backLink     = 'mantenimiento.php';
 $hideFiltros  = true;
 $mantUserRole = Auth::role();
 $mantUserName = Auth::user();
 include __DIR__ . '/../includes/header.php';
 ?>
+<script>
+    // El JS lee este flag global para pedir al API "activas" o "pausadas".
+    window.__ACCIONES_MODO = <?= json_encode($modo) ?>;
+</script>
 
 <main class="view-main">
     <div class="view-card">
         <div class="view-card-header">
-            <h2>Acciones preventivas por máquina</h2>
+            <h2><?= $modo === 'pausadas' ? 'Máquinas pausadas' : 'Acciones preventivas por máquina' ?></h2>
             <span class="view-card-info" id="info-line">—</span>
         </div>
         <div class="view-card-body">
+
+            <?php if ($modo === 'pausadas'): ?>
+            <div style="background:#fff8e1;border-left:5px solid #f59e0b;padding:12px 16px;margin-bottom:14px;border-radius:6px;font-size:13.5px;color:#6b3f00">
+                <strong style="color:#92400e">⏸ Máquinas con tareas preventivas pausadas</strong> ·
+                Aquí ves todas las máquinas que tienen al menos una tarea preventiva pausada,
+                agrupadas por máquina. Las tareas pausadas no aparecen en el panel general ni
+                se cuentan en cumplimiento. Para reanudar una tarea, abre la ficha de la
+                máquina, edita la tarea y vacía el campo "Fecha de pausado".
+                <a href="mant_acciones.php" style="float:right;color:#92400e;text-decoration:underline;font-weight:700">← Volver al panel principal</a>
+            </div>
+            <?php endif; ?>
 
             <div class="acc-toolbar">
                 <div class="acc-search-box">
@@ -86,6 +108,12 @@ include __DIR__ . '/../includes/header.php';
                 <button type="button" class="acc-btn acc-btn-secondary" id="acc-export-btn" title="Exportar a Excel las acciones preventivas de esta máquina">
                     &#x2B07; XLSX
                 </button>
+                <button type="button" class="acc-btn acc-btn-secondary" id="acc-tiempos-btn" title="Ver el tiempo total estimado de todas las tareas de esta máquina">
+                    &#x23F1; Ver tiempos
+                </button>
+                <button type="button" class="acc-btn acc-btn-secondary" id="acc-tiempos-xlsx-btn" title="Descargar Excel con los tiempos estimados de esta máquina" style="background:#1a4a7a;color:#fff">
+                    &#x2B07; Tiempos XLSX
+                </button>
             </div>
 
             <div class="acc-table-wrap">
@@ -109,6 +137,48 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- Modal · alta / edición de tarea -->
+<!-- Modal · Tiempos por máquina (solo plan completo, sin pendientes) -->
+<div id="acc-tiempos-modal" class="mant-modal" style="display:none" aria-hidden="true">
+    <div class="mant-modal-backdrop" id="acc-tiempos-modal-backdrop"></div>
+    <div class="mant-modal-dialog" role="dialog" aria-modal="true">
+        <div class="mant-modal-header">
+            <span>⏱ Tiempo del plan completo · <span id="acc-tiempos-modal-title">—</span></span>
+            <button type="button" class="mant-modal-close" id="acc-tiempos-modal-close" aria-label="Cerrar">×</button>
+        </div>
+        <div class="mant-modal-body" id="acc-tiempos-modal-body">
+            <div class="mant-empty">Cargando…</div>
+        </div>
+    </div>
+</div>
+<style>
+/* Reutilizamos los mismos anchos del popup de tiempos de mant_proximas.php */
+#acc-tiempos-modal .mant-modal-dialog {
+    width: min(1100px, 96vw);
+    max-width: none;
+    max-height: 92vh;
+}
+#acc-tiempos-modal .mant-modal-body { overflow-x: hidden; overflow-y: auto; }
+#acc-tiempos-modal .mant-table { width: 100%; table-layout: auto; border-collapse: collapse; }
+#acc-tiempos-modal .mant-table th,
+#acc-tiempos-modal .mant-table td {
+    padding: 6px 8px; word-wrap: break-word; overflow-wrap: anywhere; font-size: 12.5px;
+}
+#acc-tiempos-modal .tiempos-tbl-per th:nth-child(1),
+#acc-tiempos-modal .tiempos-tbl-per td:nth-child(1) { width: 28%; }
+#acc-tiempos-modal .tiempos-tbl-per th:nth-child(n+2),
+#acc-tiempos-modal .tiempos-tbl-per td:nth-child(n+2) { width: 36%; text-align: right; }
+#acc-tiempos-modal .tiempos-tbl-task th:nth-child(1),
+#acc-tiempos-modal .tiempos-tbl-task td:nth-child(1) { width: 72px; }
+#acc-tiempos-modal .tiempos-tbl-task th:nth-child(2),
+#acc-tiempos-modal .tiempos-tbl-task td:nth-child(2) { width: 110px; }
+#acc-tiempos-modal .tiempos-tbl-task th:nth-child(3),
+#acc-tiempos-modal .tiempos-tbl-task td:nth-child(3) { width: auto; }
+#acc-tiempos-modal .tiempos-tbl-task th:nth-child(4),
+#acc-tiempos-modal .tiempos-tbl-task td:nth-child(4) { width: 78px; text-align: right; }
+#acc-tiempos-modal .tiempos-tbl-task th:nth-child(5),
+#acc-tiempos-modal .tiempos-tbl-task td:nth-child(5) { width: 96px; text-align: center; }
+</style>
+
 <div id="acc-form-modal" class="acc-modal" aria-hidden="true">
     <div class="acc-modal-backdrop" id="acc-form-backdrop"></div>
     <div class="acc-modal-dialog acc-modal-form" role="dialog" aria-modal="true">

@@ -17,7 +17,7 @@ Auth::requireLogin();
 <title>Manual de usuario · KH Mantenimiento</title>
 <style>
     :root {
-        --kh-red: #8c181a;
+        --kh-red: #3a6aa3;
         --kh-black: #1a1a1a;
         --kh-bg: #ffffff;
         --kh-text: #1c1c1c;
@@ -58,7 +58,7 @@ Auth::requireLogin();
         border-radius: 4px;
         letter-spacing: 0.4px;
     }
-    .toolbar button:hover { background: #a52125; }
+    .toolbar button:hover { background: #5b8cc7; }
 
     .page {
         max-width: 840px;

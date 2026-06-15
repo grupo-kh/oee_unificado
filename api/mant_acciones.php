@@ -50,10 +50,16 @@ try {
 
     switch ($action) {
         case 'maquinas': {
-            $rows = MaintenancePlanStore::listMaquinasConContador();
+            // Modo: 'activas' (default) | 'pausadas' | 'todas'
+            // En el panel normal solo aparecen las activas. Las pausadas se
+            // listan en views/mant_acciones_pausadas.php (solo técnico).
+            $modo = (string)getParam('modo', 'activas');
+            if (!in_array($modo, ['activas','pausadas','todas'], true)) $modo = 'activas';
+            $rows = MaintenancePlanStore::listMaquinasConContador($modo);
             jsonOk([
                 'maquinas' => $rows,
                 'total'    => count($rows),
+                'modo'     => $modo,
             ]);
             break;
         }
@@ -63,7 +69,24 @@ try {
             if ($cod === '') jsonError('Falta parámetro cod (cod_maquina_mant)');
             // consolidar=0 fuerza vista detallada incluso para racks/plataformas
             $consolidar = (string)getParam('consolidar', '1') !== '0';
+            // modo='pausadas' → solo tareas con fecha_pausado IS NOT NULL.
+            // Cualquier otro valor (default 'todas') no filtra.
+            $modoTareas = (string)getParam('modo', 'todas');
             $rows = MaintenancePlanStore::listTareasByMaquina($cod, $consolidar);
+            if ($modoTareas === 'pausadas') {
+                $rows = array_values(array_filter($rows, function ($t) {
+                    // Tarea pausada directa, o "consolidada-virtual" con
+                    // TODAS sus sub-tareas pausadas.
+                    if (!empty($t['fecha_pausado'])) return true;
+                    if (!empty($t['consolidada']) && !empty($t['sub_tareas'])) {
+                        foreach ($t['sub_tareas'] as $s) {
+                            if (empty($s['fecha_pausado'])) return false;
+                        }
+                        return true;
+                    }
+                    return false;
+                }));
+            }
             $descMaq = $rows ? (string)$rows[0]['desc_maquina'] : '';
             jsonOk([
                 'cod_maquina_mant' => $cod,

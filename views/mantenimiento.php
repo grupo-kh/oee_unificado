@@ -20,10 +20,25 @@ include __DIR__ . '/../includes/header.php';
         <p class="intro-text">Elige una vista del panel Mantenimiento</p>
     </div>
 
+    <?php
+    // Acceso oculto a "Máquinas pausadas": solo si el usuario es técnico,
+    // la etiqueta de la sección "Mantenimiento Preventivo" actúa como
+    // enlace al panel de pausadas. Para el operario es texto inerte.
+    if (Auth::isTecnico()):
+    ?>
+    <a href="mant_acciones.php?modo=pausadas"
+       class="home-section-title home-section-title-oee"
+       style="text-decoration:none; cursor:pointer"
+       title="Acceso técnico · Máquinas pausadas">
+        <span>Mantenimiento Preventivo</span>
+        <small>Plan de revisiones · cumplimiento · histórico</small>
+    </a>
+    <?php else: ?>
     <div class="home-section-title home-section-title-oee">
         <span>Mantenimiento Preventivo</span>
         <small>Plan de revisiones · cumplimiento · histórico</small>
     </div>
+    <?php endif; ?>
 
     <div class="home-grid">
 
@@ -133,6 +148,71 @@ include __DIR__ . '/../includes/header.php';
             <div class="tile-body">
                 <h2>Histórico por Máquina <span class="tile-badge">dinámico</span></h2>
                 <p>Lista de intervenciones realizadas en un periodo, filtrable por máquina/operario</p>
+            </div>
+            <div class="tile-arrow">→</div>
+        </a>
+
+        <!-- Gestión de operarios: solo rol técnico (la clase role-tecnico-only
+             la oculta vía CSS si el usuario es operario). -->
+        <a href="mant_operarios.php" class="tile tile-mant-operarios role-tecnico-only">
+            <div class="tile-icon">
+                <svg viewBox="0 0 100 60" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <!-- Tres siluetas (operarios) -->
+                    <circle cx="30" cy="22" r="7"  fill="#2d4d7a"/>
+                    <path  d="M16 50 q14 -14 28 0" fill="#2d4d7a"/>
+                    <circle cx="55" cy="20" r="8"  fill="#3a6aa3"/>
+                    <path  d="M40 52 q15 -16 30 0" fill="#3a6aa3"/>
+                    <circle cx="78" cy="22" r="7"  fill="#5b8cc7"/>
+                    <path  d="M64 50 q14 -14 28 0" fill="#5b8cc7"/>
+                    <!-- Tick de capacitación -->
+                    <path d="M88 12 l-6 6 -3 -3" stroke="#10b981" stroke-width="3" fill="none"/>
+                </svg>
+            </div>
+            <div class="tile-body">
+                <h2>Gestión de operarios <span class="tile-badge">técnico</span></h2>
+                <p>Alta/baja de operarios, puesto y capacitación (25/50/75/100% + Racks). Define quién está habilitado para cada tarea preventiva.</p>
+            </div>
+            <div class="tile-arrow">→</div>
+        </a>
+
+        <!-- Calendario laboral: solo rol técnico -->
+        <a href="mant_calendario.php" class="tile tile-mant-calendario role-tecnico-only">
+            <div class="tile-icon">
+                <svg viewBox="0 0 100 60" fill="none">
+                    <!-- Cabecera roja del calendario -->
+                    <rect x="14" y="8" width="72" height="14" rx="3" fill="#c8102e"/>
+                    <rect x="14" y="22" width="72" height="32" rx="0 0 3 3" fill="#fff" stroke="#5b8cc7" stroke-width="1.5"/>
+                    <rect x="14" y="50" width="72" height="4" fill="#fff" stroke="#5b8cc7" stroke-width="1.5"/>
+                    <!-- Anillas -->
+                    <line x1="28" y1="4"  x2="28" y2="14" stroke="#2d4d7a" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="72" y1="4"  x2="72" y2="14" stroke="#2d4d7a" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Filas de días -->
+                    <rect x="20" y="28" width="6" height="5" fill="#3a6aa3"/>
+                    <rect x="28" y="28" width="6" height="5" fill="#3a6aa3"/>
+                    <rect x="36" y="28" width="6" height="5" fill="#3a6aa3"/>
+                    <rect x="44" y="28" width="6" height="5" fill="#3a6aa3"/>
+                    <rect x="52" y="28" width="6" height="5" fill="#3a6aa3"/>
+                    <rect x="60" y="28" width="6" height="5" fill="#bbf7d0"/>
+                    <rect x="68" y="28" width="6" height="5" fill="#fde68a"/>
+                    <rect x="20" y="36" width="6" height="5" fill="#3a6aa3"/>
+                    <rect x="28" y="36" width="6" height="5" fill="#fde68a"/>
+                    <rect x="36" y="36" width="6" height="5" fill="#3a6aa3"/>
+                    <rect x="44" y="36" width="6" height="5" fill="#3a6aa3"/>
+                    <rect x="52" y="36" width="6" height="5" fill="#3a6aa3"/>
+                    <rect x="60" y="36" width="6" height="5" fill="#3a6aa3"/>
+                    <rect x="68" y="36" width="6" height="5" fill="#3a6aa3"/>
+                    <rect x="20" y="44" width="6" height="5" fill="#3a6aa3"/>
+                    <rect x="28" y="44" width="6" height="5" fill="#3a6aa3"/>
+                    <rect x="36" y="44" width="6" height="5" fill="#3a6aa3"/>
+                    <rect x="44" y="44" width="6" height="5" fill="#3a6aa3"/>
+                    <rect x="52" y="44" width="6" height="5" fill="#3a6aa3"/>
+                    <rect x="60" y="44" width="6" height="5" fill="#3a6aa3"/>
+                    <rect x="68" y="44" width="6" height="5" fill="#3a6aa3"/>
+                </svg>
+            </div>
+            <div class="tile-body">
+                <h2>Calendario laboral <span class="tile-badge">técnico</span></h2>
+                <p>Define días no laborables extra (puentes, festivos de empresa) o habilita sábados/domingos. Las tareas planificadas se recalculan automáticamente.</p>
             </div>
             <div class="tile-arrow">→</div>
         </a>

@@ -46,3 +46,9 @@ scripts/diag_*.php
 
 # ─── Scripts con credenciales locales hardcoded ───
 tools/reset_postgres_password.ps1
+
+# ─── Secreto de firma de tokens QR (NO debe ir al repo) ───
+config/qr_secret.dat
+
+# Compañero visual de brainstorming (superpowers)
+.superpowers/

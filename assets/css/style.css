@@ -191,7 +191,7 @@ a { text-decoration: none; color: inherit; }
     gap: 6px;
     padding: 0 14px;
     height: 44px;
-    background: #8c181a;
+    background: #3a6aa3;
     color: #fff !important;
     border-radius: var(--radius);
     margin-left: 12px;
@@ -203,7 +203,7 @@ a { text-decoration: none; color: inherit; }
     text-decoration: none;
 }
 .btn-manual:hover {
-    background: #a52125;
+    background: #5b8cc7;
     transform: scale(1.04);
     box-shadow: 0 2px 8px rgba(140, 24, 26, 0.30);
 }
@@ -1147,10 +1147,50 @@ html { scroll-padding-top: calc(var(--pa-stick-top, 64px) + 10px); }
     padding: 40px;
     font-size: 14px;
 }
-/* Body de los módulos 2 y 3: altura fija para los gráficos */
+/* Body de los módulos 2 y 3: altura proporcional al viewport
+   ─ ~50% de la altura útil de la ventana, con mínimos para pantallas pequeñas
+     y máximos para que no se desboquen en monitores muy verticales. */
 .pa-module-body { padding: 20px 24px; min-height: 0; }
-#chart-seccion-big   { width: 100%; height: 720px; }
-#chart-evolucion-big { width: 100%; height: 720px; }
+/* "Cumplimiento por Sección" — el doble de alto que el resto: ocupa casi
+   toda la ventana al hacer scroll, con mínimo de 760 px para pantallas
+   pequeñas. */
+#chart-seccion-big   { width: 100%; height: 95vh; min-height: 760px; max-height: 100vh; }
+#chart-evolucion-big { width: 100%; height: 50vh; min-height: 380px; max-height: 70vh; }
+
+/* Módulo 5 — Detalle Plan vs Producido: que se adapte a la altura
+   restante de la ventana con scroll interno para mostrar el máximo de
+   filas posible sin desplazar el resto de la página. */
+#detalle-articulos {
+    max-height: calc(100vh - 180px);
+    min-height: 320px;
+    overflow: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--radius);
+    background: #ffffff;
+}
+.pa-module-5 .pa-module-body { padding: 12px 16px; }
+
+/* Botón "Refrescar" en la cabecera propia. Tono verde corporativo, con icono. */
+.pa-refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: linear-gradient(180deg, #16a34a 0%, #15803d 100%);
+    border: 1px solid #14532d;
+    color: #ffffff;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.12);
+    transition: transform .08s ease, filter .12s ease;
+}
+.pa-refresh-btn:hover  { filter: brightness(1.08); }
+.pa-refresh-btn:active { transform: translateY(1px); }
+.pa-refresh-btn svg    { display: block; }
 
 /* Hint del header ("clic en una barra...") */
 .pa-hint {
@@ -1499,7 +1539,7 @@ html { scroll-padding-top: calc(var(--pa-stick-top, 64px) + 10px); }
 .top-n-input { min-width: 70px; max-width: 90px; }
 .top-aplicar-btn {
     padding: 6px 14px;
-    background: #8c181a;
+    background: #3a6aa3;
     color: #fff;
     border: none;
     border-radius: 4px;
@@ -1507,7 +1547,7 @@ html { scroll-padding-top: calc(var(--pa-stick-top, 64px) + 10px); }
     cursor: pointer;
     font-size: 12px;
 }
-.top-aplicar-btn:hover { background: #a82124; }
+.top-aplicar-btn:hover { background: #5b8cc7; }
 
 /* Exclusión de máquinas dentro del bloque Top máquinas */
 .top-excl-wrap {
@@ -1528,12 +1568,12 @@ html { scroll-padding-top: calc(var(--pa-stick-top, 64px) + 10px); }
     font-weight: 600;
 }
 .top-excl-toggle:hover { background: #f4f7fb; }
-.top-excl-toggle.open { background: #fdf5f5; border-color: #8c181a; color: #8c181a; }
+.top-excl-toggle.open { background: #fdf5f5; border-color: #3a6aa3; color: #3a6aa3; }
 .top-excl-count {
     display: inline-block;
     min-width: 18px;
     text-align: center;
-    background: #8c181a;
+    background: #3a6aa3;
     color: #fff;
     border-radius: 9px;
     padding: 0 6px;
@@ -1621,13 +1661,13 @@ html { scroll-padding-top: calc(var(--pa-stick-top, 64px) + 10px); }
     border: 1px solid #e1c9c4;
     border-radius: 12px;
     font-size: 11px;
-    color: #8c181a;
+    color: #3a6aa3;
     font-weight: 600;
 }
 .top-excl-chip-remove {
     background: transparent;
     border: none;
-    color: #8c181a;
+    color: #3a6aa3;
     cursor: pointer;
     font-size: 14px;
     line-height: 1;
@@ -1740,10 +1780,10 @@ html { scroll-padding-top: calc(var(--pa-stick-top, 64px) + 10px); }
     user-select: none;
 }
 .motivo-por-chip:has(input:checked) {
-    background: #8c181a;
+    background: #3a6aa3;
     color: #fff;
 }
-.motivo-por-chip input { accent-color: #8c181a; }
+.motivo-por-chip input { accent-color: #3a6aa3; }
 
 /* Subtítulo "Evolución OEE" con selector de sección a la derecha */
 .evolucion-subtitle {
@@ -1762,7 +1802,7 @@ html { scroll-padding-top: calc(var(--pa-stick-top, 64px) + 10px); }
 }
 .evolucion-seccion-wrap select { min-width: 130px; }
 .evolucion-seccion-wrap #evolucion-seccion-label {
-    color: #8c181a;
+    color: #3a6aa3;
     font-weight: 700;
     padding: 2px 8px;
     background: #fff;
@@ -2137,7 +2177,7 @@ html { scroll-padding-top: calc(var(--pa-stick-top, 64px) + 10px); }
 }
 .tile-mant-mobile .tile-icon {
     background: linear-gradient(135deg, #1d1d1d 0%, #0d0d0d 100%);
-    border: 1px solid #8c181a;
+    border: 1px solid #3a6aa3;
 }
 
 /* Icono del tile "Manual de uso" — fondo morado suave que destaca por ser
@@ -2167,7 +2207,7 @@ html { scroll-padding-top: calc(var(--pa-stick-top, 64px) + 10px); }
     top: 14px;
     right: -34px;
     transform: rotate(38deg);
-    background: #8c181a;
+    background: #3a6aa3;
     color: #fff;
     font-size: 10px;
     font-weight: 800;
@@ -2854,6 +2894,68 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 .mant-row-vencida:hover { background: #ffe8eb; }
 .mant-row-urgente   { background: #fffaf0; }
 .mant-row-urgente:hover { background: #fff2dd; }
+.mant-machine-group-row {
+    background: #ffffff;
+    cursor: pointer;
+}
+.mant-machine-group-row td {
+    border-top: 2px solid #d5dfe8;
+    vertical-align: middle;
+}
+.mant-machine-group-row td:nth-child(5) {
+    min-width: 280px;
+    white-space: normal;
+}
+.mant-machine-group-row:hover td { background: #eef3f8; }
+.mant-machine-group-vencida td:first-child { border-left: 4px solid #c8102e; }
+.mant-machine-group-urgente td:first-child { border-left: 4px solid #f59e0b; }
+.mant-machine-group-en_plazo td:first-child { border-left: 4px solid #10b981; }
+.mant-group-toggle,
+.mant-group-open-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #b8c7d8;
+    background: #ffffff;
+    color: #1a4a7a;
+    border-radius: 4px;
+    font-weight: 800;
+    cursor: pointer;
+}
+.mant-group-toggle {
+    width: 24px;
+    height: 24px;
+    margin-right: 8px;
+}
+.mant-group-open-btn {
+    min-width: 82px;
+    padding: 6px 10px;
+    font-size: 12px;
+}
+.mant-group-toggle:hover,
+.mant-group-open-btn:hover {
+    background: #1a4a7a;
+    color: #ffffff;
+    border-color: #1a4a7a;
+}
+.mant-machine-detail-row > td {
+    padding: 0 0 12px 0 !important;
+    background: #f8fafc;
+}
+.mant-machine-detail {
+    margin: 0 12px 12px 52px;
+    border: 1px solid #d5dfe8;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: inset 4px 0 0 #c8d2dd;
+}
+.mant-machine-detail-table thead th {
+    background: #eef3f8;
+    color: #1a2d4a;
+}
+.mant-machine-detail-table tbody td {
+    background: #ffffff;
+}
 .mant-dias {
     font-weight: 700;
     white-space: nowrap;
@@ -3356,7 +3458,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     font-weight: 700; letter-spacing: 0.3px; display: inline-block;
 }
 /* Bloqueo temporal: vigente (rojo), pendiente futuro (gris azulado), terminado (verde apagado) */
-.acc-tag-bloqueada    { background: #8c181a; color: #fff; }
+.acc-tag-bloqueada    { background: #3a6aa3; color: #fff; }
 .acc-tag-bloqueo-pend { background: #475569; color: #e2e8f0; }
 .acc-tag-bloqueo-end  { background: #166534; color: #ecfccb; opacity: 0.75; }
 
@@ -3405,8 +3507,8 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 .mant-tipo-opt input[type="radio"] { accent-color: #2d4d7a; }
 .mant-tipo-opt:has(input[value="no_realizada"]:checked) {
     background: #fdf5f5;
-    border-color: #8c181a;
-    color: #8c181a;
+    border-color: #3a6aa3;
+    color: #3a6aa3;
 }
 
 /* Filas consolidadas (rack / plataforma) en el planificador */
@@ -3749,20 +3851,32 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     font-weight: 700;
 }
 .mant-grp-pill {
-    padding: 3px 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 84px;
+    margin: 2px 5px 2px 0;
+    padding: 4px 10px;
     border-radius: 12px;
     font-size: 11px;
     font-weight: 700;
+    line-height: 1.15;
+    white-space: nowrap;
 }
 .mant-grp-pill-venc { background: #fee2e2; color: #c8102e; }
 .mant-grp-pill-urg  { background: #fef3c7; color: #b45309; }
 .mant-grp-pill-enp  { background: #d1fae5; color: #065f46; }
+.mant-grp-pill-total { background: #e0eefb; color: #1a4a7a; }
+.mant-grp-pill-ok    { background: #d1fae5; color: #065f46; }
+.mant-grp-pill-ko    { background: #fee2e2; color: #991b1b; }
 .mant-grp-pill-pend {
     background: #c8102e;
     color: #ffffff;
     border: 2px solid #8b0000;
-    padding: 2px 9px;
+    min-width: 118px;
+    padding: 3px 10px;
 }
+.mant-grp-pill-ko { min-width: 132px; }
 
 /* Stat: pendientes (mismo estilo que vencidas, en rojo intenso) */
 .mant-stat-pendientes {
@@ -4211,25 +4325,25 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     border-color: var(--kh-red);
 }
 
-/* ─── OEE Unificado: tema corporativo #8c181a ─── */
+/* ─── OEE Unificado: tema corporativo #3a6aa3 ─── */
 .oee-uni-corp .view-card-header {
-    background: linear-gradient(135deg, #8c181a 0%, #a52225 100%);
+    background: linear-gradient(135deg, #3a6aa3 0%, #5b8cc7 100%);
 }
 .oee-uni-corp .drill-down-title,
 .oee-uni-corp .oee-detalle-subtitle {
-    color: #8c181a;
+    color: #3a6aa3;
 }
 .oee-uni-corp .drill-down-title span {
-    color: #8c181a;
+    color: #3a6aa3;
 }
 .oee-uni-corp .drill-down-close {
-    border-color: #8c181a;
-    color: #8c181a;
+    border-color: #3a6aa3;
+    color: #3a6aa3;
 }
 .oee-uni-corp .drill-down-close:hover {
-    background: #8c181a;
+    background: #3a6aa3;
     color: #fff;
-    border-color: #8c181a;
+    border-color: #3a6aa3;
 }
 .oee-uni-corp .drill-down-block {
     border-top-color: #d4a0a1;
@@ -4238,7 +4352,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     border-color: #d4a0a1;
 }
 .oee-uni-corp .seccion-hint {
-    color: #8c181a;
+    color: #3a6aa3;
 }
 .oee-uni-corp .oee-uni-filtros {
     background: linear-gradient(135deg, #fdf5f5, #f5e6e6);
@@ -4246,8 +4360,8 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 }
 
 /* ───── Histórico por referencia ───── */
-.ref-hist-view .view-card-header h2 { color: #8c181a; }
-.ref-hist-view .ref-hist-h-sub      { color: #6d1214; font-weight: 400; }
+.ref-hist-view .view-card-header h2 { color: #3a6aa3; }
+.ref-hist-view .ref-hist-h-sub      { color: #1a4a7a; font-weight: 400; }
 .ref-hist-block {
     background: #ead7d4;
     border: 1px solid #d4a0a1;
@@ -4255,7 +4369,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     padding: 14px 16px 16px 16px;
 }
 .ref-hist-block .oee-detalle-subtitle {
-    color: #6d1214;
+    color: #1a4a7a;
     border-bottom-color: #d4a0a1;
 }
 .ref-hist-export-row {
@@ -4281,14 +4395,14 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     font-family: inherit;
     font-weight: 600;
     background: #fff;
-    color: #8c181a;
+    color: #3a6aa3;
     border: 1px solid #c89191;
     border-radius: 10px;
     padding: 2px 9px;
     cursor: pointer;
     transition: background .12s ease, color .12s ease, border-color .12s ease;
 }
-.of-chip:hover { background: #8c181a; color: #fff; border-color: #6d1214; }
+.of-chip:hover { background: #3a6aa3; color: #fff; border-color: #1a4a7a; }
 .of-chip:disabled, .of-chip[aria-disabled="true"] {
     cursor: default;
     color: #999;
@@ -4322,23 +4436,23 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     padding-bottom: 8px;
     margin-bottom: 6px;
 }
-.of-popup-head h3 { margin: 0; color: #8c181a; font-size: 16px; }
+.of-popup-head h3 { margin: 0; color: #3a6aa3; font-size: 16px; }
 .of-popup-close {
     background: transparent;
     border: none;
     font-size: 22px;
     line-height: 1;
-    color: #8c181a;
+    color: #3a6aa3;
     cursor: pointer;
     padding: 0 6px;
 }
-.of-popup-close:hover { color: #6d1214; }
+.of-popup-close:hover { color: #1a4a7a; }
 .of-popup-sub {
     font-size: 13px;
     color: #2d4d7a;
     margin: 4px 0 10px 0;
 }
-.of-popup-sub strong { color: #8c181a; }
+.of-popup-sub strong { color: #3a6aa3; }
 .of-popup-chart { min-height: 380px; }
 .of-popup-loading {
     text-align: center;
@@ -4348,7 +4462,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 }
 .of-popup-empty {
     text-align: center;
-    color: #6d1214;
+    color: #1a4a7a;
     font-style: italic;
     padding: 30px 0;
 }
@@ -4365,8 +4479,8 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     padding-bottom: 6px;
     margin-bottom: 10px;
 }
-.ref-comp-head h3 { margin: 0 0 2px 0; color: #6d1214; font-size: 15px; }
-.ref-comp-head small { color: #8c181a; font-weight: 400; }
+.ref-comp-head h3 { margin: 0 0 2px 0; color: #1a4a7a; font-size: 15px; }
+.ref-comp-head small { color: #3a6aa3; font-weight: 400; }
 .ref-comp-overall {
     display: flex;
     align-items: flex-start;
@@ -4387,7 +4501,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     letter-spacing: .5px;
 }
 .ref-comp-overall-title small {
-    color: #6d1214;
+    color: #1a4a7a;
     font-weight: 400;
     text-transform: none;
     letter-spacing: 0;
@@ -4403,7 +4517,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 .ref-comp-overall-ranking { margin-top: 8px; }
 .ref-comp-overall-rank-title {
     font-size: 11px;
-    color: #6d1214;
+    color: #1a4a7a;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: .4px;
@@ -4421,9 +4535,9 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 }
 .ref-comp-overall-rank-item:last-child { border-bottom: none; }
 .ref-comp-overall-rank-item.is-best { color: #10b981; font-weight: 700; }
-.ref-comp-overall-rank-item .rk-pos { font-weight: 700; color: #8c181a; }
+.ref-comp-overall-rank-item .rk-pos { font-weight: 700; color: #3a6aa3; }
 .ref-comp-overall-rank-item .rk-val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
-.ref-comp-overall-rank-item .rk-pct { text-align: right; font-size: 11px; color: #6d1214; }
+.ref-comp-overall-rank-item .rk-pct { text-align: right; font-size: 11px; color: #1a4a7a; }
 .ref-comp-machines {
     display: flex;
     flex-direction: column;
@@ -4446,7 +4560,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 .ref-comp-machine-axis {
     font-size: 10px;
     font-weight: 700;
-    color: #8c181a;
+    color: #3a6aa3;
     letter-spacing: 2px;
     background: #fdf5f5;
     border: 1px solid #c89191;
@@ -4505,7 +4619,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 }
 .cmp-stat-label {
     font-size: 10.5px;
-    color: #6d1214;
+    color: #1a4a7a;
     text-transform: uppercase;
     letter-spacing: .4px;
     font-weight: 700;
@@ -4517,7 +4631,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     font-variant-numeric: tabular-nums;
     margin-top: 1px;
 }
-.cmp-stat-sub { font-size: 10px; color: #8c181a; }
+.cmp-stat-sub { font-size: 10px; color: #3a6aa3; }
 .cmp-stat-max { border-left-color: #2d4d7a; }
 .cmp-stat-min { border-left-color: #f59e0b; }
 .cmp-stat-avg { border-left-color: #3a6aa3; }
@@ -4595,7 +4709,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 .ref-hist-scope {
     flex: 0 0 auto;
     font-size: 11.5px;
-    color: #6d1214;
+    color: #1a4a7a;
     background: #fff;
     border: 1px solid #c89191;
     border-radius: 12px;
@@ -4612,14 +4726,14 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     padding: 2px 10px;
     cursor: pointer;
     font-size: 12px;
-    color: #6d1214;
+    color: #1a4a7a;
     user-select: none;
     white-space: nowrap;
 }
 .ref-hist-multi-toggle:hover { background: #fdf5f5; }
-.ref-hist-multi-toggle input[type=checkbox] { accent-color: #8c181a; cursor: pointer; }
+.ref-hist-multi-toggle input[type=checkbox] { accent-color: #3a6aa3; cursor: pointer; }
 .ref-hist-multi-count {
-    background: #8c181a;
+    background: #3a6aa3;
     color: #fff;
     border-radius: 10px;
     padding: 0 7px;
@@ -4628,7 +4742,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     font-variant-numeric: tabular-nums;
     margin-left: 2px;
 }
-.ref-hist-select option.opt-multi { font-weight: 700; color: #6d1214; }
+.ref-hist-select option.opt-multi { font-weight: 700; color: #1a4a7a; }
 .ref-hist-export-row {
     margin-left: auto;
     display: flex;
@@ -4646,7 +4760,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     font-size: 13px;
     color: #2d4d7a;
 }
-.ref-hist-resumen-item strong { color: #8c181a; }
+.ref-hist-resumen-item strong { color: #3a6aa3; }
 .ref-hist-resumen-ok  span    { color: #10b981; font-weight: 700; font-variant-numeric: tabular-nums; }
 .ref-hist-resumen-nok span    { color: #c8102e; font-weight: 700; font-variant-numeric: tabular-nums; }
 .ref-hist-tabla-wrap {
@@ -4663,14 +4777,14 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     color: #1a2d4a;
 }
 .ref-hist-tabla thead th {
-    background: #8c181a;
+    background: #3a6aa3;
     color: #fff;
     text-align: center;
     padding: 6px 8px;
     position: sticky;
     top: 0;
     z-index: 1;
-    border-bottom: 1px solid #6d1214;
+    border-bottom: 1px solid #1a4a7a;
 }
 .ref-hist-tabla tbody td {
     padding: 5px 8px;
@@ -4687,7 +4801,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     background: #fff;
     border: 1px dashed #c89191;
     border-radius: 4px;
-    color: #6d1214;
+    color: #1a4a7a;
     font-style: italic;
 }
 @media (max-width: 720px) {
@@ -4695,25 +4809,25 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 }
 
 .oee-uni-corp .range-quick {
-    background: #8c181a;
-    border-color: #6d1214;
+    background: #3a6aa3;
+    border-color: #1a4a7a;
     color: #fff;
 }
 .oee-uni-corp .range-quick:hover {
-    background: #6d1214;
+    background: #1a4a7a;
     border-color: #4e0d0e;
 }
 .oee-uni-corp .turno-chip input:checked + span,
 .oee-uni-corp .turno-chip input:checked ~ * {
-    color: #8c181a;
+    color: #3a6aa3;
 }
 .oee-uni-corp .metrica-maq-badge {
     background: #fdf5f5;
     border-color: #d4a0a1;
 }
 .oee-uni-corp .metrica-maq-clear:hover {
-    background: #8c181a;
-    border-color: #8c181a;
+    background: #3a6aa3;
+    border-color: #3a6aa3;
 }
 .oee-uni-corp .metric-legend-compact {
     border-top-color: #d4a0a1;
@@ -4728,10 +4842,10 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 }
 .oee-export-btn {
     padding: 6px 14px;
-    border: 1px solid #8c181a;
+    border: 1px solid #3a6aa3;
     border-radius: 4px;
     background: #fff;
-    color: #8c181a;
+    color: #3a6aa3;
     font-family: Arial, sans-serif;
     font-size: 12px;
     font-weight: 700;
@@ -4742,7 +4856,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     gap: 5px;
 }
 .oee-export-btn:hover {
-    background: #8c181a;
+    background: #3a6aa3;
     color: #fff;
 }
 
@@ -4766,7 +4880,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
-    .oee-uni-corp .view-card-header h2 { color: #8c181a !important; font-size: 16px !important; }
+    .oee-uni-corp .view-card-header h2 { color: #3a6aa3 !important; font-size: 16px !important; }
     .oee-uni-corp .view-card-info,
     .oee-uni-corp .view-card-kpi {
         background: #e8d9d9 !important;
@@ -4802,7 +4916,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     /* Subtítulos + bloques con salto */
     .oee-uni-corp .oee-detalle-subtitle {
         page-break-after: avoid;
-        color: #8c181a !important;
+        color: #3a6aa3 !important;
         margin-top: 6mm !important;
     }
     .oee-uni-corp .drill-down-block,
@@ -4836,7 +4950,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     margin: 8px 0 6px;
     background: #fdf5f5;
     border: 1px solid #d4a0a1;
-    border-left: 4px solid #8c181a;
+    border-left: 4px solid #3a6aa3;
     border-radius: 6px;
     font-family: Arial, sans-serif;
     font-size: 12px;
@@ -4905,7 +5019,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 }
 .maq-excl-label {
     font-weight: 700;
-    color: #8c181a;
+    color: #3a6aa3;
     letter-spacing: 0.2px;
     text-transform: uppercase;
     font-size: 11px;
@@ -4948,14 +5062,14 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     border: none;
     border-radius: 50%;
     background: #f0d9d9;
-    color: #8c181a;
+    color: #3a6aa3;
     font-size: 14px;
     font-weight: 700;
     line-height: 1;
     cursor: pointer;
     transition: background .15s, color .15s;
 }
-.maq-excl-chip-remove:hover { background: #8c181a; color: #fff; }
+.maq-excl-chip-remove:hover { background: #3a6aa3; color: #fff; }
 .maq-excl-clear-all {
     margin-left: auto;
     padding: 4px 10px;
@@ -4964,11 +5078,11 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     border-radius: 14px;
     font-size: 11px;
     font-weight: 700;
-    color: #8c181a;
+    color: #3a6aa3;
     cursor: pointer;
     transition: background .15s, color .15s, border-color .15s;
 }
-.maq-excl-clear-all:hover { background: #8c181a; color: #fff; border-color: #8c181a; }
+.maq-excl-clear-all:hover { background: #3a6aa3; color: #fff; border-color: #3a6aa3; }
 
 /* ─── Selector desplegable de exclusión de máquinas (en la fila de filtros) ─── */
 .maq-excl-toggle {
@@ -4988,7 +5102,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     transition: background .15s, border-color .15s, color .15s;
 }
 .maq-excl-toggle:hover { background: #fdf5f5; border-color: #d4a0a1; }
-.maq-excl-toggle.open  { background: #8c181a; color: #fff; border-color: #8c181a; }
+.maq-excl-toggle.open  { background: #3a6aa3; color: #fff; border-color: #3a6aa3; }
 .maq-excl-toggle-count {
     display: inline-flex;
     align-items: center;
@@ -4997,12 +5111,12 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     height: 18px;
     padding: 0 5px;
     background: #f0d9d9;
-    color: #8c181a;
+    color: #3a6aa3;
     border-radius: 9px;
     font-size: 11px;
     font-weight: 700;
 }
-.maq-excl-toggle.open .maq-excl-toggle-count { background: #fff; color: #8c181a; }
+.maq-excl-toggle.open .maq-excl-toggle-count { background: #fff; color: #3a6aa3; }
 .maq-excl-toggle-caret { font-size: 10px; }
 
 .maq-excl-panel {
@@ -5014,7 +5128,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     max-width: 92vw;
     background: #fff;
     border: 1px solid #c8d2dd;
-    border-top: 3px solid #8c181a;
+    border-top: 3px solid #3a6aa3;
     border-radius: 6px;
     box-shadow: 0 8px 20px rgba(26, 45, 74, .15);
     font-family: Arial, sans-serif;
@@ -5038,7 +5152,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     background: #fff;
     outline: none;
 }
-.maq-excl-search:focus { border-color: #8c181a; }
+.maq-excl-search:focus { border-color: #3a6aa3; }
 .maq-excl-panel-close {
     width: 22px;
     height: 22px;
@@ -5049,7 +5163,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     cursor: pointer;
     border-radius: 4px;
 }
-.maq-excl-panel-close:hover { background: #fdf5f5; color: #8c181a; }
+.maq-excl-panel-close:hover { background: #fdf5f5; color: #3a6aa3; }
 
 .maq-excl-list {
     max-height: 320px;
@@ -5061,7 +5175,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
-    color: #8c181a;
+    color: #3a6aa3;
     background: #fdf5f5;
     letter-spacing: 0.5px;
 }
@@ -5078,7 +5192,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 .maq-excl-item:hover { background: #f4f8fc; }
 .maq-excl-item input[type="checkbox"] {
     margin: 0;
-    accent-color: #8c181a;
+    accent-color: #3a6aa3;
     cursor: pointer;
 }
 .maq-excl-item-name { flex: 1; }
@@ -5096,4 +5210,35 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     .maq-excl-panel { display: none !important; }
 }
 
-
+/* ════════════════════════════════════════════════════════════════════
+   HOME — fondo corporativo degradado #3a6aa3
+   Aplicado SOLO en la home (body con <main class="home-main">) para no
+   afectar al resto de páginas. Si el navegador no soporta :has(), se
+   ignora la regla y queda el fondo azul-gris original.
+   ════════════════════════════════════════════════════════════════════ */
+body:has(main.home-main) {
+    background:
+        radial-gradient(ellipse at 20% 0%, rgba(255,255,255,0.07) 0%, transparent 55%),
+        linear-gradient(160deg, #3a6aa3 0%, #6a1014 55%, #4a0a0d 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+}
+body:has(main.home-main) .home-main {
+    background: transparent;
+}
+/* La línea introductoria queda más visible en blanco sobre el rojo */
+body:has(main.home-main) .intro-text {
+    color: #fff5ee;
+    opacity: 0.92;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+}
+/* Cabeceras de sección: ligera variante para destacar sobre el rojo
+   sin perder identidad (se mantiene el azul corporativo del título). */
+body:has(main.home-main) .home-section-title {
+    background: linear-gradient(90deg, rgba(26,45,74,0.95) 0%, rgba(58,106,163,0.55) 55%, rgba(58,106,163,0.05) 100%);
+    border-left-color: #ffd6a3;     /* dorado suave en vez del rojo (que ahora es el fondo) */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+body:has(main.home-main) .home-section-title small {
+    color: #ffe7d6;
+}

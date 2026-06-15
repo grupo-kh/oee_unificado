@@ -75,6 +75,17 @@ class PlanExcelReader
 
     private static function normalize(string $name): string
     {
+        return self::normalizeDesc($name);
+    }
+
+    /**
+     * Versión pública del normalizador de descripciones de máquina, para
+     * que otros stores (p. ej. OfsStore) puedan traducir Cod/Desc_maquina
+     * de MAPEX al mismo formato que se usa como clave en `pedidos[]` y
+     * `schedule[]` del Excel.
+     */
+    public static function normalizeDesc(string $name): string
+    {
         $key = trim($name);
         $up = mb_strtoupper($key, 'UTF-8');
         return self::MAP_EXCEL_TO_DESC[$up] ?? self::MAP_EXCEL_TO_DESC[$key] ?? $key;

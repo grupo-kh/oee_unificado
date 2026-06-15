@@ -20,7 +20,10 @@ Auth::requireLoginApi();
  */
 try {
     $hoy = date('Y-m-d');
-    $fdesde = getParam('fecha_desde', date('Y-m-d', strtotime('-90 days')));
+    // Por defecto, el rango es el mes actual (día 1 → hoy). Se puede
+    // sobreescribir con los params fecha_desde y fecha_hasta.
+    $primerDiaMes = date('Y-m-01');
+    $fdesde = getParam('fecha_desde', $primerDiaMes);
     $fhasta = getParam('fecha_hasta', $hoy);
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fdesde)) jsonError('fecha_desde inválida');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fhasta)) jsonError('fecha_hasta inválida');
@@ -139,14 +142,29 @@ try {
     // Precargamos un mapa [orden|tarea → tiempo_estimado] de mant_plan para
     // mostrarlo en la cabecera de cada bloque de tarea del histórico.
     $tiempoEstimadoIdx = [];
+    // También cargamos el estado "pausada" por (orden|tarea) para que el
+    // frontend pueda ocultar/aislar las tareas pausadas del listado por
+    // máquina (sin afectar al XLSX descargable, que sí las debe incluir).
+    $pausadasIdx = [];
     try {
-        $teRows = Db::pgFetchAll("SELECT orden, tarea, tiempo_estimado FROM mant_plan WHERE tiempo_estimado IS NOT NULL");
+        $teRows = Db::pgFetchAll(
+            "SELECT orden, tarea, tiempo_estimado,
+                    to_char(fecha_pausado, 'YYYY-MM-DD') AS fecha_pausado
+               FROM mant_plan"
+        );
         foreach ($teRows as $te) {
-            $tiempoEstimadoIdx[((string)$te['orden']) . '|' . ((string)$te['tarea'])] = (int)$te['tiempo_estimado'];
+            $k = ((string)$te['orden']) . '|' . ((string)$te['tarea']);
+            if ($te['tiempo_estimado'] !== null) {
+                $tiempoEstimadoIdx[$k] = (int)$te['tiempo_estimado'];
+            }
+            if (!empty($te['fecha_pausado'])) {
+                $pausadasIdx[$k] = (string)$te['fecha_pausado'];
+            }
         }
     } catch (Throwable $e) {
         // Si la query falla (modo JSON, BD no disponible) seguimos sin ese dato.
         $tiempoEstimadoIdx = [];
+        $pausadasIdx = [];
     }
 
     foreach ($rows as $r) {
@@ -168,6 +186,8 @@ try {
                 'desc_grupo'      => (string)$r['desc_grupo'],
                 'periodicidad'    => (string)$r['periodicidad'],
                 'tiempo_estimado' => $tiempoEstimadoIdx[$tareaKey] ?? null,
+                'pausada'         => isset($pausadasIdx[$tareaKey]),
+                'fecha_pausado'   => $pausadasIdx[$tareaKey] ?? null,
                 'interventions'   => [],
             ];
         }
@@ -375,8 +395,45 @@ try {
     }
     usort($maquinas, fn($a, $b) => strcmp($a['desc_maquina'], $b['desc_maquina']));
 
-    $operarios = array_keys($operariosSet);
-    sort($operarios);
+    // Operarios: enriquecemos con el catálogo mant_operarios (numero+nombre)
+    // para que el desplegable pueda mostrar "1004 - Juan Pérez". Mezclamos:
+    //   - Todos los activos del catálogo (aunque no aparezcan en el rango
+    //     filtrado todavía — el usuario quiere poder elegir cualquier
+    //     operario activo).
+    //   - Los códigos que han aparecido en intervenciones del rango pero
+    //     que no están en el catálogo (legacy / inactivos), para no perderlos.
+    $catActivos = MaintenanceCompletionStore::loadOperariosActivos();
+    $nombrePorCodigo = [];
+    foreach ($catActivos as $c) {
+        $nombrePorCodigo[(string)$c['numero']] = (string)$c['nombre'];
+    }
+    $codigosOut = [];
+    // Primero todos los activos del catálogo
+    foreach ($catActivos as $c) {
+        $codigosOut[(string)$c['numero']] = true;
+    }
+    // Después los códigos vistos en el rango (incluye antiguos no en catálogo)
+    foreach (array_keys($operariosSet) as $cod) {
+        $codigosOut[(string)$cod] = true;
+    }
+    $operarios = [];
+    foreach (array_keys($codigosOut) as $cod) {
+        $nombre = $nombrePorCodigo[$cod] ?? '';
+        $operarios[] = [
+            'numero' => $cod,
+            'nombre' => $nombre,
+        ];
+    }
+    // Orden: primero los que tienen nombre (catálogo) alfabéticamente por
+    // nombre, luego los códigos sin nombre.
+    usort($operarios, function($a, $b) {
+        $an = trim($a['nombre']);
+        $bn = trim($b['nombre']);
+        if ($an !== '' && $bn === '') return -1;
+        if ($an === '' && $bn !== '') return  1;
+        if ($an !== '' && $bn !== '') return strcasecmp($an, $bn);
+        return strcmp($a['numero'], $b['numero']);
+    });
 
     $periodicidades = array_keys($periodicidadesSet);
     sort($periodicidades);

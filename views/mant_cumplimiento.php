@@ -27,13 +27,26 @@ include __DIR__ . '/../includes/header.php';
                     <label for="f-hasta" class="machine-selector-label">Hasta:</label>
                     <input type="date" id="f-hasta" class="machine-selector" style="min-width:150px">
                 </div>
+                <div class="machine-selector-row" style="flex:0 0 auto;gap:4px;flex-wrap:wrap">
+                    <span class="machine-selector-label">Rápido:</span>
+                    <button type="button" class="cumpl-quick" data-range="dia_ant" title="Día anterior"
+                            style="padding:5px 12px;font-size:12px;background:#eef2f6;border:1px solid #c5d2e0;border-radius:4px;cursor:pointer;font-weight:600;color:#2d4d7a">Día ant.</button>
+                    <button type="button" class="cumpl-quick" data-range="sem_ant" title="Semana anterior (lunes → domingo)"
+                            style="padding:5px 12px;font-size:12px;background:#eef2f6;border:1px solid #c5d2e0;border-radius:4px;cursor:pointer;font-weight:600;color:#2d4d7a">Semana ant.</button>
+                    <button type="button" class="cumpl-quick" data-range="1m" title="Día 1 del mes en curso → hoy"
+                            style="padding:5px 12px;font-size:12px;background:#eef2f6;border:1px solid #c5d2e0;border-radius:4px;cursor:pointer;font-weight:600;color:#2d4d7a">1 mes</button>
+                    <button type="button" class="cumpl-quick" data-range="3m" title="Día 1 del mes hace 3 meses → hoy"
+                            style="padding:5px 12px;font-size:12px;background:#eef2f6;border:1px solid #c5d2e0;border-radius:4px;cursor:pointer;font-weight:600;color:#2d4d7a">3 meses</button>
+                    <button type="button" class="cumpl-quick" data-range="6m" title="Día 1 del mes hace 6 meses → hoy"
+                            style="padding:5px 12px;font-size:12px;background:#eef2f6;border:1px solid #c5d2e0;border-radius:4px;cursor:pointer;font-weight:600;color:#2d4d7a">6 meses</button>
+                </div>
                 <div class="machine-selector-row" style="flex:1">
                     <label for="machine-selector" class="machine-selector-label">Máquina:</label>
                     <select id="machine-selector" class="machine-selector">
                         <option value="">— Todas —</option>
                     </select>
                 </div>
-                <button id="filter-clear" class="machine-selector-clear" type="button" style="display:none">× Quitar filtros</button>
+                <button id="filter-clear" class="machine-selector-clear" type="button" title="Quita máquina y deja el rango en día anterior">× Quitar filtros</button>
                 <button id="cumpl-export-xlsx" class="machine-selector-clear" type="button"
                         title="Descargar el informe de cumplimiento en XLSX con los filtros actuales"
                         style="background:#10b981;color:#fff">&#x2B07; Informe XLSX</button>

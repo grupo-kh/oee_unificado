@@ -34,6 +34,12 @@ try {
     }
     $cm = getParam('cod_maquina_mant');
     $pe = getParam('periodicidad');
+    // Rango opcional: si llega, recortamos el detalle a los días dentro de [fd, fh].
+    // El frontend lo manda con los mismos filtros del panel principal.
+    $fd = (string)getParam('fecha_desde', '');
+    $fh = (string)getParam('fecha_hasta', '');
+    if ($fd !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fd)) $fd = '';
+    if ($fh !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fh)) $fh = '';
 
     $items = MaintenanceCompletionStore::loadAll();
     $rows = [];
@@ -70,7 +76,9 @@ try {
         $fpo = (string)($rec['fecha_proxima_original'] ?? '');
         $fi  = (string)($rec['fecha_intervencion']     ?? '');
 
-        // ¿pertenece al mes?
+        // Criterio coherente con el cálculo del cumplimiento global:
+        //   - completada / no_realizada: pertenece al mes de su fpo.
+        //   - recuperacion:              pertenece al mes de su fi.
         $belongs = false;
         if ($tipo === 'recuperacion') {
             if ($fi !== '' && substr($fi, 0, 7) === $mes) $belongs = true;
@@ -78,6 +86,24 @@ try {
             if ($fpo !== '' && substr($fpo, 0, 7) === $mes) $belongs = true;
         }
         if (!$belongs) continue;
+
+        // Filtro de rango opcional (panel principal). Igual que el principal:
+        // exigimos fpo en rango Y (si hay fi) fi también en rango. Para
+        // recuperaciones (no tienen fpo) basta con fi en rango.
+        if ($fd !== '' || $fh !== '') {
+            if ($tipo === 'recuperacion') {
+                if ($fi === ''
+                    || ($fd !== '' && $fi < $fd)
+                    || ($fh !== '' && $fi > $fh)) continue;
+            } else {
+                if ($fpo === ''
+                    || ($fd !== '' && $fpo < $fd)
+                    || ($fh !== '' && $fpo > $fh)) continue;
+                if ($fi !== '') {
+                    if (($fd !== '' && $fi < $fd) || ($fh !== '' && $fi > $fh)) continue;
+                }
+            }
+        }
 
         $rows[] = [
             'id'                     => $rec['id']                     ?? null,
@@ -118,6 +144,12 @@ try {
         $px = (string)($p['proxima_revision'] ?? '');
         if ($px === '' || substr($px, 0, 7) !== $mes) continue;
         if ($px >= $hoy) continue;
+        // Filtro de rango: solo cuentan las vencidas cuya proxima_revision
+        // está dentro del rango filtrado por el panel principal. Sin esto,
+        // el detalle mostraba vencidas que el cálculo global SÍ excluía,
+        // dando "mes 100%" pero un grid con muchas tareas pendientes.
+        if ($fd !== '' && $px < $fd) continue;
+        if ($fh !== '' && $px > $fh) continue;
         $cmP = (string)($p['cod_maquina_mant'] ?? '');
         $peP = (string)($p['periodicidad'] ?? '');
         if ($cm && $cmP !== $cm) continue;
@@ -164,13 +196,93 @@ try {
 
     $cumpl = $tot['denom'] > 0 ? round($tot['numer'] / $tot['denom'] * 100, 2) : null;
 
+    // ── Consolidación por (máquina + fecha efectiva + tipo) ────────────
+    // Aplicada a TODAS las máquinas, no solo RACK/PLATAFORMA/TROLEY: si
+    // varias tareas de la misma máquina se han realizado el mismo día y
+    // son del mismo tipo (completada/no_realizada/recuperación/pendiente),
+    // las agrupamos en una sola fila con un desplegable que detalla
+    // cada sub-tarea hecha. Si la máquina solo tiene 1 tarea en ese día
+    // queda como fila individual normal (no se "consolida" un grupo de uno).
+    //
+    // Convención: tras agrupar, "Revisión completa N tareas" se etiqueta
+    // así cuando es máquina consolidable clásica (RACK/PLATAFORMA/TROLEY);
+    // para el resto el frontend muestra "N tareas" sin la palabra "Revisión".
+    $esClasicaConsolidable = function(string $desc): bool {
+        $s = trim($desc);
+        return preg_match('/^RACK[\s\-]/i', $s)
+            || preg_match('/^PLATAFORMA/i', $s)
+            || preg_match('/^TROLEY/i', $s);
+    };
+
+    // 1) Primer pase: agrupamos en bins por clave.
+    $bins   = [];   // key → [filas]
+    $orden  = [];   // mantiene el orden original de aparición de la clave
+    foreach ($rows as $r) {
+        $fEf = $r['fecha_intervencion'] ?: $r['fecha_proxima_original'];
+        $key = ($r['cod_maquina_mant'] ?? '') . '||' . $fEf . '||' . $r['tipo'];
+        if (!isset($bins[$key])) { $bins[$key] = []; $orden[] = $key; }
+        $bins[$key][] = $r;
+    }
+
+    // 2) Segundo pase: emitir filas finales — consolidadas si bin>1, sino tal cual.
+    $rowsOut = [];
+    foreach ($orden as $key) {
+        $bin = $bins[$key];
+        if (count($bin) === 1) { $rowsOut[] = $bin[0]; continue; }
+
+        // Construcción de la fila consolidada (toma datos comunes del primer
+        // elemento; lista todas las sub-tareas)
+        $first = $bin[0];
+        $desc  = (string)($first['desc_maquina'] ?? '');
+        $consol = [
+            'id'                     => null,
+            'consolidada'            => true,
+            'consolidacion_clasica'  => $esClasicaConsolidable($desc), // RACK/PLATAFORMA/TROLEY
+            'tipo'                   => $first['tipo'],
+            'orden'                  => 'CONSOL:' . ($first['cod_maquina_mant'] ?? ''),
+            'cod_maquina_mant'       => $first['cod_maquina_mant'] ?? '',
+            'desc_maquina'           => $desc,
+            'desc_grupo'             => $esClasicaConsolidable($desc) ? 'Revisión completa' : '',
+            'periodicidad'           => $first['periodicidad'] ?? '',
+            'tarea'                  => 'CONSOL',
+            'desc_tarea'             => '',
+            'fecha_proxima_original' => $first['fecha_proxima_original'] ?? '',
+            'fecha_intervencion'     => $first['fecha_intervencion']     ?? '',
+            'operario'               => '',
+            'observaciones'          => '',
+            'motivo_no_realizada'    => $first['motivo_no_realizada'] ?? '',
+            'recuperada'             => !empty($first['recuperada']),
+            'recuperada_fecha'       => $first['recuperada_fecha']       ?? null,
+            'sub_tareas'             => [],
+            'subtareas_total'        => 0,
+            'periodicidades'         => [],
+        ];
+        foreach ($bin as $r) {
+            $consol['sub_tareas'][] = [
+                'tarea'        => $r['tarea']        ?? '',
+                'desc_tarea'   => $r['desc_tarea']   ?? '',
+                'periodicidad' => $r['periodicidad'] ?? '',
+            ];
+            $consol['subtareas_total']++;
+            $perR = (string)($r['periodicidad'] ?? '');
+            if ($perR !== '' && !in_array($perR, $consol['periodicidades'], true)) {
+                $consol['periodicidades'][] = $perR;
+            }
+            // Primer operario no vacío adoptado por el grupo
+            if (empty($consol['operario']) && !empty($r['operario'])) {
+                $consol['operario'] = $r['operario'];
+            }
+        }
+        $rowsOut[] = $consol;
+    }
+
     jsonOk([
         'mes'              => $mes,
         'cod_maquina_mant' => $cm ?: null,
         'periodicidad'     => $pe ?: null,
         'cumplimiento'     => $cumpl,
         'totales'          => $tot,
-        'rows'             => $rows,
+        'rows'             => $rowsOut,
     ]);
 
 } catch (Exception $e) {

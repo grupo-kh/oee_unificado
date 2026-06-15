@@ -1,4 +1,37 @@
 <?php
+// Garantizar SIEMPRE JSON limpio, incluso ante errores fatales. Sin esto
+// PHP podría devolver respuesta vacía o página HTML de error y el cliente
+// móvil mostraría "respuesta inválida del servidor".
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+set_error_handler(function ($severity, $message, $file, $line) {
+    if (!(error_reporting() & $severity)) return false;
+    if (!headers_sent()) {
+        header('Content-Type: application/json; charset=utf-8');
+        http_response_code(500);
+    }
+    echo json_encode([
+        'ok' => false,
+        'error' => 'PHP error: ' . $message . ' (' . basename($file) . ':' . $line . ')',
+    ]);
+    exit;
+});
+register_shutdown_function(function () {
+    $e = error_get_last();
+    if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)) {
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=utf-8');
+            http_response_code(500);
+        }
+        echo json_encode([
+            'ok' => false,
+            'error' => 'Fatal: ' . $e['message'] . ' (' . basename($e['file']) . ':' . $e['line'] . ')',
+        ]);
+    }
+});
+
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/helpers.php';
 require_once __DIR__ . '/../lib/Auth.php';
@@ -143,6 +176,37 @@ try {
             'total_pending' => count($rows),
             'dias_horizonte' => $dias,
             'hoy'            => $hoy,
+        ]);
+    }
+
+    if ($action === 'tasks_due') {
+        // Lista plana de tareas que el operario debería atender HOY:
+        //   - estado 'vencida' (proxima_revision < hoy)
+        //   - estado 'urgente' con dias_restantes <= dias_horizonte (default 0 = solo hoy)
+        //   - pendientes marcadas manualmente
+        // El prototipo móvil agrupa por estado (vencida / hoy), no por máquina.
+        $qLower = mb_strtolower(trim((string)getParam('q', '')));
+        $vencidas = [];
+        $hoyArr   = [];
+        foreach ($rows as $r) {
+            if ($qLower !== '') {
+                $hay = mb_strtolower(($r['desc_maquina'] ?? '') . ' ' . ($r['cod_maquina_mant'] ?? '') . ' ' . ($r['desc_tarea'] ?? ''));
+                if (mb_strpos($hay, $qLower) === false) continue;
+            }
+            if ($r['estado'] === 'vencida') $vencidas[] = $r;
+            else                            $hoyArr[]   = $r;
+        }
+        // Vencidas ordenadas por más antigua primero
+        usort($vencidas, fn($a, $b) => strcmp((string)$a['proxima_revision'], (string)$b['proxima_revision']));
+        // Caducan hoy: igual
+        usort($hoyArr,   fn($a, $b) => strcmp((string)$a['proxima_revision'], (string)$b['proxima_revision']));
+
+        jsonOk([
+            'vencidas'       => $vencidas,
+            'hoy'            => $hoyArr,
+            'fecha_hoy'      => $hoy,
+            'total_pending'  => count($rows),
+            'dias_horizonte' => $dias,
         ]);
     }
 

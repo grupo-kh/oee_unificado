@@ -422,6 +422,11 @@ async function cargarMesDetalle() {
         const perFilter = _mesActivoOrigen === 'periodicidad' ? _drillPer : null;
         if (perFilter)        params.periodicidad     = perFilter;
         if (_mantCodMaquina)  params.cod_maquina_mant = _mantCodMaquina;
+        // Pasamos también el rango de fechas del panel principal para
+        // que el detalle solo muestre las tareas con fecha efectiva
+        // (intervención o programada) dentro del rango.
+        if (_fDesde)          params.fecha_desde      = _fDesde;
+        if (_fHasta)          params.fecha_hasta      = _fHasta;
 
         const d = await apiFetch('mant_cumplimiento_mes_detalle.php', params);
 
@@ -486,12 +491,41 @@ function renderMesDetalleTabla(rows) {
         const rowClass = (r.tipo === 'no_realizada' || r.tipo === 'vencida_sin_marcar') ? 'mant-row-missed'
                        : r.tipo === 'recuperacion' ? 'mant-row-catchup'
                        : '';
+
+        // Si es consolidada (varias tareas de la misma máquina hechas el
+        // mismo día), mostramos badge con el contador y un <details> con
+        // todas las sub-tareas. Para RACK/PLATAFORMA/TROLEY mantenemos
+        // el texto "Revisión completa"; para el resto la etiqueta es
+        // simplemente "Tareas agrupadas".
+        const isConsol = !!r.consolidada;
+        const isClasica = !!r.consolidacion_clasica;
+        const subTotal = r.subtareas_total || (r.sub_tareas ? r.sub_tareas.length : 0);
+        const perPills = isConsol && Array.isArray(r.periodicidades) && r.periodicidades.length
+            ? r.periodicidades.map(p =>
+                `<span class="mant-pill mant-pill-${String(p).toLowerCase()}">${escHtml(p)}</span>`
+              ).join(' ')
+            : `<span class="mant-pill mant-pill-${(r.periodicidad||'').toLowerCase()}">${escHtml(r.periodicidad)}</span>`;
+        const consolTitulo = isClasica ? 'Revisión completa' : 'Tareas agrupadas';
+        const tareaCol = isConsol
+            ? `<strong>${consolTitulo}</strong> <span class="mant-consol-badge">${subTotal} tareas</span>` +
+              (Array.isArray(r.sub_tareas) && r.sub_tareas.length
+                ? `<details class="mant-subtareas" style="margin-top:4px">
+                       <summary style="cursor:pointer;font-size:11px;color:#5b6f86">Ver las ${subTotal} tareas</summary>
+                       <ul style="margin:6px 0 0 16px;padding:0;font-size:11.5px;color:#5b6f86">
+                           ${r.sub_tareas.map(s =>
+                               `<li><strong>${escHtml(s.tarea)}</strong>${s.desc_tarea ? ': ' + escHtml(s.desc_tarea) : ''}</li>`
+                           ).join('')}
+                       </ul>
+                   </details>`
+                : '')
+            : `${escHtml(r.desc_grupo)}<br><span class="mant-cod">tarea ${escHtml(r.tarea)} · ${escHtml(r.desc_tarea)}</span>`;
+
         return `
-            <tr class="${rowClass}">
+            <tr class="${rowClass}${isConsol ? ' mant-row-consolidada' : ''}">
                 <td>${badge}</td>
                 <td><strong>${escHtml(r.desc_maquina)}</strong><br><span class="mant-cod">(${escHtml(r.cod_maquina_mant)})</span></td>
-                <td><span class="mant-pill mant-pill-${(r.periodicidad||'').toLowerCase()}">${escHtml(r.periodicidad)}</span></td>
-                <td>${escHtml(r.desc_grupo)}<br><span class="mant-cod">tarea ${escHtml(r.tarea)} · ${escHtml(r.desc_tarea)}</span></td>
+                <td>${perPills}</td>
+                <td>${tareaCol}</td>
                 <td class="mant-fecha">${fmtFecha(r.fecha_proxima_original)}</td>
                 <td class="mant-fecha">${fmtFecha(r.fecha_intervencion)}</td>
                 <td><span class="mant-operario">${escHtml(r.operario || '—')}</span></td>
@@ -688,7 +722,14 @@ function onClearFilters() {
     _mantCodMaquina = '';
     $('#machine-selector').value = '';
     updateUrlParams({ cod_maquina_mant: '' });
-    cargarVista();
+    // Tras limpiar, el rango se deja en "día anterior" (decisión del usuario).
+    // Si la función está disponible (definida dentro del IIFE de init), la usamos.
+    const btn = document.querySelector('.cumpl-quick[data-range="dia_ant"]');
+    if (typeof window._aplicarRangoCumpl === 'function') {
+        window._aplicarRangoCumpl('dia_ant', btn);
+    } else {
+        cargarVista();
+    }
 }
 
 // ─── Título dinámico del gauge según el rango filtrado ────────────────────
@@ -807,6 +848,55 @@ document.addEventListener('DOMContentLoaded', () => {
     $('#f-hasta').addEventListener('change', onHastaChange);
     $('#machine-selector').addEventListener('change', onMachineChange);
     const c = $('#filter-clear'); if (c) c.addEventListener('click', onClearFilters);
+
+    // Calcula el rango para un kind dado. Componentes locales (no toISOString)
+    // para que el día 1 no se vaya al último del mes anterior por zona horaria.
+    function _rangoCumplRapido(kind) {
+        const pad = n => String(n).padStart(2, '0');
+        const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+        const hoy = new Date();
+        if (kind === 'dia_ant') {
+            const ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
+            return { desde: fmt(ayer), hasta: fmt(ayer) };
+        }
+        if (kind === 'sem_ant') {
+            // ISO: lunes=1 .. domingo=7. Lunes de ESTA semana = hoy - (dow-1).
+            const dow = hoy.getDay() === 0 ? 7 : hoy.getDay();
+            const lunesEsta = new Date(hoy); lunesEsta.setDate(hoy.getDate() - (dow - 1));
+            const lunesAnt  = new Date(lunesEsta); lunesAnt.setDate(lunesEsta.getDate() - 7);
+            const domingoAnt= new Date(lunesAnt);  domingoAnt.setDate(lunesAnt.getDate() + 6);
+            return { desde: fmt(lunesAnt), hasta: fmt(domingoAnt) };
+        }
+        // 1m / 3m / 6m → día 1 del mes resultante → hoy
+        let monthsBack = 0;
+        if      (kind === '3m') monthsBack = 2;
+        else if (kind === '6m') monthsBack = 5;
+        const desde = new Date(hoy.getFullYear(), hoy.getMonth() - monthsBack, 1);
+        return { desde: fmt(desde), hasta: fmt(hoy) };
+    }
+
+    function _aplicarRangoCumpl(kind, btnActivo) {
+        const r = _rangoCumplRapido(kind);
+        _fDesde = r.desde;
+        _fHasta = r.hasta;
+        $('#f-desde').value = _fDesde;
+        $('#f-hasta').value = _fHasta;
+        updateUrlParams({ fecha_desde: _fDesde, fecha_hasta: _fHasta });
+        // Resaltado visual del botón activo (si lo hay)
+        document.querySelectorAll('.cumpl-quick').forEach(b => {
+            const on = (btnActivo && b === btnActivo);
+            b.style.background  = on ? '#2d4d7a' : '#eef2f6';
+            b.style.color       = on ? '#fff'    : '#2d4d7a';
+            b.style.borderColor = on ? '#2d4d7a' : '#c5d2e0';
+        });
+        cargarVista();
+    }
+    // Exponemos para que onClearFilters pueda invocarlo
+    window._aplicarRangoCumpl = _aplicarRangoCumpl;
+
+    document.querySelectorAll('.cumpl-quick').forEach(btn => {
+        btn.addEventListener('click', () => _aplicarRangoCumpl(btn.dataset.range, btn));
+    });
 
     // Descarga del informe de cumplimiento (respeta filtros activos)
     const xlsxBtn = $('#cumpl-export-xlsx');
