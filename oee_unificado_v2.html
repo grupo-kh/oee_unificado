@@ -69,12 +69,20 @@ input[type=date]:focus,select:focus{outline:none;border-color:#2563eb;box-shadow
 .mtx th.mtx-first,.mtx td.mtx-first{position:sticky;left:0;text-align:left;background:#fff;z-index:1;min-width:250px;max-width:250px;overflow:hidden;text-overflow:ellipsis}
 .mtx thead th.mtx-first{z-index:3;min-width:250px}
 .mtx tr.mtx-maq td{background:#dce6f4;font-weight:700}
-.mtx tr.mtx-maq td.mtx-first{background:#dce6f4;cursor:pointer;color:#1e40af}
+.mtx tr.mtx-maq td.mtx-first{background:#dce6f4;color:#1e40af;cursor:pointer}
 .mtx tr.mtx-maq td.mtx-first:hover{background:#cbdcf0;text-decoration:underline}
-.mtx td.mtx-ref{padding-left:24px;color:#374151;font-weight:500}
+.mtx td.mtx-ref{padding-left:24px;color:#1e40af;font-weight:500;cursor:pointer}
+.mtx td.mtx-ref:hover{background:#eef3fb;text-decoration:underline}
 .mtx tr.mtx-tot td{background:#2d4d7a;color:#fff;font-weight:700}
 .mtx td.mtx-disp{font-weight:700;color:#1d5938;text-align:center}
 .mtx tr.mtx-tot td.mtx-disp{color:#fff}
+.mtx td.mtx-fab{font-size:11px;color:#555;text-align:center;white-space:nowrap}
+/* barra de fechas dentro de los popups de histograma */
+.hist-datebar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;padding:12px 14px;background:#f8fafc;border:1px solid #eef0f3;border-radius:8px}
+.hist-datebar .hdb-l{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase}
+.hist-datebar input[type=date]{font-size:13px}
+.hist-datebar .hfReset{background:#eef3fb;color:#1e40af;border-color:#bcd3f0}
+.hist-datebar .hdb-hint{font-size:12px;color:#9ca3af;font-style:italic;align-self:center}
 /* popup a pantalla completa (Top máquinas / Top motivos) */
 .fullpop{position:fixed;inset:0;background:#fff;z-index:1500;display:flex;flex-direction:column;overflow:hidden}
 .fullpop-head{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid #eef0f3}
@@ -204,7 +212,7 @@ tbody tr:hover{background:#f9fafb}
       <label class="chk"><input type="checkbox" class="turno" value="N" checked> Noche</label>
       <div class="quick">
         <button data-r="today">Hoy</button><button data-r="yesterday">Ayer</button>
-        <button data-r="week">Semana</button><button data-r="month">Mes</button>
+        <button data-r="week">Semana</button><button data-r="lastweek">Semana anterior</button><button data-r="month">Mes</button>
       </div>
     </div>
     <div class="excl-bar" id="exclBar" style="display:none">
@@ -317,6 +325,12 @@ const App={
     if(r==='yesterday'){t.setDate(t.getDate()-1);d.setDate(d.getDate()-1);}
     else if(r==='week'){d.setDate(d.getDate()-6);}
     else if(r==='month'){d.setDate(d.getDate()-29);}
+    else if(r==='lastweek'){
+      // Lunes a domingo de la semana anterior (getDay: 0=dom..6=sab).
+      const day=t.getDay(), diffToMon=(day===0?6:day-1);
+      d.setDate(d.getDate()-diffToMon-7);   // lunes de la semana pasada
+      t.setDate(t.getDate()-diffToMon-1);   // domingo de la semana pasada
+    }
     fDesde.value=d.toISOString().slice(0,10); fHasta.value=t.toISOString().slice(0,10);
     this.loadMain();
   },
@@ -815,12 +829,36 @@ const App={
   loadMainDebounced(){clearTimeout(this._t);this._t=setTimeout(()=>this.loadMain(),350);},
 
   /* ---------- HISTOGRAMA (ApexCharts rangeBar / Gantt) ---------- */
+  // Barra de fechas para acotar el rango del cronograma dentro de su popup
+  // (independiente del filtro principal; útil si el rango global es muy amplio).
+  histDateBar(d0,h0){
+    return `<div class="hist-datebar">
+      <label class="hdb-l">Desde<input type="date" class="hfD" value="${d0}"></label>
+      <label class="hdb-l">Hasta<input type="date" class="hfH" value="${h0}"></label>
+      <button class="btn btn-pri hfGo">Aplicar</button>
+      <button class="btn hfReset" title="Volver al rango del filtro principal">↺ Rango del filtro</button>
+      <span class="hdb-hint">Acota el rango para leer mejor el cronograma</span>
+    </div>`;
+  },
+  histWire(el,render){
+    const D=el.querySelector('.hfD'),H=el.querySelector('.hfH'),G=el.querySelector('.hfGo'),R=el.querySelector('.hfReset');
+    const go=()=>{ if(D.value&&H.value) render(D.value,H.value); };
+    G.onclick=go; D.onchange=go; H.onchange=go;
+    R.onclick=()=>{ D.value=fDesde.value; H.value=fHasta.value; go(); };
+  },
   async openHistograma(){
-    const ov=this.push('Histograma de motivos','Cronograma de paros por máquina',this.loadingHtml());
+    const ov=this.push('Histograma de motivos','Cronograma de paros por máquina',
+      this.histDateBar(fDesde.value,fHasta.value)+'<div class="histwrap"></div>');
+    const body=this.body(ov), wrap=body.querySelector('.histwrap');
+    this.histWire(body,(dd,hh)=>this.renderHistMaqs(wrap,dd,hh));
+    this.renderHistMaqs(wrap,fDesde.value,fHasta.value);
+  },
+  async renderHistMaqs(wrap,desde,hasta){
+    wrap.innerHTML=this.loadingHtml();
     try{
-      const d=await this.get('oee_unificado_hist_maquina.php',this.common({}));
+      const d=await this.get('oee_unificado_hist_maquina.php',this.common({fecha_desde:desde,fecha_hasta:hasta}));
       const ev=d.eventos||[];
-      if(!ev.length){this.body(ov).innerHTML='<div class="empty">Sin paros en el rango</div>';return;}
+      if(!ev.length){wrap.innerHTML='<div class="empty">Sin paros en el rango</div>';return;}
       const byMot={};
       ev.forEach(e=>{(byMot[e.motivo]=byMot[e.motivo]||[]).push(e);});
       const motivos=Object.keys(byMot);
@@ -828,8 +866,8 @@ const App={
         x:e.maquina,y:[this.ts(e.inicio),this.ts(e.fin)],inicio:e.inicio,fin:e.fin,segundos:e.segundos}))}));
       const nMaq=new Set(ev.map(e=>e.maquina)).size;
       const h=Math.min(1500,Math.max(420,nMaq*48+140));
-      this.body(ov).innerHTML=`<div class="breadcrumb">Total horas de paro: <b>${(d.total_horas||0).toFixed(1)} h</b> · ${ev.length} paros · ${nMaq} máquinas${d.eventos_limitados?' (limitado a 5000)':''}</div><div class="apx"></div>`;
-      this.apex(this.body(ov).querySelector('.apx'),{
+      wrap.innerHTML=`<div class="breadcrumb">Total horas de paro: <b>${(d.total_horas||0).toFixed(1)} h</b> · ${ev.length} paros · ${nMaq} máquinas${d.eventos_limitados?' (limitado a 5000)':''}</div><div class="apx"></div>`;
+      this.apex(wrap.querySelector('.apx'),{
         chart:{type:'rangeBar',height:h,animations:{enabled:false},toolbar:{show:true,tools:{zoom:true,pan:true,reset:true,zoomin:true,zoomout:true,download:true}},zoom:{enabled:true,type:'x'}},
         series, colors:motivos.map((m,i)=>PALETTE[i%PALETTE.length]),
         plotOptions:{bar:{horizontal:true,barHeight:'80%',rangeBarGroupRows:true}},
@@ -839,7 +877,7 @@ const App={
           return `<div style="padding:8px;font-size:12px"><b>${w.config.series[seriesIndex].name}</b><br>${p.x}<br>${p.inicio} → ${p.fin}<br><b>${(p.segundos/60).toFixed(1)} min</b></div>`;
         }}
       });
-    }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}
+    }catch(e){wrap.innerHTML=`<div class="error">${e.message}</div>`;}
   },
 
   /* ---------- CAMBIOS EN OF ---------- */
@@ -1038,6 +1076,9 @@ const App={
       [...body.querySelectorAll('.mtx-maq td.mtx-first')].forEach(td=>{
         td.onclick=()=>this.histMaquina(td.dataset.cod,td.dataset.name,td.dataset.disp);
       });
+      [...body.querySelectorAll('td.mtx-ref')].forEach(td=>{
+        td.onclick=()=>this.histReferencia(td.dataset.cod,td.dataset.ref,td.dataset.maq);
+      });
     }catch(e){body.innerHTML=`<div class="error">${e.message}</div>`;}
   },
   matrizTabla(d){
@@ -1046,49 +1087,65 @@ const App={
     const f2=v=>(v==null||v===0)?'':(Math.round(v*100)/100).toFixed(2);
     const pct=v=>(v==null||v==='')?'':v+'%';
     const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const e=v=>esc(v==null?'':v);
+    // Bloque izquierdo de resumen (SAGE,TOTAL,D,R,C,ini,fin). 7 celdas.
+    const cols7=(sage,tot,dd,rr,cc,ini,fin)=>
+      `<td>${e(sage)}</td><td>${f2(tot)}</td><td class="mtx-disp">${pct(dd)}</td>`+
+      `<td class="mtx-disp">${pct(rr)}</td><td class="mtx-disp">${pct(cc)}</td>`+
+      `<td class="mtx-fab">${e(ini)}</td><td class="mtx-fab">${e(fin)}</td>`;
     let h='<div class="mtx-wrap"><table class="mtx"><thead><tr>';
     h+='<th class="mtx-first">Máquina / Referencia</th>';
+    h+='<th>Nom. SAGE</th><th>TOTAL (h)</th><th>Disp. %</th><th>Rend. %</th><th>Cal. %</th><th>Inicio fab.</th><th>Fin fab.</th>';
     mots.forEach(m=>h+=`<th>${esc(m)}</th>`);
-    h+='<th>TOTAL (h)</th><th>Disp. %</th><th>Rend. %</th><th>Cal. %</th></tr></thead><tbody>';
+    h+='</tr></thead><tbody>';
+    // Fila TOTAL por motivo (horizontal, ARRIBA).
+    h+='<tr class="mtx-tot"><td class="mtx-first">TOTAL</td>'+cols7('',d.total_general,null,null,null,'','');
+    mots.forEach(m=>h+=`<td>${f2(d.total_por_motivo[m])}</td>`);
+    h+='</tr>';
     maqs.forEach(mq=>{
       const disp=mq.disponibilidad==null?'':mq.disponibilidad;
-      h+=`<tr class="mtx-maq"><td class="mtx-first" data-cod="${esc(mq.cod_maquina)}" data-name="${esc(mq.maquina)}" data-disp="${disp}" title="Clic para ver el histograma de esta máquina">${esc(mq.maquina)}</td>`;
+      h+=`<tr class="mtx-maq"><td class="mtx-first" data-cod="${esc(mq.cod_maquina)}" data-name="${esc(mq.maquina)}" data-disp="${disp}" title="Clic para ver el histograma de toda la máquina">${esc(mq.maquina)}</td>`;
+      h+=cols7('',mq.total,mq.disponibilidad,mq.rendimiento,mq.calidad,'','');
       mots.forEach(m=>h+=`<td>${f2(mq.por_motivo[m])}</td>`);
-      h+=`<td>${f2(mq.total)}</td><td class="mtx-disp">${pct(mq.disponibilidad)}</td><td class="mtx-disp">${pct(mq.rendimiento)}</td><td class="mtx-disp">${pct(mq.calidad)}</td></tr>`;
+      h+='</tr>';
       (mq.referencias||[]).forEach(r=>{
-        h+=`<tr><td class="mtx-first mtx-ref" title="${esc(r.referencia)}">${esc(r.referencia)}</td>`;
+        h+=`<tr><td class="mtx-first mtx-ref" data-cod="${esc(mq.cod_maquina)}" data-ref="${esc(r.referencia)}" data-maq="${esc(mq.maquina)}" title="Clic para ver el histograma de esta referencia">${esc(r.referencia)}</td>`;
+        h+=cols7(r.nomenclatura,r.total,r.disponibilidad,r.rendimiento,r.calidad,r.fab_inicio,r.fab_fin);
         mots.forEach(m=>h+=`<td>${f2(r.por_motivo[m])}</td>`);
-        h+=`<td>${f2(r.total)}</td><td class="mtx-disp"></td><td class="mtx-disp"></td><td class="mtx-disp"></td></tr>`;
+        h+='</tr>';
       });
     });
-    h+='<tr class="mtx-tot"><td class="mtx-first">TOTAL</td>';
-    mots.forEach(m=>h+=`<td>${f2(d.total_por_motivo[m])}</td>`);
-    h+=`<td>${f2(d.total_general)}</td><td class="mtx-disp"></td><td class="mtx-disp"></td><td class="mtx-disp"></td></tr>`;
     h+='</tbody></table></div>';
     return h;
   },
-  async histMaquina(cod,name,disp){
-    // Mismo formato que el botón "Histograma" de la pantalla principal:
-    // cronograma (Gantt) de paros en el tiempo, coloreado por motivo,
-    // pero filtrado a esta única máquina.
+  histPopupShell(titulo,sub){
     const ov=document.createElement('div'); ov.className='fullpop';
-    const dispTxt=(disp===''||disp==null||disp==='null')?'':` · Disponibilidad ${disp}%`;
     ov.innerHTML=`
       <div class="fullpop-head">
-        <h2>📊 Histograma · ${name}<small>Cronograma de paros${dispTxt}</small></h2>
+        <h2>${titulo}<small>${sub}</small></h2>
         <button class="hmClose">✕ Cerrar</button>
       </div>
-      <div class="fullpop-body"><div class="hmBody">${this.loadingHtml()}</div></div>`;
+      <div class="fullpop-body">${this.histDateBar(fDesde.value,fHasta.value)}<div class="hmBody">${this.loadingHtml()}</div></div>`;
     document.body.appendChild(ov);
     ov.querySelector('.hmClose').style.cssText='background:#f3f4f6;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280';
     ov.querySelector('.hmClose').onclick=()=>ov.remove();
-    const body=ov.querySelector('.hmBody');
+    return ov;
+  },
+  histMaquina(cod,name,disp){
+    // Histograma de toda la máquina: cronograma (Gantt) con una fila por
+    // REFERENCIA fabricada, paros coloreados por motivo.
+    const dispTxt=(disp===''||disp==null||disp==='null')?'':` · Disponibilidad ${disp}%`;
+    const ov=this.histPopupShell('📊 Histograma · '+name,'Cronograma de paros por referencia'+dispTxt);
+    const wrap=ov.querySelector('.hmBody');
+    this.histWire(ov.querySelector('.fullpop-body'),(dd,hh)=>this.renderHistMaqRefs(wrap,cod,dd,hh));
+    this.renderHistMaqRefs(wrap,cod,fDesde.value,fHasta.value);
+  },
+  async renderHistMaqRefs(wrap,cod,desde,hasta){
+    wrap.innerHTML=this.loadingHtml();
     try{
-      const d=await this.get('oee_unificado_hist_maquina.php',this.common({cod_maquina:cod}));
+      const d=await this.get('oee_unificado_hist_maquina.php',this.common({cod_maquina:cod,fecha_desde:desde,fecha_hasta:hasta}));
       const ev=d.eventos||[];
-      if(!ev.length){body.innerHTML='<div class="empty">Sin paros en el rango para esta máquina</div>';return;}
-      // Una fila por REFERENCIA fabricada (cronograma individual máquina/referencia),
-      // con los paros coloreados por motivo.
+      if(!ev.length){wrap.innerHTML='<div class="empty">Sin paros en el rango para esta máquina</div>';return;}
       const byMot={};
       ev.forEach(e=>{(byMot[e.motivo]=byMot[e.motivo]||[]).push(e);});
       const motivos=Object.keys(byMot);
@@ -1096,8 +1153,8 @@ const App={
         x:e.referencia||'(sin referencia)',y:[this.ts(e.inicio),this.ts(e.fin)],inicio:e.inicio,fin:e.fin,segundos:e.segundos}))}));
       const nRef=new Set(ev.map(e=>e.referencia||'(sin referencia)')).size;
       const h=Math.min(1600,Math.max(320,nRef*52+200));
-      body.innerHTML=`<div class="breadcrumb">Total horas de paro: <b>${(d.total_horas||0).toFixed(1)} h</b> · ${ev.length} paros · ${nRef} referencias · ${motivos.length} motivos${d.eventos_limitados?' (limitado a 5000)':''}</div><div class="apx"></div>`;
-      this.apex(body.querySelector('.apx'),{
+      wrap.innerHTML=`<div class="breadcrumb">Total horas de paro: <b>${(d.total_horas||0).toFixed(1)} h</b> · ${ev.length} paros · ${nRef} referencias · ${motivos.length} motivos${d.eventos_limitados?' (limitado a 5000)':''}</div><div class="apx"></div>`;
+      this.apex(wrap.querySelector('.apx'),{
         chart:{type:'rangeBar',height:h,animations:{enabled:false},toolbar:{show:true,tools:{zoom:true,pan:true,reset:true,zoomin:true,zoomout:true,download:true}},zoom:{enabled:true,type:'x'}},
         series, colors:motivos.map((m,i)=>PALETTE[i%PALETTE.length]),
         plotOptions:{bar:{horizontal:true,barHeight:'80%',rangeBarGroupRows:true}},
@@ -1107,7 +1164,40 @@ const App={
           return `<div style="padding:8px;font-size:12px"><b>${w.config.series[seriesIndex].name}</b><br>${p.x}<br>${p.inicio} → ${p.fin}<br><b>${(p.segundos/60).toFixed(1)} min</b></div>`;
         }}
       });
-    }catch(e){body.innerHTML=`<div class="error">${e.message}</div>`;}
+    }catch(e){wrap.innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+  histReferencia(cod,refName,maqName){
+    // Histograma enfocado a UNA referencia: una fila por MOTIVO de esa referencia.
+    const ov=this.histPopupShell('📊 Histograma · '+refName,maqName+' · cronograma de paros por motivo');
+    const wrap=ov.querySelector('.hmBody');
+    this.histWire(ov.querySelector('.fullpop-body'),(dd,hh)=>this.renderHistRef(wrap,cod,refName,dd,hh));
+    this.renderHistRef(wrap,cod,refName,fDesde.value,fHasta.value);
+  },
+  async renderHistRef(wrap,cod,refName,desde,hasta){
+    wrap.innerHTML=this.loadingHtml();
+    try{
+      const d=await this.get('oee_unificado_hist_maquina.php',this.common({cod_maquina:cod,fecha_desde:desde,fecha_hasta:hasta}));
+      const ev=(d.eventos||[]).filter(e=>(e.referencia||'(sin referencia)')===refName);
+      if(!ev.length){wrap.innerHTML='<div class="empty">Sin paros para esta referencia en el rango</div>';return;}
+      const byMot={};
+      ev.forEach(e=>{(byMot[e.motivo]=byMot[e.motivo]||[]).push(e);});
+      const motivos=Object.keys(byMot);
+      const series=motivos.map(m=>({name:m,data:byMot[m].map(e=>({
+        x:m,y:[this.ts(e.inicio),this.ts(e.fin)],inicio:e.inicio,fin:e.fin,segundos:e.segundos}))}));
+      const totH=ev.reduce((a,e)=>a+(e.segundos||0),0)/3600;
+      const h=Math.min(1200,Math.max(300,motivos.length*56+200));
+      wrap.innerHTML=`<div class="breadcrumb">Total horas de paro: <b>${totH.toFixed(1)} h</b> · ${ev.length} paros · ${motivos.length} motivos${d.eventos_limitados?' (datos limitados a 5000)':''}</div><div class="apx"></div>`;
+      this.apex(wrap.querySelector('.apx'),{
+        chart:{type:'rangeBar',height:h,animations:{enabled:false},toolbar:{show:true,tools:{zoom:true,pan:true,reset:true,zoomin:true,zoomout:true,download:true}},zoom:{enabled:true,type:'x'}},
+        series, colors:motivos.map((m,i)=>PALETTE[i%PALETTE.length]),
+        plotOptions:{bar:{horizontal:true,barHeight:'70%'}},
+        xaxis:{type:'datetime'}, dataLabels:{enabled:false}, legend:{position:'bottom'},
+        tooltip:{custom:({seriesIndex,dataPointIndex,w})=>{
+          const p=w.config.series[seriesIndex].data[dataPointIndex];
+          return `<div style="padding:8px;font-size:12px"><b>${w.config.series[seriesIndex].name}</b><br>${p.inicio} → ${p.fin}<br><b>${(p.segundos/60).toFixed(1)} min</b></div>`;
+        }}
+      });
+    }catch(e){wrap.innerHTML=`<div class="error">${e.message}</div>`;}
   }
 };
 App.init();
