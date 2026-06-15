@@ -1044,34 +1044,38 @@ const App={
     const mots=d.motivos||[]; const maqs=d.maquinas||[];
     if(!maqs.length)return '<div class="empty">Sin paros para el filtro seleccionado</div>';
     const f2=v=>(v==null||v===0)?'':(Math.round(v*100)/100).toFixed(2);
+    const pct=v=>(v==null||v==='')?'':v+'%';
     const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     let h='<div class="mtx-wrap"><table class="mtx"><thead><tr>';
     h+='<th class="mtx-first">Máquina / Referencia</th>';
     mots.forEach(m=>h+=`<th>${esc(m)}</th>`);
-    h+='<th>TOTAL (h)</th><th>Disp. %</th></tr></thead><tbody>';
+    h+='<th>TOTAL (h)</th><th>Disp. %</th><th>Rend. %</th><th>Cal. %</th></tr></thead><tbody>';
     maqs.forEach(mq=>{
       const disp=mq.disponibilidad==null?'':mq.disponibilidad;
       h+=`<tr class="mtx-maq"><td class="mtx-first" data-cod="${esc(mq.cod_maquina)}" data-name="${esc(mq.maquina)}" data-disp="${disp}" title="Clic para ver el histograma de esta máquina">${esc(mq.maquina)}</td>`;
       mots.forEach(m=>h+=`<td>${f2(mq.por_motivo[m])}</td>`);
-      h+=`<td>${f2(mq.total)}</td><td class="mtx-disp">${disp===''?'':disp+'%'}</td></tr>`;
+      h+=`<td>${f2(mq.total)}</td><td class="mtx-disp">${pct(mq.disponibilidad)}</td><td class="mtx-disp">${pct(mq.rendimiento)}</td><td class="mtx-disp">${pct(mq.calidad)}</td></tr>`;
       (mq.referencias||[]).forEach(r=>{
         h+=`<tr><td class="mtx-first mtx-ref" title="${esc(r.referencia)}">${esc(r.referencia)}</td>`;
         mots.forEach(m=>h+=`<td>${f2(r.por_motivo[m])}</td>`);
-        h+=`<td>${f2(r.total)}</td><td class="mtx-disp"></td></tr>`;
+        h+=`<td>${f2(r.total)}</td><td class="mtx-disp"></td><td class="mtx-disp"></td><td class="mtx-disp"></td></tr>`;
       });
     });
     h+='<tr class="mtx-tot"><td class="mtx-first">TOTAL</td>';
     mots.forEach(m=>h+=`<td>${f2(d.total_por_motivo[m])}</td>`);
-    h+=`<td>${f2(d.total_general)}</td><td class="mtx-disp"></td></tr>`;
+    h+=`<td>${f2(d.total_general)}</td><td class="mtx-disp"></td><td class="mtx-disp"></td><td class="mtx-disp"></td></tr>`;
     h+='</tbody></table></div>';
     return h;
   },
   async histMaquina(cod,name,disp){
+    // Mismo formato que el botón "Histograma" de la pantalla principal:
+    // cronograma (Gantt) de paros en el tiempo, coloreado por motivo,
+    // pero filtrado a esta única máquina.
     const ov=document.createElement('div'); ov.className='fullpop';
     const dispTxt=(disp===''||disp==null||disp==='null')?'':` · Disponibilidad ${disp}%`;
     ov.innerHTML=`
       <div class="fullpop-head">
-        <h2>📊 Histograma · ${name}<small>Horas de paro por referencia${dispTxt}</small></h2>
+        <h2>📊 Histograma · ${name}<small>Cronograma de paros${dispTxt}</small></h2>
         <button class="hmClose">✕ Cerrar</button>
       </div>
       <div class="fullpop-body"><div class="hmBody">${this.loadingHtml()}</div></div>`;
@@ -1080,36 +1084,28 @@ const App={
     ov.querySelector('.hmClose').onclick=()=>ov.remove();
     const body=ov.querySelector('.hmBody');
     try{
-      const d=await this.get('oee_unificado_maq_refs.php',this.common({cod_maquina:cod}));
-      const refs=d.referencias||[];
-      if(!refs.length){body.innerHTML='<div class="empty">Sin referencias con paros</div>';return;}
-      const max=Math.max(...refs.map(r=>r.horas_paro||0),1);
-      body.innerHTML=this.barList(refs,{name:r=>r.referencia||r.cod_referencia,val:r=>r.horas_paro||0,unit:'h',max,color:()=>'#c45a2c',clickable:true})
-        +'<div class="hint">Haz clic en una referencia para ver el acumulado de paro por día.</div>'
-        +'<div class="hmDet" style="margin-top:20px"></div>';
-      const det=body.querySelector('.hmDet');
-      [...body.querySelectorAll('.brow')].forEach((row,ix)=>{
-        row.onclick=()=>this.histRefDetalle(det,cod,refs[ix].cod_referencia,refs[ix].referencia||refs[ix].cod_referencia);
+      const d=await this.get('oee_unificado_hist_maquina.php',this.common({cod_maquina:cod}));
+      const ev=d.eventos||[];
+      if(!ev.length){body.innerHTML='<div class="empty">Sin paros en el rango para esta máquina</div>';return;}
+      const byMot={};
+      ev.forEach(e=>{(byMot[e.motivo]=byMot[e.motivo]||[]).push(e);});
+      const motivos=Object.keys(byMot);
+      const series=motivos.map(m=>({name:m,data:byMot[m].map(e=>({
+        x:e.maquina,y:[this.ts(e.inicio),this.ts(e.fin)],inicio:e.inicio,fin:e.fin,segundos:e.segundos}))}));
+      const nMaq=new Set(ev.map(e=>e.maquina)).size;
+      const h=Math.min(900,Math.max(300,nMaq*64+200));
+      body.innerHTML=`<div class="breadcrumb">Total horas de paro: <b>${(d.total_horas||0).toFixed(1)} h</b> · ${ev.length} paros · ${motivos.length} motivos${d.eventos_limitados?' (limitado a 5000)':''}</div><div class="apx"></div>`;
+      this.apex(body.querySelector('.apx'),{
+        chart:{type:'rangeBar',height:h,animations:{enabled:false},toolbar:{show:true,tools:{zoom:true,pan:true,reset:true,zoomin:true,zoomout:true,download:true}},zoom:{enabled:true,type:'x'}},
+        series, colors:motivos.map((m,i)=>PALETTE[i%PALETTE.length]),
+        plotOptions:{bar:{horizontal:true,barHeight:'80%',rangeBarGroupRows:true}},
+        xaxis:{type:'datetime'}, dataLabels:{enabled:false}, legend:{position:'bottom'},
+        tooltip:{custom:({seriesIndex,dataPointIndex,w})=>{
+          const p=w.config.series[seriesIndex].data[dataPointIndex];
+          return `<div style="padding:8px;font-size:12px"><b>${w.config.series[seriesIndex].name}</b><br>${p.x}<br>${p.inicio} → ${p.fin}<br><b>${(p.segundos/60).toFixed(1)} min</b></div>`;
+        }}
       });
     }catch(e){body.innerHTML=`<div class="error">${e.message}</div>`;}
-  },
-  async histRefDetalle(det,cod,codRef,refName){
-    det.innerHTML=this.loadingHtml();
-    try{
-      const d=await this.get('oee_unificado_maq_ref_paros.php',this.common({cod_maquina:cod,cod_referencia:codRef}));
-      const pd=d.por_dia||[]; let acc=0; const cum=pd.map(x=>Math.round((acc+=x.horas)*10)/10);
-      det.innerHTML=`<div style="font-size:15px;font-weight:700;color:#111827;margin-bottom:10px">Acumulado de paro · ${refName}</div>`
-        +(pd.length?'<div class="chartbox tall"><canvas class="cvhd"></canvas></div>':'<div class="empty">Sin datos por día</div>');
-      if(pd.length){
-        const el=det.querySelector('.cvhd'); this.chartDestroy(el);
-        new Chart(el,{data:{labels:pd.map(x=>x.dia),datasets:[
-          {type:'bar',label:'Horas/día',data:pd.map(x=>x.horas),backgroundColor:'#c45a2c',yAxisID:'y',datalabels:{anchor:'end',align:'top',color:'#c45a2c'}},
-          {type:'line',label:'Acumulado',data:cum,borderColor:'#3a6aa3',backgroundColor:'#3a6aa322',tension:.25,yAxisID:'y1',datalabels:{anchor:'end',align:'top',color:'#3a6aa3'}}
-        ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-          scales:{y:{position:'left',beginAtZero:true,title:{display:true,text:'Horas/día'}},y1:{position:'right',beginAtZero:true,grid:{drawOnChartArea:false},title:{display:true,text:'Acumulado'}}}}});
-      }
-      det.scrollIntoView({behavior:'smooth',block:'nearest'});
-    }catch(e){det.innerHTML=`<div class="error">${e.message}</div>`;}
   }
 };
 App.init();

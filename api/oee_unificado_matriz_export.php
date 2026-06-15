@@ -34,9 +34,16 @@ function _matSeccion(?string $desc): ?string {
     return PlanAttainmentAgg::MAQUINA_TO_SECCION_EXT[$desc] ?? null;
 }
 
-/** Disponibilidad % = M / (M + PNP) * 100 (misma fórmula que el export OEE). */
-function _matDisponibilidad(float $M, float $PNP): float {
-    return ($M + $PNP) > 0 ? round($M / ($M + $PNP) * 100, 1) : 0.0;
+/**
+ * Disponibilidad / Rendimiento / Calidad en % (misma fórmula que el export OEE).
+ * Devuelve ['disp'=>..., 'rend'=>..., 'cal'=>...] redondeados a 1 decimal.
+ *   D = M / (M + PNP)            R = (MOT + PC) / (M + PP + PC)     C = MOKT / (MOT + PC)
+ */
+function _matDRC(float $M, float $MOT, float $MOKT, float $PP, float $PC, float $PNP): array {
+    $d = ($M + $PNP)      > 0 ? $M / ($M + $PNP) * 100               : 0.0;
+    $r = ($M + $PP + $PC) > 0 ? ($MOT + $PC) / ($M + $PP + $PC) * 100 : 0.0;
+    $c = ($MOT + $PC)     > 0 ? $MOKT / ($MOT + $PC) * 100            : 0.0;
+    return ['disp' => round($d, 1), 'rend' => round($r, 1), 'cal' => round($c, 1)];
 }
 
 try {
@@ -50,7 +57,7 @@ try {
     $turnos = array_values(array_filter(getListParam('turnos'), fn($t) => in_array($t, ['M','T','N'], true)));
     $excl   = getListParam('excl');
 
-    // ───── 1) Máquinas en ámbito + % Disponibilidad (query OEE F_his_ct) ─────
+    // ───── 1) Máquinas en ámbito + % D/R/C (query OEE F_his_ct) ─────
     $where  = [
         "CAST(oee.TimePeriod AS DATE) BETWEEN ? AND ?",
         "oee.WorkGroup NOT IN ('Improductivos','AUX000','AUXI1','SOLD4','SOLD5')",
@@ -70,7 +77,8 @@ try {
 
     $sqlOee = "
         SELECT oee.WorkGroup AS cod_maquina, mq.Desc_maquina AS maquina,
-               SUM(oee.M) AS M, SUM(oee.PNP) AS PNP
+               SUM(oee.M) AS M, SUM(oee.M_OKNOK_TEO) AS MOT, SUM(oee.M_OK_TEO) AS MOKT,
+               SUM(oee.PPERF) AS PP, SUM(oee.PCALIDAD) AS PC, SUM(oee.PNP) AS PNP
         FROM F_his_ct('WORKCENTER','DAY','TURNOS, PRODUCTOS',
                       ? + ' 00:00:00', ? + ' 23:59:59', 16) oee
         LEFT JOIN cfg_maquina mq ON mq.Cod_maquina = oee.WorkGroup
@@ -80,7 +88,7 @@ try {
     ";
     $oeeRows = fetchAll('mapex', $sqlOee, array_merge([$fdesde, $fhasta], $params));
 
-    $dispByName = [];   // Desc_maquina => % disponibilidad
+    $drcByName  = [];   // Desc_maquina => ['disp'=>,'rend'=>,'cal'=>]
     $codByName  = [];   // Desc_maquina => Cod_maquina (para el drill al histograma)
     $codMaqs    = [];   // Cod_maquina en ámbito (para el árbol de paros)
     $seccionLabel = $seccion !== '' ? $seccion : 'Todas';
@@ -88,7 +96,10 @@ try {
         $name = (string)($r['maquina'] ?: $r['cod_maquina']);
         $sec  = _matSeccion($r['maquina']);
         if ($seccion !== '' && $sec !== $seccion) continue;   // filtro de sección
-        $dispByName[$name] = _matDisponibilidad((float)$r['M'], (float)$r['PNP']);
+        $drcByName[$name] = _matDRC(
+            (float)$r['M'], (float)$r['MOT'], (float)$r['MOKT'],
+            (float)$r['PP'], (float)$r['PC'], (float)$r['PNP']
+        );
         $codByName[$name]  = (string)$r['cod_maquina'];
         $codMaqs[] = (string)$r['cod_maquina'];
     }
@@ -169,10 +180,13 @@ try {
                     'por_motivo' => array_map(fn($v) => round($v, 2), $matrix[$maq][$ref] ?? []),
                 ];
             }
+            $drc = $drcByName[$maq] ?? null;
             $maqOut[] = [
                 'maquina'        => $maq,
                 'cod_maquina'    => $codByName[$maq] ?? '',
-                'disponibilidad' => $dispByName[$maq] ?? null,
+                'disponibilidad' => $drc['disp'] ?? null,
+                'rendimiento'    => $drc['rend'] ?? null,
+                'calidad'        => $drc['cal']  ?? null,
                 'total'          => round(array_sum($maqTotal[$maq] ?? []), 2),
                 'por_motivo'     => array_map(fn($v) => round($v, 2), $maqTotal[$maq] ?? []),
                 'referencias'    => $refOut,
@@ -202,8 +216,10 @@ try {
 
     $nMot      = count($motivos);
     $colTotal  = 2 + $nMot;            // índice 1-based de la columna "TOTAL paro"
-    $colDisp   = $colTotal + 1;        // columna "Disponib. %"
-    $lastColLt = Coordinate::stringFromColumnIndex($colDisp);
+    $colDisp   = $colTotal + 1;        // columna "Disp. %"
+    $colRend   = $colTotal + 2;        // columna "Rend. %"
+    $colCal    = $colTotal + 3;        // columna "Cal. %"
+    $lastColLt = Coordinate::stringFromColumnIndex($colCal);
 
     // Fila 1: título.  Fila 2: filtros aplicados.
     $ws->setCellValue('A1', 'OEE Unificado · Matriz motivos × máquina/referencia');
@@ -225,7 +241,9 @@ try {
         $ws->setCellValue([2 + $i, $hRow], $mot);
     }
     $ws->setCellValue([$colTotal, $hRow], 'TOTAL paro (h)');
-    $ws->setCellValue([$colDisp,  $hRow], 'Disponib. %');
+    $ws->setCellValue([$colDisp,  $hRow], 'Disp. %');
+    $ws->setCellValue([$colRend,  $hRow], 'Rend. %');
+    $ws->setCellValue([$colCal,   $hRow], 'Cal. %');
 
     $hdrRange = "A$hRow:{$lastColLt}$hRow";
     $ws->getStyle($hdrRange)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
@@ -251,7 +269,11 @@ try {
             if ($v > 0) { $ws->setCellValue([2 + $i, $maqRow], round($v, 2)); $sumMaq += $v; }
         }
         $ws->setCellValue([$colTotal, $maqRow], round($sumMaq, 2));
-        if (isset($dispByName[$maq])) $ws->setCellValue([$colDisp, $maqRow], $dispByName[$maq]);
+        if (isset($drcByName[$maq])) {
+            $ws->setCellValue([$colDisp, $maqRow], $drcByName[$maq]['disp']);
+            $ws->setCellValue([$colRend, $maqRow], $drcByName[$maq]['rend']);
+            $ws->setCellValue([$colCal,  $maqRow], $drcByName[$maq]['cal']);
+        }
         $ws->getStyle("A$maqRow:{$lastColLt}$maqRow")->getFont()->setBold(true);
         $ws->getStyle("A$maqRow:{$lastColLt}$maqRow")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F4');
         $row++;
@@ -288,15 +310,17 @@ try {
         $numRange = "{$colMotIni}" . ($hRow + 1) . ":{$colTotalLt}$totRow";
         $ws->getStyle($numRange)->getNumberFormat()->setFormatCode('#,##0.00');
         $ws->getStyle($numRange)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-        $dispRange = "{$lastColLt}" . ($hRow + 1) . ":{$lastColLt}$totRow";
-        $ws->getStyle($dispRange)->getNumberFormat()->setFormatCode('0.0"%"');
-        $ws->getStyle($dispRange)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $pctIni = Coordinate::stringFromColumnIndex($colDisp);
+        $pctRange = "{$pctIni}" . ($hRow + 1) . ":{$lastColLt}$totRow";
+        $ws->getStyle($pctRange)->getNumberFormat()->setFormatCode('0.0"%"');
+        $ws->getStyle($pctRange)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $allRange = "A$hRow:{$lastColLt}$totRow";
         $ws->getStyle($allRange)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9D4E3');
     }
     $ws->getColumnDimension('A')->setWidth(38);
-    for ($c = 2; $c <= $colDisp; $c++) {
-        $ws->getColumnDimension(Coordinate::stringFromColumnIndex($c))->setWidth($c >= $colTotal ? 14 : 12);
+    for ($c = 2; $c <= $colCal; $c++) {
+        $w = $c === $colTotal ? 14 : ($c >= $colDisp ? 10 : 12);
+        $ws->getColumnDimension(Coordinate::stringFromColumnIndex($c))->setWidth($w);
     }
     $ws->freezePane('B' . ($hRow + 1));
 
