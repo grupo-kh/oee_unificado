@@ -1327,12 +1327,12 @@ const App={
         `<td class="mtx-real">${f2(o.prep)}</td>`+
         `<td class="mtx-fab">${e(o.ini)}</td><td class="mtx-fab">${e(o.fin)}</td>`+
         `<td class="mtx-real">${n0(o.utot)}</td><td class="mtx-real">${n0(o.uteo)}</td>`+
-        `<td class="mtx-real">${n1(o.phreal)}</td><td class="mtx-real">${n1(o.phteo)}</td>`+
+        `<td class="mtx-real">${n0(o.phreal)}</td><td class="mtx-real">${n1(o.phteo)}</td>`+
         `<td class="mtx-real">${f2(o.real)}</td>`;
     };
     let h='<div class="mtx-wrap"><table class="mtx"><thead><tr>';
     h+='<th class="mtx-first">Máquina / Referencia</th>';
-    h+='<th>Nom. SAGE</th><th>TOTAL (h)</th><th>Disp. %</th><th>Rend. %</th><th>Cal. %</th><th>OEE %</th><th>Preparación (h)</th><th>Inicio fab.</th><th>Fin fab.</th><th>Uds. Total</th><th>Uds. Teo</th><th>Pzs/h real</th><th>Pzs/h teo</th><th>Fab. real (h)</th>';
+    h+='<th>Nom. SAGE</th><th>TOTAL (h)</th><th>Disp. %</th><th>Rend. %</th><th>Cal. %</th><th>OEE %</th><th>Preparación (h)</th><th>Inicio fab.</th><th>Fin fab.</th><th>Uds. Total fab.</th><th>Uds. Teo fab.</th><th>Pzs/h real</th><th>Rdto. Teo</th><th>Fab. real (h)</th>';
     mots.forEach(m=>h+=`<th>${esc(m)}</th>`);
     h+='</tr></thead><tbody>';
     // Fila TOTAL por motivo (horizontal, ARRIBA).

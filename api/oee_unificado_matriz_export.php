@@ -117,17 +117,16 @@ try {
     }
     $codMaqs = array_values(array_unique($codMaqs));
 
-    // ───── 2) % D/R/C + unidades + piezas/hora por máquina + referencia ─────
+    // ───── 2) % D/R/C + unidades fabricadas por máquina + referencia ─────
     $drcRef   = [];   // [cod_maquina][cod_producto] => ['disp','rend','cal','oee']
-    $unitsRef = [];   // [cod_maquina][cod_producto] => ['u_total','u_teo','ph_real','ph_teo']
+    $unitsRef = [];   // [cod_maquina][cod_producto] => ['u_total','u_teo','dif']
     if (!empty($codMaqs)) {
         $phM = implode(',', array_fill(0, count($codMaqs), '?'));
         $sqlOeeRef = "
             SELECT oee.WorkGroup AS cod_maquina, LTRIM(RTRIM(oee.Cod_producto)) AS cod_ref,
                    SUM(oee.M) AS M, SUM(oee.M_OKNOK_TEO) AS MOT, SUM(oee.M_OK_TEO) AS MOKT,
                    SUM(oee.PPERF) AS PP, SUM(oee.PCALIDAD) AS PC, SUM(oee.PNP) AS PNP,
-                   SUM(oee.Unidades_Total) AS u_total, SUM(oee.Unidades_Teo) AS u_teo,
-                   SUM(oee.Seg_Prod) AS seg_prod
+                   SUM(oee.Unidades_Total) AS u_total, SUM(oee.Unidades_Teo) AS u_teo
             FROM F_his_ct('WORKCENTER','DAY','TURNOS, PRODUCTOS',
                           ? + ' 00:00:00', ? + ' 23:59:59', 16) oee
             WHERE $whereSQL AND oee.WorkGroup IN ($phM)
@@ -142,15 +141,35 @@ try {
                 (float)$r['M'], (float)$r['MOT'], (float)$r['MOKT'],
                 (float)$r['PP'], (float)$r['PC'], (float)$r['PNP']
             );
-            // Piezas/hora = unidades / horas de producción (Seg_Prod). Su ratio
-            // real/teo equivale al rendimiento.
-            $hProd = ((int)$r['seg_prod']) / 3600;
+            $uTot = (int)$r['u_total']; $uTeo = (int)$r['u_teo'];
             $unitsRef[$cm][$cr] = [
-                'u_total' => (int)$r['u_total'],
-                'u_teo'   => (int)$r['u_teo'],
-                'ph_real' => $hProd > 0 ? round($r['u_total'] / $hProd, 1) : null,
-                'ph_teo'  => $hProd > 0 ? round($r['u_teo']   / $hProd, 1) : null,
+                'u_total' => $uTot,
+                'u_teo'   => $uTeo,
+                'dif'     => $uTot - $uTeo,   // Uds. Total fab. - Uds. Teo fab. (±)
             ];
+        }
+    }
+
+    // ───── 2b) Rdto. Teo: rendimiento nominal previsto por máquina+producto ─────
+    // Fuente MAPEX: configuración de productividad por máquina-producto
+    // (cfg_fase_maquina.Rendimientonominal1 = piezas/hora previstas).
+    $rendTeo = [];   // [cod_maquina][cod_producto] => piezas/hora nominal
+    if (!empty($codMaqs)) {
+        $phM = implode(',', array_fill(0, count($codMaqs), '?'));
+        $sqlRend = "
+            SELECT mq.Cod_maquina AS cod_maquina, LTRIM(RTRIM(p.Cod_producto)) AS cod_ref,
+                   MAX(fm.Rendimientonominal1) AS rend
+            FROM cfg_fase_maquina fm
+            INNER JOIN cfg_fase     f  ON f.Id_fase     = fm.Id_fase AND f.Activo = 1
+            INNER JOIN cfg_producto p  ON p.Id_producto = f.Id_producto
+            INNER JOIN cfg_maquina  mq ON mq.Id_maquina = fm.Id_maquina
+            WHERE fm.Activo = 1 AND mq.Cod_maquina IN ($phM)
+            GROUP BY mq.Cod_maquina, LTRIM(RTRIM(p.Cod_producto))
+        ";
+        foreach (fetchAll('mapex', $sqlRend, $codMaqs) as $r) {
+            $cm = (string)$r['cod_maquina']; $cr = (string)$r['cod_ref'];
+            if ($cr === '') continue;
+            $rendTeo[$cm][$cr] = round((float)$r['rend'], 1);
         }
     }
 
@@ -290,12 +309,13 @@ try {
     // Helper: datos por referencia listos para JSON/XLSX.
     // Orden de las referencias de cada máquina: por FECHA DE INICIO de fabricación
     // ascendente (orden cronológico de fabricación); las sin fecha, al final.
-    $refsDe = function(string $maq) use ($refTotal, $refLabel, $matrix, $drcRef, $unitsRef, $fab, $sageNom, $codByName) {
+    $refsDe = function(string $maq) use ($refTotal, $refLabel, $matrix, $drcRef, $unitsRef, $rendTeo, $fab, $sageNom, $codByName) {
         $cm = $codByName[$maq] ?? '';
         $out = [];
         foreach (array_keys($refTotal[$maq] ?? []) as $k) {
             $drc = ($k !== '__NOREF__') ? ($drcRef[$cm][$k] ?? null) : null;
             $un  = ($k !== '__NOREF__') ? ($unitsRef[$cm][$k] ?? null) : null;
+            $rdt = ($k !== '__NOREF__') ? ($rendTeo[$cm][$k] ?? null) : null;
             $fb  = ($k !== '__NOREF__') ? ($fab[$cm][$k] ?? null) : null;
             $out[] = [
                 'cod_referencia'  => $k === '__NOREF__' ? '' : $k,
@@ -308,8 +328,8 @@ try {
                 'oee'             => $drc['oee']  ?? null,
                 'uds_total'       => $un['u_total'] ?? null,
                 'uds_teo'         => $un['u_teo']   ?? null,
-                'ph_real'         => $un['ph_real'] ?? null,
-                'ph_teo'          => $un['ph_teo']  ?? null,
+                'ph_real'         => $un['dif']     ?? null,   // Uds. Total fab. - Uds. Teo fab.
+                'ph_teo'          => $rdt,                     // Rdto. Teo (pzs/h previstas, cfg_fase_maquina)
                 'fab_inicio'      => $fb['ini'] ?? '',
                 'fab_fin'         => $fb['fin'] ?? '',
                 'fab_prep'        => $fb['prep_h'] ?? null,
@@ -394,10 +414,10 @@ try {
     $ws->setCellValue([$colIni,  $hRow], 'Inicio fab.');
     $ws->setCellValue([$colFin,  $hRow], 'Fin fab.');
     $ws->setCellValue([$colPrep, $hRow], 'Preparación (h)');
-    $ws->setCellValue([$colUTot, $hRow], 'Uds. Total');
-    $ws->setCellValue([$colUTeo, $hRow], 'Uds. Teo');
+    $ws->setCellValue([$colUTot, $hRow], 'Uds. Total fab.');
+    $ws->setCellValue([$colUTeo, $hRow], 'Uds. Teo fab.');
     $ws->setCellValue([$colPhReal, $hRow], 'Pzs/h real');
-    $ws->setCellValue([$colPhTeo, $hRow], 'Pzs/h teo');
+    $ws->setCellValue([$colPhTeo, $hRow], 'Rdto. Teo');
     $ws->setCellValue([$colReal, $hRow], 'Fab. real (h)');
     foreach ($motivos as $i => $mot) $ws->setCellValue([$colMot0 + $i, $hRow], $mot);
     $hdrRange = "A$hRow:{$lastColLt}$hRow";
@@ -508,8 +528,9 @@ try {
         }
         $utLt = Coordinate::stringFromColumnIndex($colUTot);
         $ptLt = Coordinate::stringFromColumnIndex($colPhTeo);
-        $ws->getStyle("{$utLt}$totRow:" . Coordinate::stringFromColumnIndex($colUTeo) . "$lastRow")->getNumberFormat()->setFormatCode('#,##0');
-        $ws->getStyle(Coordinate::stringFromColumnIndex($colPhReal) . "$totRow:{$ptLt}$lastRow")->getNumberFormat()->setFormatCode('#,##0.0');
+        // Uds. Total/Teo fab. + Pzs/h real (diferencia) = enteros; Rdto. Teo = 1 decimal.
+        $ws->getStyle("{$utLt}$totRow:" . Coordinate::stringFromColumnIndex($colPhReal) . "$lastRow")->getNumberFormat()->setFormatCode('#,##0');
+        $ws->getStyle("{$ptLt}$totRow:{$ptLt}$lastRow")->getNumberFormat()->setFormatCode('#,##0.0');
         $ws->getStyle("{$utLt}$totRow:{$ptLt}$lastRow")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         $ws->getStyle("A$hRow:{$lastColLt}$lastRow")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9D4E3');
     }
