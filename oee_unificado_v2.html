@@ -77,12 +77,20 @@ input[type=date]:focus,select:focus{outline:none;border-color:#2563eb;box-shadow
 .mtx td.mtx-disp{font-weight:700;color:#1d5938;text-align:center}
 .mtx tr.mtx-tot td.mtx-disp{color:#fff}
 .mtx td.mtx-fab{font-size:11px;color:#555;text-align:center;white-space:nowrap}
+.mtx td.mtx-real{text-align:right;font-weight:600;color:#1e3a5f}
+/* formato condicional: tonos salmón (override del fondo de fila con !important) */
+.mtx td.sal1{background:#fde2d8!important}
+.mtx td.sal2{background:#f9c3b0!important}
+.mtx td.sal3{background:#f3a088!important}
 /* barra de fechas dentro de los popups de histograma */
 .hist-datebar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;padding:12px 14px;background:#f8fafc;border:1px solid #eef0f3;border-radius:8px}
 .hist-datebar .hdb-l{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase}
 .hist-datebar input[type=date]{font-size:13px}
 .hist-datebar .hfReset{background:#eef3fb;color:#1e40af;border-color:#bcd3f0}
 .hist-datebar .hdb-hint{font-size:12px;color:#9ca3af;font-style:italic;align-self:center}
+.hist-datebar .hdb-turnos{display:flex;gap:10px;align-items:center;padding-bottom:6px}
+.hist-datebar .hdb-chk{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;color:#374151;text-transform:none;cursor:pointer}
+.hist-datebar .hdb-chk input{cursor:pointer}
 /* popup a pantalla completa (Top máquinas / Top motivos) */
 .fullpop{position:fixed;inset:0;background:#fff;z-index:1500;display:flex;flex-direction:column;overflow:hidden}
 .fullpop-head{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid #eef0f3}
@@ -132,6 +140,46 @@ input[type=date]:focus,select:focus{outline:none;border-color:#2563eb;box-shadow
 .module-general .mg-title small{font-weight:500;color:#5a7596}
 .badge-gen{background:#1e3a5f;color:#fff;font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;letter-spacing:.6px}
 .module-general .mg-body{padding:16px 18px}
+/* ───── Rendimiento: histórico por referencia + comparativa por OF ───── */
+.rdto-mod .badge-gen{background:#1d5938}
+.rdto-controls{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
+.rdto-controls label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase}
+.rdto-controls .rdtoSearch{min-width:170px}
+.rdto-controls .rdtoSelect{min-width:340px;max-width:520px;font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px}
+.rdto-controls .chk{flex-direction:row;align-items:center;text-transform:none;color:#374151}
+.rdto-multi-n{background:#1d5938;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700}
+.rdto-quick{display:flex;gap:6px;align-self:center}
+.rdto-quick button{padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;background:#eef3ec;border:1px solid #aedcc1;border-radius:6px;color:#1d5938}
+.rdto-quick button:hover{background:#d3eadd}
+.rdtoScope{align-self:center}
+.rdtoResumen{display:flex;gap:22px;flex-wrap:wrap;background:#eef3f8;border-left:4px solid #1d5938;padding:8px 14px;border-radius:6px;margin-bottom:12px;font-size:13.5px}
+.rdtoResumen b{color:#111827}
+.rdto-table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border-radius:8px;overflow:hidden}
+.rdto-table th{background:#1d5938;color:#fff;font-weight:700;padding:8px 10px;text-align:left}
+.rdto-table td{border-bottom:1px solid #eef0f3;padding:6px 10px}
+.rdto-table td.num{text-align:right;font-variant-numeric:tabular-nums}
+.of-chip{background:#1d5938;color:#fff;border:0;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer}
+.of-chip:hover{background:#16442b}
+.of-chip:disabled{background:#cbd5e1;cursor:default}
+.of-cell-chips{display:flex;flex-wrap:wrap;gap:5px}
+.of-maq-chip{background:#e6f3ec;color:#1d5938;border:1px solid #aedcc1;border-radius:12px;padding:2px 9px;font-size:11.5px;font-weight:600}
+/* comparativa */
+.rdto-comp-overall{background:#eef3ec;border:1px solid #aedcc1;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13.5px;color:#1d5938}
+.rdto-comp-rank{margin-top:8px;display:flex;flex-direction:column;gap:3px}
+.rdto-comp-rank .rk{display:grid;grid-template-columns:34px 1fr auto auto;gap:10px;font-size:12.5px;padding:2px 0}
+.rdto-comp-rank .rk.is-best{font-weight:700}
+.rdto-comp-machine{border:1px solid #e5e7eb;border-radius:10px;margin-bottom:16px;background:#fff}
+.rdto-comp-machine-head{display:flex;align-items:baseline;gap:8px;padding:10px 14px;border-bottom:1px solid #eef0f3}
+.rdto-comp-machine-head .axis{font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:.5px}
+.rdto-comp-machine-head h4{font-size:15px;font-weight:700;color:#111827;margin:0}
+.rdto-comp-row{display:grid;grid-template-columns:1fr 220px;gap:14px;padding:12px 14px}
+.rdto-comp-axis-label{font-size:11px;font-weight:700;color:#5a7596;margin:4px 0}
+.rdto-comp-stats{display:flex;flex-direction:column;gap:8px}
+.rdto-comp-stats .st{background:#f8fafc;border:1px solid #eef0f3;border-radius:8px;padding:8px 10px}
+.rdto-comp-stats .st .l{font-size:11px;color:#6b7280;font-weight:600}
+.rdto-comp-stats .st .v{font-size:18px;font-weight:800;color:#111827}
+.rdto-comp-stats .st.ok .v{color:#1d5938}.rdto-comp-stats .st.nok .v{color:#c8102e}
+@media(max-width:900px){.rdto-comp-row{grid-template-columns:1fr}}
 /* paneles apilados debajo (en lugar de modales) */
 #panels{display:flex;flex-direction:column;gap:16px;margin-top:16px}
 .panel{background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.07);scroll-margin-top:12px;animation:slidein .2s ease}
@@ -255,6 +303,7 @@ tbody tr:hover{background:#f9fafb}
     </div>
     <div id="machBody"><div class="loading"><div class="spinner"></div>Cargando…</div></div>
     <div id="generalBody"></div>
+    <div id="rdtoBody"></div>
   </div>
 
   <div id="panels"></div>
@@ -405,6 +454,8 @@ const App={
         }
       }
       this.renderGeneralMotivos(d.motivos||[]);
+      if(State.metrica==='rendimiento') this.renderRendimiento();
+      else { const rb=document.getElementById('rdtoBody'); if(rb) rb.innerHTML=''; }
     }catch(e){machBody.innerHTML=`<div class="error">${e.message}</div>`;}
   },
 
@@ -447,6 +498,153 @@ const App={
         y:{position:'left',beginAtZero:true,grace:'12%',title:{display:true,text:this.motivoValLabel()}},
         y1:{position:'right',beginAtZero:true,max:100,grid:{drawOnChartArea:false},title:{display:true,text:'% acumulado'}}
       }}});
+  },
+  /* ===== Rendimiento: histórico por referencia + comparativa por OF ===== */
+  _rd:{refs:[],ofs:[],cod:'',desde:'',hasta:''},
+  fU(n){return (Number(n)||0).toLocaleString('es-ES');},
+  fFecha(iso){if(!iso)return '—';const[y,m,d]=String(iso).split('-');return `${d}/${m}/${y}`;},
+  esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));},
+  renderRendimiento(){
+    const host=document.getElementById('rdtoBody');
+    if(host.querySelector('.rdtoSelect')) return;   // ya construido, conservar estado/selección
+    host.innerHTML=`
+      <div class="module-general rdto-mod">
+        <div class="mg-head"><span class="badge-gen">RDTO</span>
+          <span class="mg-title">Histórico de producción por referencia<small> · OFs por referencia · clic en una OF = desglose horario</small></span></div>
+        <div class="mg-body">
+          <div class="rdto-controls">
+            <label>Referencia<input type="search" class="rdtoSearch" placeholder="Filtrar lista…" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px"></label>
+            <label>&nbsp;<select class="rdtoSelect"><option value="">— Cargando… —</option></select></label>
+            <label class="chk">&nbsp;<span style="display:flex;align-items:center;gap:6px"><input type="checkbox" class="rdtoMulti"> Solo multi-máquina <span class="rdto-multi-n rdtoMultiN">0</span></span></label>
+            <label>Desde<input type="date" class="rdtoDesde"></label>
+            <label>Hasta<input type="date" class="rdtoHasta"></label>
+            <span class="rdto-quick"><button data-r="month">Mes</button><button data-r="3months">3 meses</button><button data-r="6months">6 meses</button><button data-r="year">1 año</button></span>
+            <span class="rdtoScope hint"></span>
+          </div>
+          <div class="rdtoResumen" style="display:none"></div>
+          <div class="rdtoHistWrap"><div class="hint">Elige una referencia para ver su histórico de OFs.</div></div>
+        </div>
+      </div>
+      <div class="module-general rdto-mod">
+        <div class="mg-head"><span class="badge-gen">RDTO</span>
+          <span class="mg-title">Comparativa de rendimiento por OF<small> · piezas/hora y OK/NOK por OF, separado por máquina</small></span></div>
+        <div class="mg-body">
+          <div class="rdtoCompOverall rdto-comp-overall" style="display:none"></div>
+          <div class="rdtoCompMachines"></div>
+          <div class="rdtoCompEmpty hint">Elige una referencia para ver la comparativa.</div>
+        </div>
+      </div>`;
+    if(this._rd.desde){host.querySelector('.rdtoDesde').value=this._rd.desde;host.querySelector('.rdtoHasta').value=this._rd.hasta;}
+    else this.rdSetRange('month');
+    host.querySelector('.rdtoSearch').oninput=()=>this.rdRenderList();
+    host.querySelector('.rdtoMulti').onchange=()=>this.rdRenderList();
+    host.querySelector('.rdtoSelect').onchange=()=>this.rdRecargar();
+    host.querySelector('.rdtoDesde').onchange=()=>this.rdRecargar();
+    host.querySelector('.rdtoHasta').onchange=()=>this.rdRecargar();
+    host.querySelectorAll('.rdto-quick button').forEach(b=>b.onclick=()=>{this.rdSetRange(b.dataset.r);this.rdRecargar();});
+    this.rdLoadList();
+  },
+  async rdLoadList(){
+    const host=document.getElementById('rdtoBody');
+    try{
+      const d=await this.get('oee_unificado_ref_lista.php',new URLSearchParams());
+      this._rd.refs=Array.isArray(d.refs)?d.refs:[];
+      this.rdRenderList();
+      const sc=host.querySelector('.rdtoScope'); if(sc&&d.desde) sc.textContent=`Producción desde ${this.fFecha(d.desde)} · ${this._rd.refs.length} refs`;
+      const mc=Number(d.multi_count)||this._rd.refs.filter(r=>+r.num_maquinas>1).length;
+      host.querySelector('.rdtoMultiN').textContent=mc;
+      if(this._rd.cod){ const sel=host.querySelector('.rdtoSelect'); if([...sel.options].some(o=>o.value===this._rd.cod)){sel.value=this._rd.cod;this.rdRecargar();} }
+    }catch(e){ const sel=host.querySelector('.rdtoSelect'); if(sel)sel.innerHTML='<option value="">— Error cargando referencias —</option>'; }
+  },
+  rdRenderList(){
+    const host=document.getElementById('rdtoBody'); if(!host)return;
+    const sel=host.querySelector('.rdtoSelect'); if(!sel)return;
+    const q=(host.querySelector('.rdtoSearch').value||'').toLowerCase().trim();
+    const onlyMulti=host.querySelector('.rdtoMulti').checked; const prev=sel.value;
+    let list=this._rd.refs;
+    if(onlyMulti)list=list.filter(r=>+r.num_maquinas>1);
+    if(q)list=list.filter(r=>(r.cod_producto||'').toLowerCase().includes(q)||(r.desc_producto||'').toLowerCase().includes(q));
+    const ph=list.length?`— Elige una referencia (${list.length}) —`:'— Sin coincidencias —';
+    sel.innerHTML=`<option value="">${ph}</option>`+list.map(r=>{const n=+r.num_maquinas||0;return `<option value="${this.esc(r.cod_producto)}">${this.esc(r.desc_producto)}${n>1?` [${n} máq]`:''}</option>`;}).join('');
+    sel.value=(prev&&[...sel.options].some(o=>o.value===prev))?prev:'';
+  },
+  rdSetRange(kind){
+    const host=document.getElementById('rdtoBody'); const t=new Date(),d=new Date();
+    if(kind==='month')d.setMonth(t.getMonth()-1); else if(kind==='3months')d.setMonth(t.getMonth()-3);
+    else if(kind==='6months')d.setMonth(t.getMonth()-6); else if(kind==='year')d.setFullYear(t.getFullYear()-1);
+    host.querySelector('.rdtoDesde').value=d.toISOString().slice(0,10);
+    host.querySelector('.rdtoHasta').value=t.toISOString().slice(0,10);
+  },
+  async rdRecargar(){
+    const host=document.getElementById('rdtoBody');
+    const cod=host.querySelector('.rdtoSelect').value, desde=host.querySelector('.rdtoDesde').value, hasta=host.querySelector('.rdtoHasta').value;
+    this._rd.cod=cod; this._rd.desde=desde; this._rd.hasta=hasta;
+    const W=host.querySelector('.rdtoHistWrap'), R=host.querySelector('.rdtoResumen');
+    if(!cod||!desde||!hasta){ R.style.display='none'; W.innerHTML='<div class="hint">Elige una referencia para ver su histórico de OFs.</div>'; this.rdCompEmpty(); return; }
+    W.innerHTML=this.loadingHtml();
+    try{ const d=await this.get('oee_unificado_ref_historico.php',new URLSearchParams({cod_producto:cod,fecha_desde:desde,fecha_hasta:hasta})); this.rdRenderHist(d); }
+    catch(e){ W.innerHTML=`<div class="error">${e.message}</div>`; }
+    try{ const c=await this.get('oee_unificado_ref_comparativa.php',new URLSearchParams({cod_producto:cod,fecha_desde:desde,fecha_hasta:hasta})); this.rdRenderComp(c); }
+    catch(e){ this.rdCompEmpty(); }
+  },
+  rdRenderHist(d){
+    const host=document.getElementById('rdtoBody'); const ofs=Array.isArray(d.ofs)?d.ofs:[]; const t=d.totales||{};
+    this._rd.ofs=ofs;
+    const R=host.querySelector('.rdtoResumen'); R.style.display='flex';
+    R.innerHTML=`<span>OFs: <b>${this.fU(t.num_ofs)}</b></span><span>Máquinas: <b>${this.fU(t.num_maquinas)}</b></span><span>Días con producción: <b>${this.fU(t.dias)}</b></span><span>Total OK: <b style="color:#1d5938">${this.fU(t.unidades_ok)}</b></span><span>Total NOK: <b style="color:#c8102e">${this.fU(t.unidades_nok)}</b></span>`;
+    const W=host.querySelector('.rdtoHistWrap');
+    if(!ofs.length){W.innerHTML='<div class="empty">Sin producción en el rango.</div>';return;}
+    let h='<table class="rdto-table"><thead><tr><th>OF</th><th>Máquina(s)</th><th class="num">Días</th><th class="num">Unidades OK</th><th class="num">Unidades NOK</th></tr></thead><tbody>';
+    ofs.forEach((of,idx)=>{
+      const codOf=String(of.cod_of||''); const dis=(!codOf||codOf==='—')?' disabled':'';
+      const chips=(of.maquinas||[]).map(m=>`<span class="of-maq-chip" title="OK ${this.fU(m.unidades_ok)} · NOK ${this.fU(m.unidades_nok)} · ${this.fU(m.uds_h)} uds/h">${this.esc(m.maquina)}</span>`).join('');
+      h+=`<tr><td><button class="of-chip" data-idx="${idx}"${dis} title="clic para desglose horario">${this.esc(codOf||'—')}</button></td><td><div class="of-cell-chips">${chips}</div></td><td class="num">${this.fU(of.num_dias)}</td><td class="num">${this.fU(of.unidades_ok)}</td><td class="num">${this.fU(of.unidades_nok)}</td></tr>`;
+    });
+    W.innerHTML=h+'</tbody></table>';
+    [...W.querySelectorAll('.of-chip')].forEach(b=>{ if(b.disabled)return; b.onclick=()=>this.rdOpenOf(+b.dataset.idx); });
+  },
+  rdCompEmpty(){ const host=document.getElementById('rdtoBody'); if(!host)return; host.querySelector('.rdtoCompOverall').style.display='none'; host.querySelector('.rdtoCompMachines').innerHTML=''; const e=host.querySelector('.rdtoCompEmpty'); if(e)e.style.display=''; },
+  rdRenderComp(d){
+    const host=document.getElementById('rdtoBody'); const ofs=d.ofs||[], maqs=d.maquinas_distintas||[], ranking=d.maquina_ranking||[];
+    if(!ofs.length||!maqs.length){ this.rdCompEmpty(); return; }
+    host.querySelector('.rdtoCompEmpty').style.display='none';
+    const ov=host.querySelector('.rdtoCompOverall');
+    if(ranking.length){
+      const top=ranking[0];
+      let html=`<div><b>Mejor máquina del rango:</b> <b>${this.esc(top.maquina)}</b> · <b>${this.fU(top.uds_h)} uds/h</b> · ${this.fU(top.unidades_ok)} OK en ${this.fU(top.horas)} h · ${this.fU(top.num_ofs)} OF${top.num_ofs===1?'':'s'} · ${(top.nok_pct||0).toFixed(2)}% NOK</div>`;
+      if(ranking.length>1) html+='<div class="rdto-comp-rank">'+ranking.map((m,i)=>`<div class="rk ${i===0?'is-best':''}"><span>${i+1}${i===0?' 🏅':''}</span><span>${this.esc(m.maquina)}</span><span>${this.fU(m.uds_h)} uds/h</span><span>${(m.pct_vs_best||0).toFixed(1)}% vs mejor</span></div>`).join('')+'</div>';
+      ov.innerHTML=html; ov.style.display='';
+    } else ov.style.display='none';
+    const C=host.querySelector('.rdtoCompMachines');
+    C.innerHTML=maqs.map(m=>{const id=String(m.cod_maquina).replace(/[^a-zA-Z0-9_-]/g,'_');return `<section class="rdto-comp-machine"><div class="rdto-comp-machine-head"><span class="axis">MÁQUINA</span><h4>${this.esc(m.maquina)}</h4></div><div class="rdto-comp-row"><div><div class="rdto-comp-axis-label">piezas / hora por OF</div><div class="rdUp_${id} apx"></div><div class="rdto-comp-axis-label">OK / NOK por OF</div><div class="rdDn_${id} apx"></div></div><aside class="rdto-comp-stats rdSt_${id}"></aside></div></section>`;}).join('');
+    maqs.forEach(m=>{
+      const id=String(m.cod_maquina).replace(/[^a-zA-Z0-9_-]/g,'_');
+      const cells=ofs.map(of=>{const c=(of.maquinas||[]).find(x=>x.cod_maquina===m.cod_maquina);return c?{cod_of:of.cod_of,...c}:null;}).filter(Boolean);
+      if(!cells.length){host.querySelector('.rdUp_'+id).innerHTML='<div class="hint">Sin OFs para esta máquina.</div>';return;}
+      const cats=cells.map(c=>c.cod_of), udsH=cells.map(c=>+c.uds_h), ok=cells.map(c=>+c.unidades_ok), nok=cells.map(c=>+c.unidades_nok);
+      const valid=udsH.filter(v=>v>0), maxV=valid.length?Math.max(...valid):0, minV=valid.length?Math.min(...valid):0, avgV=valid.length?valid.reduce((a,b)=>a+b,0)/valid.length:0;
+      const tOk=ok.reduce((a,b)=>a+b,0), tNok=nok.reduce((a,b)=>a+b,0), tAll=tOk+tNok;
+      this.apex(host.querySelector('.rdUp_'+id),{chart:{type:'bar',height:240,toolbar:{show:false},animations:{enabled:false}},series:[{name:'piezas/hora',data:udsH}],colors:['#3a6aa3'],plotOptions:{bar:{columnWidth:'45%',borderRadius:2}},xaxis:{categories:cats,labels:{style:{fontSize:'11px',fontWeight:700}}},yaxis:{min:0,labels:{formatter:v=>this.fU(Math.round(v))}},dataLabels:{enabled:cats.length<=14,formatter:v=>v>0?this.fU(Math.round(v)):'',style:{fontSize:'10px',colors:['#fff']}},legend:{show:false},tooltip:{y:{formatter:v=>this.fU(Math.round(v))+' uds/h'}}});
+      this.apex(host.querySelector('.rdDn_'+id),{chart:{type:'bar',stacked:true,height:240,toolbar:{show:false},animations:{enabled:false}},series:[{name:'OK',data:ok},{name:'NOK',data:nok}],colors:['#10b981','#c8102e'],plotOptions:{bar:{columnWidth:'45%',borderRadius:2}},xaxis:{categories:cats,labels:{style:{fontSize:'11px',fontWeight:700}}},yaxis:{min:0,labels:{formatter:v=>this.fU(Math.round(v))}},dataLabels:{enabled:false},legend:{position:'bottom',fontSize:'11px'},tooltip:{shared:true,intersect:false,y:{formatter:v=>this.fU(Math.round(v))+' uds'}}});
+      const f2=v=>Number(v).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});
+      host.querySelector('.rdSt_'+id).innerHTML=`<div class="st"><div class="l">Máx piezas/hora</div><div class="v">${f2(maxV)}</div></div><div class="st"><div class="l">Mín piezas/hora</div><div class="v">${f2(minV)}</div></div><div class="st"><div class="l">Promedio piezas/hora</div><div class="v">${f2(avgV)}</div></div><div class="st ok"><div class="l">Total OK</div><div class="v">${this.fU(tOk)}</div></div><div class="st nok"><div class="l">Total NOK</div><div class="v">${this.fU(tNok)}</div></div><div class="st"><div class="l">% OK · NOK</div><div class="v">${f2(tAll>0?tOk/tAll*100:0)}% · ${f2(tAll>0?tNok/tAll*100:0)}%</div></div>`;
+    });
+  },
+  async rdOpenOf(idx){
+    const of=this._rd.ofs[idx]; if(!of)return;
+    const ov=document.createElement('div'); ov.className='fullpop';
+    ov.innerHTML=`<div class="fullpop-head"><h2>OF ${this.esc(of.cod_of)}<small>Referencia ${this.esc(this._rd.cod)} · ${(of.maquinas||[]).length} máquina(s) · ${this.fU(of.num_dias)} días · desglose horario OK/NOK</small></h2><button class="hmClose">✕ Cerrar</button></div><div class="fullpop-body"><div class="hmBody">${this.loadingHtml()}</div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('.hmClose').style.cssText='background:#f3f4f6;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280';
+    ov.querySelector('.hmClose').onclick=()=>ov.remove();
+    const body=ov.querySelector('.hmBody');
+    try{
+      const d=await this.get('oee_unificado_ref_historico_horas.php',new URLSearchParams({cod_of:of.cod_of,cod_producto:this._rd.cod,fecha_desde:this._rd.desde,fecha_hasta:this._rd.hasta}));
+      const horas=d.horas||[]; const sOk=(d.totales&&d.totales.unidades_ok)||0, sNok=(d.totales&&d.totales.unidades_nok)||0;
+      if(!sOk&&!sNok){body.innerHTML='<div class="empty">Sin producción horaria para esta OF.</div>';return;}
+      body.innerHTML=`<div class="breadcrumb">Total: <b>${this.fU(sOk)}</b> OK · <b>${this.fU(sNok)}</b> NOK</div><div class="apx"></div>`;
+      this.apex(body.querySelector('.apx'),{chart:{type:'bar',height:420,toolbar:{show:true},animations:{enabled:false}},series:[{name:'OK',data:horas.map(h=>h.unidades_ok)},{name:'NOK',data:horas.map(h=>h.unidades_nok)}],colors:['#10b981','#c8102e'],xaxis:{categories:horas.map(h=>h.hora+'h'),title:{text:'Hora del día'}},yaxis:{title:{text:'Unidades'},labels:{formatter:v=>this.fU(Math.round(v))}},plotOptions:{bar:{columnWidth:'70%'}},dataLabels:{enabled:false},legend:{position:'top'},tooltip:{y:{formatter:v=>this.fU(v)}}});
+    }catch(e){body.innerHTML=`<div class="error">${e.message}</div>`;}
   },
   async openMotivoGeneral(motivo){
     const esRef=State.por==='referencia';
@@ -831,32 +1029,46 @@ const App={
   /* ---------- HISTOGRAMA (ApexCharts rangeBar / Gantt) ---------- */
   // Barra de fechas para acotar el rango del cronograma dentro de su popup
   // (independiente del filtro principal; útil si el rango global es muy amplio).
-  histDateBar(d0,h0){
+  histDateBar(d0,h0,turnos){
+    const tu=(turnos&&turnos.length)?turnos:['M','T','N'];
+    const lbl={M:'Mañana',T:'Tarde',N:'Noche'};
+    const chks=['M','T','N'].map(t=>`<label class="hdb-chk"><input type="checkbox" class="hfT" value="${t}" ${tu.includes(t)?'checked':''}> ${lbl[t]}</label>`).join('');
     return `<div class="hist-datebar">
       <label class="hdb-l">Desde<input type="date" class="hfD" value="${d0}"></label>
       <label class="hdb-l">Hasta<input type="date" class="hfH" value="${h0}"></label>
+      <span class="hdb-l" style="gap:2px">Turnos<span class="hdb-turnos">${chks}</span></span>
       <button class="btn btn-pri hfGo">Aplicar</button>
-      <button class="btn hfReset" title="Volver al rango del filtro principal">↺ Rango del filtro</button>
-      <span class="hdb-hint">Acota el rango para leer mejor el cronograma</span>
+      <button class="btn hfReset" title="Volver al rango y turnos del filtro principal">↺ Rango del filtro</button>
+      <span class="hdb-hint">Acota rango y turnos para leer mejor el cronograma</span>
     </div>`;
   },
   histWire(el,render){
     const D=el.querySelector('.hfD'),H=el.querySelector('.hfH'),G=el.querySelector('.hfGo'),R=el.querySelector('.hfReset');
-    const go=()=>{ if(D.value&&H.value) render(D.value,H.value); };
+    const tsel=()=>[...el.querySelectorAll('.hfT:checked')].map(c=>c.value);
+    const go=()=>{ if(D.value&&H.value) render(D.value,H.value,tsel()); };
     G.onclick=go; D.onchange=go; H.onchange=go;
-    R.onclick=()=>{ D.value=fDesde.value; H.value=fHasta.value; go(); };
+    [...el.querySelectorAll('.hfT')].forEach(c=>c.onchange=go);
+    R.onclick=()=>{ D.value=fDesde.value; H.value=fHasta.value; el.querySelectorAll('.hfT').forEach(c=>c.checked=true); go(); };
+  },
+  // URLSearchParams para el histograma con override de fechas y turnos del popup.
+  histParams(extra,desde,hasta,turnos){
+    const p=this.common(Object.assign({fecha_desde:desde,fecha_hasta:hasta},extra));
+    p.delete('turnos');
+    if(turnos&&turnos.length&&turnos.length<3) p.set('turnos',turnos.join(','));
+    return p;
   },
   async openHistograma(){
+    const tu=this.turnos();
     const ov=this.push('Histograma de motivos','Cronograma de paros por máquina',
-      this.histDateBar(fDesde.value,fHasta.value)+'<div class="histwrap"></div>');
+      this.histDateBar(fDesde.value,fHasta.value,tu)+'<div class="histwrap"></div>');
     const body=this.body(ov), wrap=body.querySelector('.histwrap');
-    this.histWire(body,(dd,hh)=>this.renderHistMaqs(wrap,dd,hh));
-    this.renderHistMaqs(wrap,fDesde.value,fHasta.value);
+    this.histWire(body,(dd,hh,tt)=>this.renderHistMaqs(wrap,dd,hh,tt));
+    this.renderHistMaqs(wrap,fDesde.value,fHasta.value,tu);
   },
-  async renderHistMaqs(wrap,desde,hasta){
+  async renderHistMaqs(wrap,desde,hasta,turnos){
     wrap.innerHTML=this.loadingHtml();
     try{
-      const d=await this.get('oee_unificado_hist_maquina.php',this.common({fecha_desde:desde,fecha_hasta:hasta}));
+      const d=await this.get('oee_unificado_hist_maquina.php',this.histParams({},desde,hasta,turnos));
       const ev=d.eventos||[];
       if(!ev.length){wrap.innerHTML='<div class="empty">Sin paros en el rango</div>';return;}
       const byMot={};
@@ -1088,30 +1300,39 @@ const App={
     const pct=v=>(v==null||v==='')?'':v+'%';
     const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     const e=v=>esc(v==null?'':v);
-    // Bloque izquierdo de resumen (SAGE,TOTAL,D,R,C,ini,fin). 7 celdas.
-    const cols7=(sage,tot,dd,rr,cc,ini,fin)=>
-      `<td>${e(sage)}</td><td>${f2(tot)}</td><td class="mtx-disp">${pct(dd)}</td>`+
-      `<td class="mtx-disp">${pct(rr)}</td><td class="mtx-disp">${pct(cc)}</td>`+
-      `<td class="mtx-fab">${e(ini)}</td><td class="mtx-fab">${e(fin)}</td>`;
+    // Formato condicional salmón: % < 75 (suave) y gradiente de horas por motivo.
+    const salMot=v=>(v==null)?'':(v>3?'sal3':v>2?'sal2':v>1?'sal1':'');
+    // Bloque izquierdo (SAGE,TOTAL,D,R,C,OEE,ini,fin,real). salPct: aplicar salmón
+    // <75 en los % (solo en referencias; NO en máquina ni TOTAL).
+    const n0=v=>(v==null||v==='')?'':Math.round(v).toLocaleString('es-ES');
+    const n1=v=>(v==null||v==='')?'':(Math.round(v*10)/10).toLocaleString('es-ES');
+    const cells=(o,salPct)=>{
+      const pTd=v=>`<td class="mtx-disp${(salPct&&v!=null&&v!==''&&v<75)?' sal1':''}">${pct(v)}</td>`;
+      return `<td>${e(o.sage)}</td><td>${f2(o.tot)}</td>`+pTd(o.dd)+pTd(o.rr)+pTd(o.cc)+pTd(o.oo)+
+        `<td class="mtx-real">${f2(o.prep)}</td>`+
+        `<td class="mtx-real">${n0(o.utot)}</td><td class="mtx-real">${n0(o.uteo)}</td>`+
+        `<td class="mtx-real">${n1(o.phreal)}</td><td class="mtx-real">${n1(o.phteo)}</td>`+
+        `<td class="mtx-fab">${e(o.ini)}</td><td class="mtx-fab">${e(o.fin)}</td><td class="mtx-real">${f2(o.real)}</td>`;
+    };
     let h='<div class="mtx-wrap"><table class="mtx"><thead><tr>';
     h+='<th class="mtx-first">Máquina / Referencia</th>';
-    h+='<th>Nom. SAGE</th><th>TOTAL (h)</th><th>Disp. %</th><th>Rend. %</th><th>Cal. %</th><th>Inicio fab.</th><th>Fin fab.</th>';
+    h+='<th>Nom. SAGE</th><th>TOTAL (h)</th><th>Disp. %</th><th>Rend. %</th><th>Cal. %</th><th>OEE %</th><th>Preparación (h)</th><th>Uds. Total</th><th>Uds. Teo</th><th>Pzs/h real</th><th>Pzs/h teo</th><th>Inicio fab.</th><th>Fin fab.</th><th>Fab. real (h)</th>';
     mots.forEach(m=>h+=`<th>${esc(m)}</th>`);
     h+='</tr></thead><tbody>';
     // Fila TOTAL por motivo (horizontal, ARRIBA).
-    h+='<tr class="mtx-tot"><td class="mtx-first">TOTAL</td>'+cols7('',d.total_general,null,null,null,'','');
+    h+='<tr class="mtx-tot"><td class="mtx-first">TOTAL</td>'+cells({tot:d.total_general},false);
     mots.forEach(m=>h+=`<td>${f2(d.total_por_motivo[m])}</td>`);
     h+='</tr>';
     maqs.forEach(mq=>{
       const disp=mq.disponibilidad==null?'':mq.disponibilidad;
       h+=`<tr class="mtx-maq"><td class="mtx-first" data-cod="${esc(mq.cod_maquina)}" data-name="${esc(mq.maquina)}" data-disp="${disp}" title="Clic para ver el histograma de toda la máquina">${esc(mq.maquina)}</td>`;
-      h+=cols7('',mq.total,mq.disponibilidad,mq.rendimiento,mq.calidad,'','');
+      h+=cells({tot:mq.total,dd:mq.disponibilidad,rr:mq.rendimiento,cc:mq.calidad,oo:mq.oee},false);
       mots.forEach(m=>h+=`<td>${f2(mq.por_motivo[m])}</td>`);
       h+='</tr>';
       (mq.referencias||[]).forEach(r=>{
         h+=`<tr><td class="mtx-first mtx-ref" data-cod="${esc(mq.cod_maquina)}" data-ref="${esc(r.referencia)}" data-maq="${esc(mq.maquina)}" title="Clic para ver el histograma de esta referencia">${esc(r.referencia)}</td>`;
-        h+=cols7(r.nomenclatura,r.total,r.disponibilidad,r.rendimiento,r.calidad,r.fab_inicio,r.fab_fin);
-        mots.forEach(m=>h+=`<td>${f2(r.por_motivo[m])}</td>`);
+        h+=cells({sage:r.nomenclatura,tot:r.total,dd:r.disponibilidad,rr:r.rendimiento,cc:r.calidad,oo:r.oee,prep:r.fab_prep,utot:r.uds_total,uteo:r.uds_teo,phreal:r.ph_real,phteo:r.ph_teo,ini:r.fab_inicio,fin:r.fab_fin,real:r.fab_real},true);
+        mots.forEach(m=>{const v=r.por_motivo[m];h+=`<td class="${salMot(v)}">${f2(v)}</td>`;});
         h+='</tr>';
       });
     });
@@ -1125,7 +1346,7 @@ const App={
         <h2>${titulo}<small>${sub}</small></h2>
         <button class="hmClose">✕ Cerrar</button>
       </div>
-      <div class="fullpop-body">${this.histDateBar(fDesde.value,fHasta.value)}<div class="hmBody">${this.loadingHtml()}</div></div>`;
+      <div class="fullpop-body">${this.histDateBar(fDesde.value,fHasta.value,this.turnos())}<div class="hmBody">${this.loadingHtml()}</div></div>`;
     document.body.appendChild(ov);
     ov.querySelector('.hmClose').style.cssText='background:#f3f4f6;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280';
     ov.querySelector('.hmClose').onclick=()=>ov.remove();
@@ -1137,13 +1358,13 @@ const App={
     const dispTxt=(disp===''||disp==null||disp==='null')?'':` · Disponibilidad ${disp}%`;
     const ov=this.histPopupShell('📊 Histograma · '+name,'Cronograma de paros por referencia'+dispTxt);
     const wrap=ov.querySelector('.hmBody');
-    this.histWire(ov.querySelector('.fullpop-body'),(dd,hh)=>this.renderHistMaqRefs(wrap,cod,dd,hh));
-    this.renderHistMaqRefs(wrap,cod,fDesde.value,fHasta.value);
+    this.histWire(ov.querySelector('.fullpop-body'),(dd,hh,tt)=>this.renderHistMaqRefs(wrap,cod,dd,hh,tt));
+    this.renderHistMaqRefs(wrap,cod,fDesde.value,fHasta.value,this.turnos());
   },
-  async renderHistMaqRefs(wrap,cod,desde,hasta){
+  async renderHistMaqRefs(wrap,cod,desde,hasta,turnos){
     wrap.innerHTML=this.loadingHtml();
     try{
-      const d=await this.get('oee_unificado_hist_maquina.php',this.common({cod_maquina:cod,fecha_desde:desde,fecha_hasta:hasta}));
+      const d=await this.get('oee_unificado_hist_maquina.php',this.histParams({cod_maquina:cod},desde,hasta,turnos));
       const ev=d.eventos||[];
       if(!ev.length){wrap.innerHTML='<div class="empty">Sin paros en el rango para esta máquina</div>';return;}
       const byMot={};
@@ -1170,13 +1391,13 @@ const App={
     // Histograma enfocado a UNA referencia: una fila por MOTIVO de esa referencia.
     const ov=this.histPopupShell('📊 Histograma · '+refName,maqName+' · cronograma de paros por motivo');
     const wrap=ov.querySelector('.hmBody');
-    this.histWire(ov.querySelector('.fullpop-body'),(dd,hh)=>this.renderHistRef(wrap,cod,refName,dd,hh));
-    this.renderHistRef(wrap,cod,refName,fDesde.value,fHasta.value);
+    this.histWire(ov.querySelector('.fullpop-body'),(dd,hh,tt)=>this.renderHistRef(wrap,cod,refName,dd,hh,tt));
+    this.renderHistRef(wrap,cod,refName,fDesde.value,fHasta.value,this.turnos());
   },
-  async renderHistRef(wrap,cod,refName,desde,hasta){
+  async renderHistRef(wrap,cod,refName,desde,hasta,turnos){
     wrap.innerHTML=this.loadingHtml();
     try{
-      const d=await this.get('oee_unificado_hist_maquina.php',this.common({cod_maquina:cod,fecha_desde:desde,fecha_hasta:hasta}));
+      const d=await this.get('oee_unificado_hist_maquina.php',this.histParams({cod_maquina:cod},desde,hasta,turnos));
       const ev=(d.eventos||[]).filter(e=>(e.referencia||'(sin referencia)')===refName);
       if(!ev.length){wrap.innerHTML='<div class="empty">Sin paros para esta referencia en el rango</div>';return;}
       const byMot={};

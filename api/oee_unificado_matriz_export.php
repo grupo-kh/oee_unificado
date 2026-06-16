@@ -40,12 +40,14 @@ function _matSeccion(?string $desc): ?string {
 /**
  * Disponibilidad / Rendimiento / Calidad en % (misma fórmula que el export OEE).
  *   D = M / (M + PNP)   R = (MOT + PC) / (M + PP + PC)   C = MOKT / (MOT + PC)
+ *   OEE = D * R * C / 10000
  */
 function _matDRC(float $M, float $MOT, float $MOKT, float $PP, float $PC, float $PNP): array {
     $d = ($M + $PNP)      > 0 ? $M / ($M + $PNP) * 100               : 0.0;
     $r = ($M + $PP + $PC) > 0 ? ($MOT + $PC) / ($M + $PP + $PC) * 100 : 0.0;
     $c = ($MOT + $PC)     > 0 ? $MOKT / ($MOT + $PC) * 100            : 0.0;
-    return ['disp' => round($d, 1), 'rend' => round($r, 1), 'cal' => round($c, 1)];
+    $oee = $d * $r * $c / 10000;
+    return ['disp' => round($d, 1), 'rend' => round($r, 1), 'cal' => round($c, 1), 'oee' => round($oee, 1)];
 }
 
 /** 'YYYY-MM-DD HH:MM:SS' → 'dd/mm/yy HH:MM' (vacío si no hay fecha). */
@@ -115,14 +117,17 @@ try {
     }
     $codMaqs = array_values(array_unique($codMaqs));
 
-    // ───── 2) % D/R/C por máquina + referencia (F_his_ct agrupado por producto) ─────
-    $drcRef = [];   // [cod_maquina][cod_producto] => ['disp','rend','cal']
+    // ───── 2) % D/R/C + unidades + piezas/hora por máquina + referencia ─────
+    $drcRef   = [];   // [cod_maquina][cod_producto] => ['disp','rend','cal','oee']
+    $unitsRef = [];   // [cod_maquina][cod_producto] => ['u_total','u_teo','ph_real','ph_teo']
     if (!empty($codMaqs)) {
         $phM = implode(',', array_fill(0, count($codMaqs), '?'));
         $sqlOeeRef = "
             SELECT oee.WorkGroup AS cod_maquina, LTRIM(RTRIM(oee.Cod_producto)) AS cod_ref,
                    SUM(oee.M) AS M, SUM(oee.M_OKNOK_TEO) AS MOT, SUM(oee.M_OK_TEO) AS MOKT,
-                   SUM(oee.PPERF) AS PP, SUM(oee.PCALIDAD) AS PC, SUM(oee.PNP) AS PNP
+                   SUM(oee.PPERF) AS PP, SUM(oee.PCALIDAD) AS PC, SUM(oee.PNP) AS PNP,
+                   SUM(oee.Unidades_Total) AS u_total, SUM(oee.Unidades_Teo) AS u_teo,
+                   SUM(oee.Seg_Prod) AS seg_prod
             FROM F_his_ct('WORKCENTER','DAY','TURNOS, PRODUCTOS',
                           ? + ' 00:00:00', ? + ' 23:59:59', 16) oee
             WHERE $whereSQL AND oee.WorkGroup IN ($phM)
@@ -137,6 +142,15 @@ try {
                 (float)$r['M'], (float)$r['MOT'], (float)$r['MOKT'],
                 (float)$r['PP'], (float)$r['PC'], (float)$r['PNP']
             );
+            // Piezas/hora = unidades / horas de producción (Seg_Prod). Su ratio
+            // real/teo equivale al rendimiento.
+            $hProd = ((int)$r['seg_prod']) / 3600;
+            $unitsRef[$cm][$cr] = [
+                'u_total' => (int)$r['u_total'],
+                'u_teo'   => (int)$r['u_teo'],
+                'ph_real' => $hProd > 0 ? round($r['u_total'] / $hProd, 1) : null,
+                'ph_teo'  => $hProd > 0 ? round($r['u_teo']   / $hProd, 1) : null,
+            ];
         }
     }
 
@@ -153,22 +167,38 @@ try {
         $ph = implode(',', array_fill(0, count($codMaqs), '?'));
         $wf[] = "mq.Cod_maquina IN ($ph)";
         $pf = array_merge($pf, $codMaqs);
+        // Además del span bruto (fin-ini) calculamos el tiempo en PREPARACION
+        // (cfg_actividad.Desc_actividad = 'PREPARACION') para restarlo y obtener
+        // el tiempo de fabricación REAL.
         $sqlFab = "
             SELECT mq.Cod_maquina AS cod_maquina, LTRIM(RTRIM(prod.Cod_producto)) AS cod_ref,
-                   MIN(hp.Fecha_ini) AS ini, MAX(ISNULL(hp.Fecha_fin, hp.Fecha_ini)) AS fin
+                   MIN(hp.Fecha_ini) AS ini, MAX(ISNULL(hp.Fecha_fin, hp.Fecha_ini)) AS fin,
+                   DATEDIFF(SECOND, MIN(hp.Fecha_ini), MAX(ISNULL(hp.Fecha_fin, hp.Fecha_ini))) AS span_seg,
+                   SUM(CASE WHEN LTRIM(RTRIM(act.Desc_actividad)) = 'PREPARACION'
+                            THEN DATEDIFF(SECOND, hp.Fecha_ini, ISNULL(hp.Fecha_fin, hp.Fecha_ini))
+                            ELSE 0 END) AS prep_seg
             FROM his_prod hp
-            INNER JOIN cfg_maquina  mq   ON mq.Id_maquina   = hp.Id_maquina
-            INNER JOIN cfg_turno    ct   ON ct.Id_turno     = hp.Id_turno
-            LEFT  JOIN his_fase     fa   ON fa.Id_his_fase  = hp.Id_his_fase
-            LEFT  JOIN his_of       o    ON o.Id_his_of     = fa.Id_his_of
-            LEFT  JOIN cfg_producto prod ON prod.Id_producto = o.Id_producto
+            INNER JOIN cfg_maquina   mq   ON mq.Id_maquina   = hp.Id_maquina
+            INNER JOIN cfg_turno     ct   ON ct.Id_turno     = hp.Id_turno
+            LEFT  JOIN cfg_actividad act  ON act.Id_actividad = hp.Id_actividad
+            LEFT  JOIN his_fase      fa   ON fa.Id_his_fase  = hp.Id_his_fase
+            LEFT  JOIN his_of        o    ON o.Id_his_of     = fa.Id_his_of
+            LEFT  JOIN cfg_producto  prod ON prod.Id_producto = o.Id_producto
             WHERE " . implode(' AND ', $wf) . "
             GROUP BY mq.Cod_maquina, LTRIM(RTRIM(prod.Cod_producto))
         ";
         foreach (fetchAll('mapex', $sqlFab, $pf) as $r) {
             $cm = (string)$r['cod_maquina']; $cr = (string)$r['cod_ref'];
             if ($cr === '') continue;
-            $fab[$cm][$cr] = ['ini' => _matFecha($r['ini']), 'fin' => _matFecha($r['fin'])];
+            $prep = (int)$r['prep_seg'];
+            $real = max(0, (int)$r['span_seg'] - $prep);   // bruto − preparación
+            $fab[$cm][$cr] = [
+                'ini'     => _matFecha($r['ini']),
+                'fin'     => _matFecha($r['fin']),
+                'raw'     => substr((string)$r['ini'], 0, 19),
+                'prep_h'  => round($prep / 3600, 2),
+                'real_h'  => round($real / 3600, 2),
+            ];
         }
     }
 
@@ -251,20 +281,21 @@ try {
         } catch (\Throwable $e) { /* SAGE no disponible: nomenclatura vacía, no rompe el export */ }
     }
 
-    // Orden: motivos por total desc; máquinas alfabéticas; refs por total desc.
+    // Orden: motivos por total desc; máquinas por TOTAL paro desc (mayor arriba).
     arsort($motivoTot);
     $motivos = array_keys($motivoTot);
     $maquinas = array_keys($matrix);
-    sort($maquinas, SORT_NATURAL | SORT_FLAG_CASE);
+    usort($maquinas, fn($a, $b) => array_sum($maqTotal[$b] ?? []) <=> array_sum($maqTotal[$a] ?? []));
 
-    // Helper: datos por referencia listos para JSON/XLSX (orden por total desc).
-    $refsDe = function(string $maq) use ($refTotal, $refLabel, $matrix, $drcRef, $fab, $sageNom, $codByName) {
+    // Helper: datos por referencia listos para JSON/XLSX.
+    // Orden de las referencias de cada máquina: por FECHA DE INICIO de fabricación
+    // ascendente (orden cronológico de fabricación); las sin fecha, al final.
+    $refsDe = function(string $maq) use ($refTotal, $refLabel, $matrix, $drcRef, $unitsRef, $fab, $sageNom, $codByName) {
         $cm = $codByName[$maq] ?? '';
-        $refs = $refTotal[$maq] ?? [];
-        arsort($refs);
         $out = [];
-        foreach (array_keys($refs) as $k) {
+        foreach (array_keys($refTotal[$maq] ?? []) as $k) {
             $drc = ($k !== '__NOREF__') ? ($drcRef[$cm][$k] ?? null) : null;
+            $un  = ($k !== '__NOREF__') ? ($unitsRef[$cm][$k] ?? null) : null;
             $fb  = ($k !== '__NOREF__') ? ($fab[$cm][$k] ?? null) : null;
             $out[] = [
                 'cod_referencia'  => $k === '__NOREF__' ? '' : $k,
@@ -274,11 +305,21 @@ try {
                 'disponibilidad'  => $drc['disp'] ?? null,
                 'rendimiento'     => $drc['rend'] ?? null,
                 'calidad'         => $drc['cal']  ?? null,
+                'oee'             => $drc['oee']  ?? null,
+                'uds_total'       => $un['u_total'] ?? null,
+                'uds_teo'         => $un['u_teo']   ?? null,
+                'ph_real'         => $un['ph_real'] ?? null,
+                'ph_teo'          => $un['ph_teo']  ?? null,
                 'fab_inicio'      => $fb['ini'] ?? '',
                 'fab_fin'         => $fb['fin'] ?? '',
+                'fab_prep'        => $fb['prep_h'] ?? null,
+                'fab_real'        => $fb['real_h'] ?? null,
                 'por_motivo'      => array_map(fn($v) => round($v, 2), $matrix[$maq][$k] ?? []),
+                '_sort'           => $fb['raw'] ?? '9999-12-31 23:59:59',
             ];
         }
+        usort($out, fn($a, $b) => strcmp($a['_sort'], $b['_sort']));
+        foreach ($out as &$o) unset($o['_sort']);
         return $out;
     };
 
@@ -293,6 +334,7 @@ try {
                 'disponibilidad' => $drc['disp'] ?? null,
                 'rendimiento'    => $drc['rend'] ?? null,
                 'calidad'        => $drc['cal']  ?? null,
+                'oee'            => $drc['oee']  ?? null,
                 'total'          => round(array_sum($maqTotal[$maq] ?? []), 2),
                 'por_motivo'     => array_map(fn($v) => round($v, 2), $maqTotal[$maq] ?? []),
                 'referencias'    => $refsDe($maq),
@@ -312,16 +354,18 @@ try {
     }
 
     // ───── Construir el XLSX ─────
-    // Columnas: 1 Máquina/Ref · 2 Nom.SAGE · 3 TOTAL(h) · 4 Disp · 5 Rend · 6 Cal
-    //           · 7 Inicio fab · 8 Fin fab · 9.. motivos
+    // Columnas: 1 Máquina/Ref · 2 Nom.SAGE · 3 TOTAL(h) · 4 Disp · 5 Rend · 6 Cal · 7 OEE
+    //           · 8 Preparación(h) · 9 Uds.Total · 10 Uds.Teo · 11 Pzs/h real · 12 Pzs/h teo
+    //           · 13 Inicio fab · 14 Fin fab · 15 Fab. real(h) · 16.. motivos
     $book = new Spreadsheet();
     $book->getProperties()->setCreator('KH Plan Attainment')->setTitle('OEE Unificado · Matriz')
         ->setDescription("Matriz motivos × máquina/referencia $fdesde a $fhasta");
     $ws = $book->getActiveSheet();
     $ws->setTitle('Matriz');
 
-    $colName = 1; $colSage = 2; $colTotal = 3; $colDisp = 4; $colRend = 5; $colCal = 6;
-    $colIni = 7; $colFin = 8; $colMot0 = 9;
+    $colName = 1; $colSage = 2; $colTotal = 3; $colDisp = 4; $colRend = 5; $colCal = 6; $colOee = 7;
+    $colPrep = 8; $colUTot = 9; $colUTeo = 10; $colPhReal = 11; $colPhTeo = 12;
+    $colIni = 13; $colFin = 14; $colReal = 15; $colMot0 = 16;
     $nMot = count($motivos);
     $lastCol = $colMot0 + $nMot - 1; if ($lastCol < $colFin) $lastCol = $colFin;
     $lastColLt = Coordinate::stringFromColumnIndex($lastCol);
@@ -346,8 +390,15 @@ try {
     $ws->setCellValue([$colDisp, $hRow], 'Disp. %');
     $ws->setCellValue([$colRend, $hRow], 'Rend. %');
     $ws->setCellValue([$colCal,  $hRow], 'Cal. %');
+    $ws->setCellValue([$colOee,  $hRow], 'OEE %');
     $ws->setCellValue([$colIni,  $hRow], 'Inicio fab.');
     $ws->setCellValue([$colFin,  $hRow], 'Fin fab.');
+    $ws->setCellValue([$colPrep, $hRow], 'Preparación (h)');
+    $ws->setCellValue([$colUTot, $hRow], 'Uds. Total');
+    $ws->setCellValue([$colUTeo, $hRow], 'Uds. Teo');
+    $ws->setCellValue([$colPhReal, $hRow], 'Pzs/h real');
+    $ws->setCellValue([$colPhTeo, $hRow], 'Pzs/h teo');
+    $ws->setCellValue([$colReal, $hRow], 'Fab. real (h)');
     foreach ($motivos as $i => $mot) $ws->setCellValue([$colMot0 + $i, $hRow], $mot);
     $hdrRange = "A$hRow:{$lastColLt}$hRow";
     $ws->getStyle($hdrRange)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
@@ -369,6 +420,17 @@ try {
     $ws->getStyle("A$totRow:{$lastColLt}$totRow")->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
     $ws->getStyle("A$totRow:{$lastColLt}$totRow")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('2D4D7A');
 
+    // Formato condicional (tonos salmón).
+    //   - % D/R/C/OEE < 75  → salmón suave.
+    //   - celdas de motivo por referencia: >1 suave · >2 medio · >3 oscuro.
+    $SAL1 = 'FDE2D8'; $SAL2 = 'F9C3B0'; $SAL3 = 'F3A088';
+    $fillCell = function(int $col, int $rw, string $rgb) use ($ws) {
+        $ws->getStyle([$col, $rw])->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB($rgb);
+    };
+    $salMot = function(float $v) use ($SAL1, $SAL2, $SAL3): ?string {
+        if ($v > 3) return $SAL3; if ($v > 2) return $SAL2; if ($v > 1) return $SAL1; return null;
+    };
+
     // Cuerpo.
     $row = $totRow + 1;
     foreach ($maquinas as $maq) {
@@ -384,9 +446,12 @@ try {
             $ws->setCellValue([$colDisp, $maqRow], $drcByName[$maq]['disp']);
             $ws->setCellValue([$colRend, $maqRow], $drcByName[$maq]['rend']);
             $ws->setCellValue([$colCal,  $maqRow], $drcByName[$maq]['cal']);
+            $ws->setCellValue([$colOee,  $maqRow], $drcByName[$maq]['oee']);
         }
         $ws->getStyle("A$maqRow:{$lastColLt}$maqRow")->getFont()->setBold(true);
         $ws->getStyle("A$maqRow:{$lastColLt}$maqRow")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F4');
+        // (El formato condicional salmón en % NO se aplica a las filas de máquina,
+        //  solo al detalle por referencia.)
         $row++;
 
         foreach ($refsDe($maq) as $rf) {
@@ -397,11 +462,24 @@ try {
             if ($rf['disponibilidad'] !== null) $ws->setCellValue([$colDisp, $row], $rf['disponibilidad']);
             if ($rf['rendimiento'] !== null)    $ws->setCellValue([$colRend, $row], $rf['rendimiento']);
             if ($rf['calidad'] !== null)        $ws->setCellValue([$colCal,  $row], $rf['calidad']);
+            if ($rf['oee'] !== null)            $ws->setCellValue([$colOee,  $row], $rf['oee']);
             $ws->setCellValueExplicit([$colIni, $row], $rf['fab_inicio'], \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
             $ws->setCellValueExplicit([$colFin, $row], $rf['fab_fin'],    \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            if ($rf['fab_prep'] !== null) $ws->setCellValue([$colPrep, $row], $rf['fab_prep']);
+            if ($rf['uds_total'] !== null) $ws->setCellValue([$colUTot, $row], $rf['uds_total']);
+            if ($rf['uds_teo'] !== null)   $ws->setCellValue([$colUTeo, $row], $rf['uds_teo']);
+            if ($rf['ph_real'] !== null)   $ws->setCellValue([$colPhReal, $row], $rf['ph_real']);
+            if ($rf['ph_teo'] !== null)    $ws->setCellValue([$colPhTeo, $row], $rf['ph_teo']);
+            if ($rf['fab_real'] !== null) $ws->setCellValue([$colReal, $row], $rf['fab_real']);
+            // Salmón en % < 75 de la referencia.
+            foreach ([[$colDisp,'disponibilidad'],[$colRend,'rendimiento'],[$colCal,'calidad'],[$colOee,'oee']] as $pc) {
+                if ($rf[$pc[1]] !== null && $rf[$pc[1]] < 75) $fillCell($pc[0], $row, $SAL1);
+            }
             foreach ($motivos as $i => $mot) {
                 $v = $rf['por_motivo'][$mot] ?? 0;
                 if ($v > 0) $ws->setCellValue([$colMot0 + $i, $row], round($v, 2));
+                $tone = $salMot((float)$v);          // gradiente salmón por horas de paro
+                if ($tone !== null) $fillCell($colMot0 + $i, $row, $tone);
             }
             $row++;
         }
@@ -411,7 +489,7 @@ try {
     // Formatos: horas (TOTAL + motivos), % (D/R/C), texto fechas, bordes y anchos.
     $totLt  = Coordinate::stringFromColumnIndex($colTotal);
     $motIniLt = Coordinate::stringFromColumnIndex($colMot0);
-    $calLt  = Coordinate::stringFromColumnIndex($colCal);
+    $pctFinLt = Coordinate::stringFromColumnIndex($colOee);
     $dispLt = Coordinate::stringFromColumnIndex($colDisp);
     if ($lastRow >= $totRow) {
         // Columna TOTAL (izquierda) + columnas de motivos = horas.
@@ -421,18 +499,31 @@ try {
             $ws->getStyle("{$motIniLt}$totRow:{$lastColLt}$lastRow")->getNumberFormat()->setFormatCode('#,##0.00');
             $ws->getStyle("{$motIniLt}$totRow:{$lastColLt}$lastRow")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         }
-        $ws->getStyle("{$dispLt}$totRow:{$calLt}$lastRow")->getNumberFormat()->setFormatCode('0.0"%"');
-        $ws->getStyle("{$dispLt}$totRow:{$calLt}$lastRow")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $ws->getStyle("{$dispLt}$totRow:{$pctFinLt}$lastRow")->getNumberFormat()->setFormatCode('0.0"%"');
+        $ws->getStyle("{$dispLt}$totRow:{$pctFinLt}$lastRow")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        foreach ([$colPrep, $colReal] as $cc) {   // horas: prep y fab. real (no adyacentes)
+            $lt = Coordinate::stringFromColumnIndex($cc);
+            $ws->getStyle("{$lt}$totRow:{$lt}$lastRow")->getNumberFormat()->setFormatCode('#,##0.00');
+            $ws->getStyle("{$lt}$totRow:{$lt}$lastRow")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+        }
+        $utLt = Coordinate::stringFromColumnIndex($colUTot);
+        $ptLt = Coordinate::stringFromColumnIndex($colPhTeo);
+        $ws->getStyle("{$utLt}$totRow:" . Coordinate::stringFromColumnIndex($colUTeo) . "$lastRow")->getNumberFormat()->setFormatCode('#,##0');
+        $ws->getStyle(Coordinate::stringFromColumnIndex($colPhReal) . "$totRow:{$ptLt}$lastRow")->getNumberFormat()->setFormatCode('#,##0.0');
+        $ws->getStyle("{$utLt}$totRow:{$ptLt}$lastRow")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         $ws->getStyle("A$hRow:{$lastColLt}$lastRow")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('C9D4E3');
     }
     $ws->getColumnDimension('A')->setWidth(40);
     $ws->getColumnDimension(Coordinate::stringFromColumnIndex($colSage))->setWidth(16);
     $ws->getColumnDimension($totLt)->setWidth(13);
-    foreach ([$colDisp,$colRend,$colCal] as $c) $ws->getColumnDimension(Coordinate::stringFromColumnIndex($c))->setWidth(9);
+    foreach ([$colDisp,$colRend,$colCal,$colOee] as $c) $ws->getColumnDimension(Coordinate::stringFromColumnIndex($c))->setWidth(9);
     $ws->getColumnDimension(Coordinate::stringFromColumnIndex($colIni))->setWidth(15);
     $ws->getColumnDimension(Coordinate::stringFromColumnIndex($colFin))->setWidth(15);
+    $ws->getColumnDimension(Coordinate::stringFromColumnIndex($colPrep))->setWidth(13);
+    foreach ([$colUTot,$colUTeo,$colPhReal,$colPhTeo] as $c) $ws->getColumnDimension(Coordinate::stringFromColumnIndex($c))->setWidth(11);
+    $ws->getColumnDimension(Coordinate::stringFromColumnIndex($colReal))->setWidth(13);
     for ($c = $colMot0; $c <= $lastCol; $c++) $ws->getColumnDimension(Coordinate::stringFromColumnIndex($c))->setWidth(12);
-    // Inmoviliza bloque izquierdo (8 cols) + cabecera + fila TOTAL.
+    // Inmoviliza bloque izquierdo (15 cols) + cabecera + fila TOTAL.
     $ws->freezePane(Coordinate::stringFromColumnIndex($colMot0) . ($totRow + 1));
 
     // ───── Descargar ─────
