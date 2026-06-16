@@ -3,9 +3,10 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/helpers.php';
 
 /**
- * Referencias con escandallo (SAGE, vista KHITT_estructuras).
- * Una referencia "tiene escandallo" si tiene al menos un componente distinto
- * de sí misma (articulocomponente <> codigoarticulo).
+ * Referencias del escandallo (SAGE, vista KHITT_estructuras). Incluye TODAS las
+ * referencias presentes en la vista (con o sin componentes), para poder buscarlas
+ * por código SAGE / nombre / ReferenciaEdi_. num_componentes = componentes reales
+ * (articulocomponente <> codigoarticulo).
  *
  * Devuelve: { refs: [{ cod_producto, desc, referencia_edi, num_componentes }] }
  */
@@ -19,8 +20,6 @@ try {
         FROM KHITT_estructuras e
         LEFT JOIN Articulos a ON a.CodigoArticulo = e.codigoarticulo
         GROUP BY LTRIM(RTRIM(e.codigoarticulo))
-        HAVING COUNT(DISTINCT CASE WHEN LTRIM(RTRIM(e.articulocomponente)) <> LTRIM(RTRIM(e.codigoarticulo))
-                                   THEN LTRIM(RTRIM(e.articulocomponente)) END) > 0
     ");
 
     $refs = [];
