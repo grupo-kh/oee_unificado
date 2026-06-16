@@ -355,8 +355,8 @@ try {
 
     // ───── Construir el XLSX ─────
     // Columnas: 1 Máquina/Ref · 2 Nom.SAGE · 3 TOTAL(h) · 4 Disp · 5 Rend · 6 Cal · 7 OEE
-    //           · 8 Preparación(h) · 9 Uds.Total · 10 Uds.Teo · 11 Pzs/h real · 12 Pzs/h teo
-    //           · 13 Inicio fab · 14 Fin fab · 15 Fab. real(h) · 16.. motivos
+    //           · 8 Preparación(h) · 9 Inicio fab · 10 Fin fab · 11 Uds.Total · 12 Uds.Teo
+    //           · 13 Pzs/h real · 14 Pzs/h teo · 15 Fab. real(h) · 16.. motivos
     $book = new Spreadsheet();
     $book->getProperties()->setCreator('KH Plan Attainment')->setTitle('OEE Unificado · Matriz')
         ->setDescription("Matriz motivos × máquina/referencia $fdesde a $fhasta");
@@ -364,8 +364,8 @@ try {
     $ws->setTitle('Matriz');
 
     $colName = 1; $colSage = 2; $colTotal = 3; $colDisp = 4; $colRend = 5; $colCal = 6; $colOee = 7;
-    $colPrep = 8; $colUTot = 9; $colUTeo = 10; $colPhReal = 11; $colPhTeo = 12;
-    $colIni = 13; $colFin = 14; $colReal = 15; $colMot0 = 16;
+    $colPrep = 8; $colIni = 9; $colFin = 10; $colUTot = 11; $colUTeo = 12;
+    $colPhReal = 13; $colPhTeo = 14; $colReal = 15; $colMot0 = 16;
     $nMot = count($motivos);
     $lastCol = $colMot0 + $nMot - 1; if ($lastCol < $colFin) $lastCol = $colFin;
     $lastColLt = Coordinate::stringFromColumnIndex($lastCol);

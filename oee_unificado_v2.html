@@ -538,7 +538,7 @@ const App={
     else this.rdSetRange('month');
     host.querySelector('.rdtoSearch').oninput=()=>this.rdRenderList();
     host.querySelector('.rdtoMulti').onchange=()=>this.rdRenderList();
-    host.querySelector('.rdtoSelect').onchange=()=>this.rdRecargar();
+    host.querySelector('.rdtoSelect').onchange=()=>this.rdOnSelect();
     host.querySelector('.rdtoDesde').onchange=()=>this.rdRecargar();
     host.querySelector('.rdtoHasta').onchange=()=>this.rdRecargar();
     host.querySelectorAll('.rdto-quick button').forEach(b=>b.onclick=()=>{this.rdSetRange(b.dataset.r);this.rdRecargar();});
@@ -574,6 +574,21 @@ const App={
     else if(kind==='6months')d.setMonth(t.getMonth()-6); else if(kind==='year')d.setFullYear(t.getFullYear()-1);
     host.querySelector('.rdtoDesde').value=d.toISOString().slice(0,10);
     host.querySelector('.rdtoHasta').value=t.toISOString().slice(0,10);
+  },
+  rdOnSelect(){
+    // Al elegir referencia, auto-ajusta Desde/Hasta a su 1ª y última fabricación
+    // (capado a 366 días por el límite del endpoint).
+    const host=document.getElementById('rdtoBody');
+    const cod=host.querySelector('.rdtoSelect').value;
+    const ref=this._rd.refs.find(r=>String(r.cod_producto)===cod);
+    if(ref&&ref.ultima){
+      let desde=ref.primera||ref.ultima; const hasta=ref.ultima;
+      const cap=new Date(hasta); cap.setDate(cap.getDate()-365);
+      if(new Date(desde)<cap) desde=cap.toISOString().slice(0,10);
+      host.querySelector('.rdtoDesde').value=desde;
+      host.querySelector('.rdtoHasta').value=hasta;
+    }
+    this.rdRecargar();
   },
   async rdRecargar(){
     const host=document.getElementById('rdtoBody');
@@ -1310,13 +1325,14 @@ const App={
       const pTd=v=>`<td class="mtx-disp${(salPct&&v!=null&&v!==''&&v<75)?' sal1':''}">${pct(v)}</td>`;
       return `<td>${e(o.sage)}</td><td>${f2(o.tot)}</td>`+pTd(o.dd)+pTd(o.rr)+pTd(o.cc)+pTd(o.oo)+
         `<td class="mtx-real">${f2(o.prep)}</td>`+
+        `<td class="mtx-fab">${e(o.ini)}</td><td class="mtx-fab">${e(o.fin)}</td>`+
         `<td class="mtx-real">${n0(o.utot)}</td><td class="mtx-real">${n0(o.uteo)}</td>`+
         `<td class="mtx-real">${n1(o.phreal)}</td><td class="mtx-real">${n1(o.phteo)}</td>`+
-        `<td class="mtx-fab">${e(o.ini)}</td><td class="mtx-fab">${e(o.fin)}</td><td class="mtx-real">${f2(o.real)}</td>`;
+        `<td class="mtx-real">${f2(o.real)}</td>`;
     };
     let h='<div class="mtx-wrap"><table class="mtx"><thead><tr>';
     h+='<th class="mtx-first">Máquina / Referencia</th>';
-    h+='<th>Nom. SAGE</th><th>TOTAL (h)</th><th>Disp. %</th><th>Rend. %</th><th>Cal. %</th><th>OEE %</th><th>Preparación (h)</th><th>Uds. Total</th><th>Uds. Teo</th><th>Pzs/h real</th><th>Pzs/h teo</th><th>Inicio fab.</th><th>Fin fab.</th><th>Fab. real (h)</th>';
+    h+='<th>Nom. SAGE</th><th>TOTAL (h)</th><th>Disp. %</th><th>Rend. %</th><th>Cal. %</th><th>OEE %</th><th>Preparación (h)</th><th>Inicio fab.</th><th>Fin fab.</th><th>Uds. Total</th><th>Uds. Teo</th><th>Pzs/h real</th><th>Pzs/h teo</th><th>Fab. real (h)</th>';
     mots.forEach(m=>h+=`<th>${esc(m)}</th>`);
     h+='</tr></thead><tbody>';
     // Fila TOTAL por motivo (horizontal, ARRIBA).
