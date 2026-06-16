@@ -47,12 +47,12 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
 <body>
 <div class="wrap">
   <header>
-    <h1>🧩 Referencias · Escandallo / Centro / Máquina<small>componentes (SAGE) y centro/máquina (MAPEX)</small></h1>
+    <h1>🧩 Referencias · Escandallo / Centro / Máquina<small>componentes, centro y máquina (SAGE)</small></h1>
     <input type="search" class="search" id="search" placeholder="Buscar referencia…">
   </header>
   <div class="layout">
     <div class="card">
-      <div class="card-h">Referencias fabricables <span class="badge mapex">MAPEX</span> <span id="refcount" style="margin-left:auto;color:#9ca3af;font-weight:500;font-size:12px"></span></div>
+      <div class="card-h">Referencias con escandallo <span class="badge sage">SAGE</span> <span id="refcount" style="margin-left:auto;color:#9ca3af;font-weight:500;font-size:12px"></span></div>
       <div class="reflist" id="reflist"><div class="loading">Cargando…</div></div>
     </div>
     <div id="detail"><div class="card"><div class="placeholder">Selecciona una referencia de la izquierda para ver su escandallo y su centro/máquina.</div></div></div>
@@ -89,7 +89,7 @@ function renderList(){
     <div class="refitem${String(r.cod_producto)===CUR?' active':''}" data-cod="${esc(r.cod_producto)}">
       <div class="rn">${esc(r.desc)}</div>
       <div class="rs">SAGE: ${esc(r.referencia_edi||'—')} · cód: ${esc(r.cod_producto)}</div>
-      <span class="rc">${fU(r.num_maquinas)} máq</span>${r.num_componentes>0?` <span class="rc" style="color:#8a5a1a;background:#f6ecdb;border-color:#e0c79a">${fU(r.num_componentes)} comp.</span>`:''}
+      <span class="rc" style="color:#8a5a1a;background:#f6ecdb;border-color:#e0c79a">${fU(r.num_componentes)} componente${r.num_componentes===1?'':'s'}</span>
     </div>`).join('');
   [...document.querySelectorAll('.refitem')].forEach(el=>el.onclick=()=>selectRef(el.dataset.cod));
 }
@@ -104,28 +104,22 @@ async function selectRef(cod){
   }catch(e){ det.innerHTML=`<div class="card"><div class="empty">Error: ${esc(e.message)}</div></div>`; }
 }
 function renderDetail(d){
-  const r=d.referencia||{}, comps=d.componentes||[], fases=d.fases||[];
+  const r=d.referencia||{}, comps=d.componentes||[], maquinas=d.maquinas||[];
   let h=`<div class="detail">
     <div class="det-head"><div class="t">${esc(r.desc)}</div><div class="s">SAGE: ${esc(r.referencia_edi||'—')} · código: ${esc(r.cod)}</div></div>`;
-  // Componentes
-  h+=`<div class="card"><div class="card-h">Escandallo · componentes <span class="badge sage">SAGE</span></div>`;
-  if(comps.length){
-    h+='<table><thead><tr><th>Componente</th><th>Código</th><th class="num">Unidades</th><th>UM</th></tr></thead><tbody>';
-    comps.forEach(c=>h+=`<tr><td>${esc(c.desc)}</td><td>${esc(c.cod)}</td><td class="num">${f2(c.unidades)}</td><td>${esc(c.um)}</td></tr>`);
-    h+='</tbody></table>';
-  } else h+='<div class="empty">Sin escandallo definido en SAGE.</div>';
+  // Centro y máquina (máquinas de fabricación del propio artículo)
+  h+=`<div class="card"><div class="card-h">Centro y máquina <span class="badge sage">SAGE</span></div>`;
+  if(maquinas.length){
+    h+='<div style="padding:14px 16px"><div class="maqs">'+maquinas.map(m=>`<div class="maq"><div class="mn">${esc(m.maquina||m.centro)}</div><div class="md">centro ${esc(m.centro)}</div></div>`).join('')+'</div></div>';
+  } else h+='<div class="empty">Sin centro/máquina en el escandallo.</div>';
   h+='</div>';
-  // Centro y máquina
-  h+=`<div class="card"><div class="card-h">Centro y máquina <span class="badge mapex">MAPEX</span></div>`;
-  if(fases.length){
-    fases.forEach(f=>{
-      h+=`<div class="fase"><div class="ft">Fase ${f.orden} · ${esc(f.desc_fase)} <small>[${esc(f.cod_fase)}]</small></div>`;
-      if((f.maquinas||[]).length){
-        h+='<div class="maqs">'+f.maquinas.map(m=>`<div class="maq"><div class="mn">${esc(m.desc_maquina)}</div><div class="md">${esc(m.cod_maquina)} · rend. nominal ${fU(m.rend_nominal)}${m.seg_ciclo?(' · ciclo '+m.seg_ciclo+'s'):''}</div></div>`).join('')+'</div>';
-      } else h+='<div class="md" style="color:#9ca3af">Sin máquinas configuradas.</div>';
-      h+='</div>';
-    });
-  } else h+='<div class="empty">Sin fases de fabricación en MAPEX para esta referencia.</div>';
+  // Escandallo · componentes
+  h+=`<div class="card"><div class="card-h">Escandallo · componentes <span class="badge sage">SAGE</span> <span style="margin-left:auto;color:#9ca3af;font-weight:500;font-size:12px">${comps.length} línea${comps.length===1?'':'s'}</span></div>`;
+  if(comps.length){
+    h+='<table><thead><tr><th>Componente</th><th>Código</th><th>Centro</th><th>Máquina</th><th class="num">Uds/ud</th></tr></thead><tbody>';
+    comps.forEach(c=>h+=`<tr><td>${esc(c.desc)}</td><td>${esc(c.cod)}</td><td>${esc(c.centro||'—')}</td><td>${esc(c.maquina||'—')}</td><td class="num">${f2(c.unidades)}</td></tr>`);
+    h+='</tbody></table>';
+  } else h+='<div class="empty">Sin componentes en el escandallo.</div>';
   h+='</div></div>';
   $('#detail').innerHTML=h;
 }
