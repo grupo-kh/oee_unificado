@@ -1,5 +1,5 @@
 <?php
-// TEMP: exploración del esquema Logicclass (Sage) para el Tablero Kanban - Entregas.
+// TEMP: exploración del esquema Sage  para el Tablero Kanban - Entregas.
 error_reporting(E_ERROR | E_PARSE);
 require __DIR__ . '/../config/database.php';
 $pdo = getConnection('sage');

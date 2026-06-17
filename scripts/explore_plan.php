@@ -3,7 +3,8 @@ ini_set('memory_limit', '2G');
 require __DIR__ . '/../vendor/autoload.php';
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
-$file = $argv[1] ?? 'Z:\Produccion\2 - Control de la producción\3 - Seguimiento producción\Planificaciones diarias\F13057 Seguimiento OFs 22.04.2026.xlsm';
+$file = $argv[1] ?? (getenv('EXCEL_BASE_PATH') ? getenv('EXCEL_BASE_PATH') . '\\fichero.xlsm' : 'ruta\\al\\fichero.xlsm');
+if (!is_file($file)) { fwrite(STDERR, "Uso: php explore_plan.php <ruta_al_xlsm>\n"); exit(1); }
 $reader = IOFactory::createReaderForFile($file);
 $reader->setReadDataOnly(true);
 $reader->setLoadSheetsOnly(['PLANIFICACIÓN']);

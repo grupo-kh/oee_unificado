@@ -225,6 +225,15 @@ tbody tr:hover{background:#f9fafb}
 .rdtbl th.r,.rdtbl td.r{text-align:right;font-variant-numeric:tabular-nums}
 .rdtbl tbody tr:hover{background:#f6f9fc}
 .rdtbl tbody tr.ofrow{cursor:pointer}
+/* Popup análisis histórico por artículo (réplica QlikView) */
+.oa-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:6px}
+.oa-kpi{background:#0d2233;border:1px solid #16364f;border-radius:10px;padding:14px 18px}
+.oa-kpi-l{font-size:11px;font-weight:700;color:#9fc6e8;text-transform:uppercase;letter-spacing:.5px}
+.oa-kpi-v{font-size:34px;font-weight:800;color:#34c0ff;font-variant-numeric:tabular-nums;text-align:right;margin-top:6px;text-shadow:0 0 8px rgba(52,192,255,.35)}
+.oa-kpi-v.neg{color:#ff7b6e;text-shadow:0 0 8px rgba(255,123,110,.35)}
+.oa-sech{background:#8a1538;color:#fff;font-weight:700;font-size:13.5px;padding:9px 14px;border-radius:7px;margin:18px 0 10px}
+.oa-tbl td.neg,.oa-tbl td.r.neg{color:#c8102e;font-weight:700}
+.oa-tbl tr.oa-tot td{background:#eef3f9;font-weight:800;color:#1e3a5f;border-top:2px solid #c9d6e4}
 .ofp-sub{font-size:12.5px;color:#5b6f86;margin:4px 0 12px}
 .ofk-row{display:flex;gap:8px;margin-bottom:12px}
 .ofk{flex:1;color:#fff;border-radius:8px;padding:8px 10px;text-align:center}
@@ -472,8 +481,9 @@ const App={
         }
       }
       this.renderGeneralMotivos(d.motivos||[]);
-      if(State.metrica==='rendimiento') this.renderRendimiento();
-      else { const rb=document.getElementById('rdtoBody'); if(rb) rb.innerHTML=''; }
+      // Histórico + comparativa por referencia ya no se muestran en la pantalla principal:
+      // se abren al clicar una referencia en «Referencias fabricadas · {máquina}» (rdRefModulos).
+      const rb=document.getElementById('rdtoBody'); if(rb) rb.innerHTML='';
     }catch(e){machBody.innerHTML=`<div class="error">${e.message}</div>`;}
   },
 
@@ -522,25 +532,18 @@ const App={
   fU(n){return (Number(n)||0).toLocaleString('es-ES');},
   fFecha(iso){if(!iso)return '—';const[y,m,d]=String(iso).split('-');return `${d}/${m}/${y}`;},
   esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));},
-  renderRendimiento(){
-    const host=document.getElementById('rdtoBody');
-    if(host.querySelector('.rdtoSelect')) return;   // ya construido, conservar estado/selección
+  // Histórico + comparativa de una referencia concreta, renderizados en `host`
+  // (se invoca al clicar una referencia en «Referencias fabricadas · {máquina}»).
+  // Usa el rango de fechas del filtro principal.
+  async rdRefModulos(host,cod,name){
+    this._rd.cod=cod; this._rd.desde=fDesde.value; this._rd.hasta=fHasta.value;
     host.innerHTML=`
-      <div class="module-general rdto-mod">
+      <div class="module-general rdto-mod" style="margin-top:18px">
         <div class="mg-head"><span class="badge-gen">RDTO</span>
-          <span class="mg-title">Histórico de producción por referencia<small> · OFs por referencia · clic en una OF = desglose horario</small></span></div>
+          <span class="mg-title">Histórico de producción · ${this.esc(name)}<small> · OFs de la referencia · clic en una OF = desglose horario</small></span></div>
         <div class="mg-body">
-          <div class="rdto-controls">
-            <label>Referencia<input type="search" class="rdtoSearch" placeholder="Filtrar lista…" style="padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px"></label>
-            <label>&nbsp;<select class="rdtoSelect"><option value="">— Cargando… —</option></select></label>
-            <label class="chk">&nbsp;<span style="display:flex;align-items:center;gap:6px"><input type="checkbox" class="rdtoMulti"> Solo multi-máquina <span class="rdto-multi-n rdtoMultiN">0</span></span></label>
-            <label>Desde<input type="date" class="rdtoDesde"></label>
-            <label>Hasta<input type="date" class="rdtoHasta"></label>
-            <span class="rdto-quick"><button data-r="month">Mes</button><button data-r="3months">3 meses</button><button data-r="6months">6 meses</button><button data-r="year">1 año</button></span>
-            <span class="rdtoScope hint"></span>
-          </div>
           <div class="rdtoResumen" style="display:none"></div>
-          <div class="rdtoHistWrap"><div class="hint">Elige una referencia para ver su histórico de OFs.</div></div>
+          <div class="rdtoHistWrap">${this.loadingHtml()}</div>
         </div>
       </div>
       <div class="module-general rdto-mod">
@@ -549,80 +552,19 @@ const App={
         <div class="mg-body">
           <div class="rdtoCompOverall rdto-comp-overall" style="display:none"></div>
           <div class="rdtoCompMachines"></div>
-          <div class="rdtoCompEmpty hint">Elige una referencia para ver la comparativa.</div>
+          <div class="rdtoCompEmpty hint" style="display:none"></div>
         </div>
       </div>`;
-    if(this._rd.desde){host.querySelector('.rdtoDesde').value=this._rd.desde;host.querySelector('.rdtoHasta').value=this._rd.hasta;}
-    else this.rdSetRange('month');
-    host.querySelector('.rdtoSearch').oninput=()=>this.rdRenderList();
-    host.querySelector('.rdtoMulti').onchange=()=>this.rdRenderList();
-    host.querySelector('.rdtoSelect').onchange=()=>this.rdOnSelect();
-    host.querySelector('.rdtoDesde').onchange=()=>this.rdRecargar();
-    host.querySelector('.rdtoHasta').onchange=()=>this.rdRecargar();
-    host.querySelectorAll('.rdto-quick button').forEach(b=>b.onclick=()=>{this.rdSetRange(b.dataset.r);this.rdRecargar();});
-    this.rdLoadList();
-  },
-  async rdLoadList(){
-    const host=document.getElementById('rdtoBody');
-    try{
-      const d=await this.get('oee_unificado_ref_lista.php',new URLSearchParams());
-      this._rd.refs=Array.isArray(d.refs)?d.refs:[];
-      this.rdRenderList();
-      const sc=host.querySelector('.rdtoScope'); if(sc&&d.desde) sc.textContent=`Producción desde ${this.fFecha(d.desde)} · ${this._rd.refs.length} refs`;
-      const mc=Number(d.multi_count)||this._rd.refs.filter(r=>+r.num_maquinas>1).length;
-      host.querySelector('.rdtoMultiN').textContent=mc;
-      if(this._rd.cod){ const sel=host.querySelector('.rdtoSelect'); if([...sel.options].some(o=>o.value===this._rd.cod)){sel.value=this._rd.cod;this.rdRecargar();} }
-    }catch(e){ const sel=host.querySelector('.rdtoSelect'); if(sel)sel.innerHTML='<option value="">— Error cargando referencias —</option>'; }
-  },
-  rdRenderList(){
-    const host=document.getElementById('rdtoBody'); if(!host)return;
-    const sel=host.querySelector('.rdtoSelect'); if(!sel)return;
-    const q=(host.querySelector('.rdtoSearch').value||'').toLowerCase().trim();
-    const onlyMulti=host.querySelector('.rdtoMulti').checked; const prev=sel.value;
-    let list=this._rd.refs;
-    if(onlyMulti)list=list.filter(r=>+r.num_maquinas>1);
-    if(q)list=list.filter(r=>(r.cod_producto||'').toLowerCase().includes(q)||(r.desc_producto||'').toLowerCase().includes(q));
-    const ph=list.length?`— Elige una referencia (${list.length}) —`:'— Sin coincidencias —';
-    sel.innerHTML=`<option value="">${ph}</option>`+list.map(r=>{const n=+r.num_maquinas||0;return `<option value="${this.esc(r.cod_producto)}">${this.esc(r.desc_producto)}${n>1?` [${n} máq]`:''}</option>`;}).join('');
-    sel.value=(prev&&[...sel.options].some(o=>o.value===prev))?prev:'';
-  },
-  rdSetRange(kind){
-    const host=document.getElementById('rdtoBody'); const t=new Date(),d=new Date();
-    if(kind==='month')d.setMonth(t.getMonth()-1); else if(kind==='3months')d.setMonth(t.getMonth()-3);
-    else if(kind==='6months')d.setMonth(t.getMonth()-6); else if(kind==='year')d.setFullYear(t.getFullYear()-1);
-    host.querySelector('.rdtoDesde').value=d.toISOString().slice(0,10);
-    host.querySelector('.rdtoHasta').value=t.toISOString().slice(0,10);
-  },
-  rdOnSelect(){
-    // Al elegir referencia, auto-ajusta Desde/Hasta a su 1ª y última fabricación
-    // (capado a 366 días por el límite del endpoint).
-    const host=document.getElementById('rdtoBody');
-    const cod=host.querySelector('.rdtoSelect').value;
-    const ref=this._rd.refs.find(r=>String(r.cod_producto)===cod);
-    if(ref&&ref.ultima){
-      let desde=ref.primera||ref.ultima; const hasta=ref.ultima;
-      const cap=new Date(hasta); cap.setDate(cap.getDate()-365);
-      if(new Date(desde)<cap) desde=cap.toISOString().slice(0,10);
-      host.querySelector('.rdtoDesde').value=desde;
-      host.querySelector('.rdtoHasta').value=hasta;
-    }
-    this.rdRecargar();
-  },
-  async rdRecargar(){
-    const host=document.getElementById('rdtoBody');
-    const cod=host.querySelector('.rdtoSelect').value, desde=host.querySelector('.rdtoDesde').value, hasta=host.querySelector('.rdtoHasta').value;
-    this._rd.cod=cod; this._rd.desde=desde; this._rd.hasta=hasta;
-    const W=host.querySelector('.rdtoHistWrap'), R=host.querySelector('.rdtoResumen');
-    if(!cod||!desde||!hasta){ R.style.display='none'; W.innerHTML='<div class="hint">Elige una referencia para ver su histórico de OFs.</div>'; this.rdCompEmpty(); return; }
-    W.innerHTML=this.loadingHtml();
-    try{ const d=await this.get('oee_unificado_ref_historico.php',new URLSearchParams({cod_producto:cod,fecha_desde:desde,fecha_hasta:hasta})); this.rdRenderHist(d); }
+    const W=host.querySelector('.rdtoHistWrap');
+    const qs=new URLSearchParams({cod_producto:cod,fecha_desde:this._rd.desde,fecha_hasta:this._rd.hasta});
+    try{ const d=await this.get('oee_unificado_ref_historico.php',qs); this.rdRenderHist(host,d); }
     catch(e){ W.innerHTML=`<div class="error">${e.message}</div>`; }
-    try{ const c=await this.get('oee_unificado_ref_comparativa.php',new URLSearchParams({cod_producto:cod,fecha_desde:desde,fecha_hasta:hasta})); this.rdRenderComp(c); }
-    catch(e){ this.rdCompEmpty(); }
+    try{ const c=await this.get('oee_unificado_ref_comparativa.php',qs); this.rdRenderComp(host,c); }
+    catch(e){ this.rdCompEmpty(host); }
   },
-  rdRenderHist(d){
-    const host=document.getElementById('rdtoBody'); const ofs=Array.isArray(d.ofs)?d.ofs:[]; const t=d.totales||{};
-    this._rd.ofs=ofs;
+  rdRenderHist(host,d){
+    const ofs=Array.isArray(d.ofs)?d.ofs:[]; const t=d.totales||{};
+    this._rd.ofs=ofs; this._rd.desc=d.desc_producto||this._rd.cod;
     const R=host.querySelector('.rdtoResumen'); R.style.display='flex';
     R.innerHTML=`<span>OFs: <b>${this.fU(t.num_ofs)}</b></span><span>Máquinas: <b>${this.fU(t.num_maquinas)}</b></span><span>Días con producción: <b>${this.fU(t.dias)}</b></span><span>Total OK: <b style="color:#1d5938">${this.fU(t.unidades_ok)}</b></span><span>Total NOK: <b style="color:#c8102e">${this.fU(t.unidades_nok)}</b></span>`;
     const W=host.querySelector('.rdtoHistWrap');
@@ -631,15 +573,15 @@ const App={
     ofs.forEach((of,idx)=>{
       const codOf=String(of.cod_of||''); const dis=(!codOf||codOf==='—')?' disabled':'';
       const chips=(of.maquinas||[]).map(m=>`<span class="of-maq-chip" title="OK ${this.fU(m.unidades_ok)} · NOK ${this.fU(m.unidades_nok)} · ${this.fU(m.uds_h)} uds/h">${this.esc(m.maquina)}</span>`).join('');
-      h+=`<tr><td><button class="of-chip" data-idx="${idx}"${dis} title="clic para desglose horario">${this.esc(codOf||'—')}</button></td><td><div class="of-cell-chips">${chips}</div></td><td class="num">${this.fU(of.num_dias)}</td><td class="num">${this.fU(of.unidades_ok)}</td><td class="num">${this.fU(of.unidades_nok)}</td></tr>`;
+      h+=`<tr><td><button class="of-chip" data-idx="${idx}"${dis} title="clic para el análisis histórico de OFs del artículo">${this.esc(codOf||'—')}</button></td><td><div class="of-cell-chips">${chips}</div></td><td class="num">${this.fU(of.num_dias)}</td><td class="num">${this.fU(of.unidades_ok)}</td><td class="num">${this.fU(of.unidades_nok)}</td></tr>`;
     });
     W.innerHTML=h+'</tbody></table>';
-    [...W.querySelectorAll('.of-chip')].forEach(b=>{ if(b.disabled)return; b.onclick=()=>this.rdOpenOf(+b.dataset.idx); });
+    [...W.querySelectorAll('.of-chip')].forEach(b=>{ if(b.disabled)return; b.onclick=()=>this.rdOfAnalisis(this._rd.cod,this._rd.desc); });
   },
-  rdCompEmpty(){ const host=document.getElementById('rdtoBody'); if(!host)return; host.querySelector('.rdtoCompOverall').style.display='none'; host.querySelector('.rdtoCompMachines').innerHTML=''; const e=host.querySelector('.rdtoCompEmpty'); if(e)e.style.display=''; },
-  rdRenderComp(d){
-    const host=document.getElementById('rdtoBody'); const ofs=d.ofs||[], maqs=d.maquinas_distintas||[], ranking=d.maquina_ranking||[];
-    if(!ofs.length||!maqs.length){ this.rdCompEmpty(); return; }
+  rdCompEmpty(host){ if(!host)return; host.querySelector('.rdtoCompOverall').style.display='none'; host.querySelector('.rdtoCompMachines').innerHTML=''; const e=host.querySelector('.rdtoCompEmpty'); if(e){e.textContent='Sin comparativa para esta referencia en el rango.';e.style.display='';} },
+  rdRenderComp(host,d){
+    const ofs=d.ofs||[], maqs=d.maquinas_distintas||[], ranking=d.maquina_ranking||[];
+    if(!ofs.length||!maqs.length){ this.rdCompEmpty(host); return; }
     host.querySelector('.rdtoCompEmpty').style.display='none';
     const ov=host.querySelector('.rdtoCompOverall');
     if(ranking.length){
@@ -663,20 +605,45 @@ const App={
       host.querySelector('.rdSt_'+id).innerHTML=`<div class="st"><div class="l">Máx piezas/hora</div><div class="v">${f2(maxV)}</div></div><div class="st"><div class="l">Mín piezas/hora</div><div class="v">${f2(minV)}</div></div><div class="st"><div class="l">Promedio piezas/hora</div><div class="v">${f2(avgV)}</div></div><div class="st ok"><div class="l">Total OK</div><div class="v">${this.fU(tOk)}</div></div><div class="st nok"><div class="l">Total NOK</div><div class="v">${this.fU(tNok)}</div></div><div class="st"><div class="l">% OK · NOK</div><div class="v">${f2(tAll>0?tOk/tAll*100:0)}% · ${f2(tAll>0?tNok/tAll*100:0)}%</div></div>`;
     });
   },
-  async rdOpenOf(idx){
-    const of=this._rd.ofs[idx]; if(!of)return;
-    const ov=document.createElement('div'); ov.className='fullpop';
-    ov.innerHTML=`<div class="fullpop-head"><h2>OF ${this.esc(of.cod_of)}<small>Referencia ${this.esc(this._rd.cod)} · ${(of.maquinas||[]).length} máquina(s) · ${this.fU(of.num_dias)} días · desglose horario OK/NOK</small></h2><button class="hmClose">✕ Cerrar</button></div><div class="fullpop-body"><div class="hmBody">${this.loadingHtml()}</div></div>`;
+  // Popup «Análisis Histórico de OF por Artículo» (réplica del cuadro QlikView):
+  // KPIs + gráfico Pzas/hora por OF + tabla de detalle. Acotado al rango del filtro principal.
+  async rdOfAnalisis(art,name){
+    const ov=document.createElement('div'); ov.className='fullpop oa-pop';
+    ov.innerHTML=`<div class="fullpop-head"><h2>Análisis histórico de OF · ${this.esc(name||art)}<small>${this.esc(art)} · rango del filtro</small></h2><button class="hmClose">✕ Cerrar</button></div><div class="fullpop-body"><div class="oaBody">${this.loadingHtml()}</div></div>`;
     document.body.appendChild(ov);
     ov.querySelector('.hmClose').style.cssText='background:#f3f4f6;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280';
-    ov.querySelector('.hmClose').onclick=()=>ov.remove();
-    const body=ov.querySelector('.hmBody');
+    const close=()=>ov.remove();
+    ov.querySelector('.hmClose').onclick=close; ov.onclick=e=>{if(e.target===ov)close();};
+    const body=ov.querySelector('.oaBody');
     try{
-      const d=await this.get('oee_unificado_ref_historico_horas.php',new URLSearchParams({cod_of:of.cod_of,cod_producto:this._rd.cod,fecha_desde:this._rd.desde,fecha_hasta:this._rd.hasta}));
-      const horas=d.horas||[]; const sOk=(d.totales&&d.totales.unidades_ok)||0, sNok=(d.totales&&d.totales.unidades_nok)||0;
-      if(!sOk&&!sNok){body.innerHTML='<div class="empty">Sin producción horaria para esta OF.</div>';return;}
-      body.innerHTML=`<div class="breadcrumb">Total: <b>${this.fU(sOk)}</b> OK · <b>${this.fU(sNok)}</b> NOK</div><div class="apx"></div>`;
-      this.apex(body.querySelector('.apx'),{chart:{type:'bar',height:420,toolbar:{show:true},animations:{enabled:false}},series:[{name:'OK',data:horas.map(h=>h.unidades_ok)},{name:'NOK',data:horas.map(h=>h.unidades_nok)}],colors:['#10b981','#c8102e'],xaxis:{categories:horas.map(h=>h.hora+'h'),title:{text:'Hora del día'}},yaxis:{title:{text:'Unidades'},labels:{formatter:v=>this.fU(Math.round(v))}},plotOptions:{bar:{columnWidth:'70%'}},dataLabels:{enabled:false},legend:{position:'top'},tooltip:{y:{formatter:v=>this.fU(v)}}});
+      const d=await this.get('oee_unificado_art_analisis.php',this.common({cod_producto:art}));
+      const ofs=d.ofs||[], t=d.totales||{};
+      if(!ofs.length){body.innerHTML='<div class="empty">Sin OFs para este artículo en el rango.</div>';return;}
+      const fU=n=>(Number(n)||0).toLocaleString('es-ES');
+      const f2=n=>Number(n||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});
+      const lcd=(l,v,neg)=>`<div class="oa-kpi"><div class="oa-kpi-l">${l}</div><div class="oa-kpi-v${neg?' neg':''}">${v}</div></div>`;
+      // KPIs
+      let h=`<div class="oa-kpis">${lcd('Total Unidades Fabricadas',fU(t.unidades))}${lcd('Horas Dedicadas',f2(t.horas_dedicadas))}${lcd('Horas Perdidas',f2(t.horas_perdidas),(t.horas_perdidas||0)<0)}</div>`;
+      // Gráfico Pzas/hora por OF
+      h+=`<div class="oa-sech">Rendimiento obtenido por orden de Fabricación (UDS/HORA)</div>`;
+      h+=`<div class="chartbox" style="height:380px"><canvas class="oaCv"></canvas></div>`;
+      // Tabla de detalle
+      const tPerd=ofs.reduce((a,o)=>a+(+o.horas_perdidas||0),0), tPzh=ofs.reduce((a,o)=>a+(+o.pzas_hora_real||0),0);
+      h+=`<div class="oa-sech">Rendimiento obtenido por OF</div>`;
+      h+='<table class="rdtbl oa-tbl"><thead><tr><th>Año</th><th>Mes</th><th>Cod_OF</th><th>Desc_maquina</th><th>Artículo</th><th class="r">Rend_C</th><th class="r">Horas perdidas</th><th class="r">Horas dedicadas</th><th class="r">Pzas/Hora real</th><th class="r">Uds. fab.</th></tr></thead><tbody>';
+      ofs.forEach(o=>{const neg=(+o.horas_perdidas||0)<0;h+=`<tr><td>${o.anio}</td><td>${o.mes}</td><td>${this.esc(o.cod_of)}</td><td>${this.esc(o.desc_maquina)}</td><td>${this.esc(o.cod_articulo)}</td><td class="r">${f2(o.rend_c)}</td><td class="r${neg?' neg':''}">${f2(o.horas_perdidas)}</td><td class="r">${f2(o.horas_dedicadas)}</td><td class="r">${f2(o.pzas_hora_real)}</td><td class="r">${fU(o.unidades)}</td></tr>`;});
+      h+=`<tr class="oa-tot"><td colspan="6">TOTAL · ${ofs.length} OF${ofs.length===1?'':'s'}</td><td class="r${tPerd<0?' neg':''}">${f2(tPerd)}</td><td class="r">${f2(t.horas_dedicadas)}</td><td class="r">${f2(tPzh)}</td><td class="r">${fU(t.unidades)}</td></tr>`;
+      h+='</tbody></table>';
+      body.innerHTML=h;
+      // Render gráfico
+      const cv=body.querySelector('.oaCv'); this.chartDestroy(cv);
+      const palette=['#5a7fa6','#d96459','#9ec45a','#e6c33a','#4fb39a','#7c6bb0','#e08a3c','#5fa8d3','#c45a9a','#8aa05a'];
+      new Chart(cv,{type:'bar',data:{labels:ofs.map(o=>o.cod_of),datasets:[{label:'Pzas/Hora real',data:ofs.map(o=>o.pzas_hora_real),backgroundColor:ofs.map((o,i)=>palette[i%palette.length])}]},
+        options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24}},
+          plugins:{legend:{display:false},
+            datalabels:{anchor:'end',align:'top',color:'#1f2937',font:{size:11,weight:'700'},formatter:v=>Math.round(v).toLocaleString('es-ES')},
+            tooltip:{callbacks:{afterBody:items=>{const o=ofs[items[0].dataIndex];return 'Rend '+f2(o.rend_c)+'% · '+fU(o.unidades)+' uds · '+f2(o.horas_dedicadas)+' h';}}}},
+          scales:{y:{beginAtZero:false,title:{display:true,text:'piezas / hora'}},x:{ticks:{font:{size:10},maxRotation:60,minRotation:30}}}}});
     }catch(e){body.innerHTML=`<div class="error">${e.message}</div>`;}
   },
   async openMotivoGeneral(motivo){
@@ -1061,17 +1028,21 @@ const App={
 
   /* ---------- RENDIMIENTO: referencias fabricadas en una máquina → OFs ---------- */
   async rdMaqRefs(cod,name){
+    // Al cambiar de máquina, cierra el panel anterior de «Referencias fabricadas»
+    // (y lo que tuviera abierto dentro) para no acumular información en pantalla.
+    [...panels.querySelectorAll('.panel-maqrefs')].forEach(p=>p.remove());
     const ov=this.push('Referencias fabricadas · '+name,
       State.seccion+' · piezas/hora OK y NOK por referencia · clic en una referencia para ver sus OFs',
       this.loadingHtml());
+    ov.classList.add('panel-maqrefs');
     const self=this;
     try{
       const d=await this.get('oee_unificado_maq_referencias.php',this.common({cod_maquina:cod}));
       const refs=d.referencias||[];
       if(!refs.length){this.body(ov).innerHTML='<div class="empty">Sin referencias fabricadas en el rango</div>';return;}
-      const labels=refs.map(r=>r.desc+(r.nom_sage?(' · '+r.nom_sage):''));
+      const labels=refs.map(r=>r.desc+(r.nom_sage?(' · '+r.nom_sage):'')+' · Rdto '+(r.rend!=null?r.rend:0)+'%');
       const h=Math.min(1600,Math.max(280,refs.length*30+150));
-      this.body(ov).innerHTML=`<div class="breadcrumb">${refs.length} referencias · barras = piezas/hora (OK verde · NOK rojo). Haz clic en una referencia para ver sus OFs.</div>`
+      this.body(ov).innerHTML=`<div class="breadcrumb">${refs.length} referencias · barras = piezas/hora (OK rojo corp. · NOK naranja) · «Rdto» = % rendimiento. Haz clic en una referencia para ver sus OFs, histórico y comparativa.</div>`
         +`<div class="chartbox" style="height:${h}px"><canvas class="cvr"></canvas></div>`
         +`<div class="rdofs" style="margin-top:18px"></div>`;
       const wrap=this.body(ov), el=wrap.querySelector('.cvr'), detail=wrap.querySelector('.rdofs');
@@ -1084,8 +1055,13 @@ const App={
         plugins:{legend:{position:'bottom'},
           datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]>0,anchor:'end',align:'right',
             color:'#1f2937',font:{size:11,weight:'700'},formatter:v=>Math.round(v).toLocaleString('es-ES')},
-          tooltip:{callbacks:{afterBody:items=>{const r=refs[items[0].dataIndex];return 'Total: '+(r.uds_total).toLocaleString('es-ES')+' uds · '+r.horas+' h';}}}},
-        onClick:(e,els)=>{if(els.length){const r=refs[els[0].index];self.rdRefOfs(detail,cod,r.cod,r.desc,r.nom_sage);}},
+          tooltip:{callbacks:{afterBody:items=>{const r=refs[items[0].dataIndex];return 'Total: '+(r.uds_total).toLocaleString('es-ES')+' uds · '+r.horas+' h · Rendimiento '+(r.rend!=null?r.rend:0)+'%';}}}},
+        onClick:(e,els)=>{if(els.length){const r=refs[els[0].index];
+          detail.innerHTML='<div class="rd-ofs"></div><div class="rd-mods"></div>';
+          self.rdRefOfs(detail.querySelector('.rd-ofs'),cod,r.cod,r.desc,r.nom_sage);
+          self.rdRefModulos(detail.querySelector('.rd-mods'),r.cod,r.desc);
+          detail.scrollIntoView({behavior:'smooth',block:'nearest'});
+        }},
         scales:{x:{beginAtZero:true,title:{display:true,text:'piezas / hora'}},
           y:{ticks:{font:{size:12,weight:'700'},color:'#1f2937',autoSkip:false}}}}});
     }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}

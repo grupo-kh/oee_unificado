@@ -23,20 +23,23 @@ error_reporting(E_ALL);
 // ───── Constantes de conexión (compat con código existente) ─────
 // Mantenemos las constantes públicas para no romper nada que ya las use
 // (lib/, scripts/, tools/ y los APIs que pudieran referenciarlas).
-define('DB_MAPEX_HOST', env('DB_MAPEX_HOST', '10.0.0.45'));
-define('DB_MAPEX_NAME', env('DB_MAPEX_NAME', 'mapexbp_Test'));
-define('DB_MAPEX_USER', env('DB_MAPEX_USER', 'sa'));
+// IMPORTANTE: estos valores por defecto deben quedar VACÍOS en el repositorio.
+// La configuración real (host, base de datos, usuario y contraseña) se inyecta
+// exclusivamente vía `.env` (no versionado). Ver `.env.example`.
+define('DB_MAPEX_HOST', env('DB_MAPEX_HOST', ''));
+define('DB_MAPEX_NAME', env('DB_MAPEX_NAME', ''));
+define('DB_MAPEX_USER', env('DB_MAPEX_USER', ''));
 define('DB_MAPEX_PASS', env('DB_MAPEX_PASS', ''));
 
-define('DB_SAGE_HOST', env('DB_SAGE_HOST', 'SERVER2'));
-define('DB_SAGE_NAME', env('DB_SAGE_NAME', 'Logicclass'));
-define('DB_SAGE_USER', env('DB_SAGE_USER', 'sistemas'));
+define('DB_SAGE_HOST', env('DB_SAGE_HOST', ''));
+define('DB_SAGE_NAME', env('DB_SAGE_NAME', ''));
+define('DB_SAGE_USER', env('DB_SAGE_USER', ''));
 define('DB_SAGE_PASS', env('DB_SAGE_PASS', ''));
 
 define('DB_PG_HOST',   env('DB_PG_HOST',   '127.0.0.1'));
 define('DB_PG_PORT',   env('DB_PG_PORT',   '5432'));
 define('DB_PG_NAME',   env('DB_PG_NAME',   'plan_attainment'));
-define('DB_PG_USER',   env('DB_PG_USER',   'plan_attainment_app'));
+define('DB_PG_USER',   env('DB_PG_USER',   ''));
 define('DB_PG_PASS',   env('DB_PG_PASS',   ''));
 define('DB_PG_SCHEMA', env('DB_PG_SCHEMA', 'public'));
 
@@ -45,8 +48,8 @@ if (!defined('MANT_USE_PG')) {
 }
 
 if (!defined('MANT_XLSX_PATH')) {
-    define('MANT_XLSX_PATH', (string) env('MANT_XLSX_PATH',
-        'Z:\\Mantenimiento\\Copia de 260402_Ordenes Mant Prev.xlsx'));
+    // Ruta al Excel de mantenimiento. Se define en `.env` (MANT_XLSX_PATH).
+    define('MANT_XLSX_PATH', (string) env('MANT_XLSX_PATH', ''));
 }
 
 function getConnection($bd = 'mapex') {

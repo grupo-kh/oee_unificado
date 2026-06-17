@@ -52,3 +52,10 @@ config/qr_secret.dat
 
 # Compañero visual de brainstorming (superpowers)
 .superpowers/
+
+# ─── Documentación interna y datos (respaldados en .claude/project-archive) ───
+#    Contienen IPs, hostnames y rutas de red internas. NO deben publicarse.
+.notebook/
+docs/
+input/
+SETUP_POSTGRES.md

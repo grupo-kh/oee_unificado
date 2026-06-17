@@ -25,7 +25,16 @@
 
 class PlanExcelReader
 {
-    const EXCEL_BASE_PATH = 'Z:\Produccion\2 - Control de la producción\3 - Seguimiento producción\Planificaciones diarias';
+    /**
+     * Carpeta de los Excel de Planificación diaria.
+     * Se configura por entorno (EXCEL_BASE_PATH en `.env`); el repositorio
+     * no contiene ninguna ruta real.
+     */
+    public static function excelBase(): string
+    {
+        if (function_exists('env')) return (string) env('EXCEL_BASE_PATH', '');
+        return (string) (getenv('EXCEL_BASE_PATH') ?: '');
+    }
     const CACHE_DIR = __DIR__ . '/../cache/plan_excel';
     const CACHE_PARSED_DIR = __DIR__ . '/../cache/plan_parsed';
 
@@ -92,7 +101,8 @@ class PlanExcelReader
     }
 
     /**
-     * Sincroniza el Excel de la fecha indicada desde Z:\ al cache local.
+     * Sincroniza el Excel de la fecha indicada desde la carpeta configurada
+     * (EXCEL_BASE_PATH) al cache local.
      *
      * Si el planificador deja varios ficheros para la misma fecha (p. ej.
      * "F13057... 27.04.2026.xlsm" y "Copia de F13057... 27.04.2026.xlsm"),
@@ -106,7 +116,7 @@ class PlanExcelReader
     {
         if (!is_dir(self::CACHE_DIR)) @mkdir(self::CACHE_DIR, 0777, true);
         $local = self::CACHE_DIR . '/' . $fechaDMY . '.xlsm';
-        $candidates = glob(self::EXCEL_BASE_PATH . '\\*' . $fechaDMY . '.xlsm') ?: [];
+        $candidates = glob(self::excelBase() . '\\*' . $fechaDMY . '.xlsm') ?: [];
         if (!$candidates) return file_exists($local) ? $local : null;
 
         usort($candidates, fn($a, $b) => filemtime($b) <=> filemtime($a));

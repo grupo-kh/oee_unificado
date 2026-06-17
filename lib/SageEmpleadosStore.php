@@ -1,11 +1,11 @@
 <?php
 /**
- * Mantenimiento de empleados en Sage Logicclass.
+ * Mantenimiento de empleados en Sage.
  *
  * Sage tiene su propia tabla de personal — sirve para identificar al
  * operario que entra en la app de planta (tablet de OFs). Estado:
  *
- *   - Probamos contra un set de tablas/columnas habituales en Logicclass
+ *   - Probamos contra un set de tablas/columnas habituales en Sage
  *     (PERSONAL, RH_PERSONA, Sistema_PERSONAL...) hasta dar con una que
  *     responda. La primera que encuentre se queda CACHEADA para la
  *     petición.
@@ -25,11 +25,11 @@ class SageEmpleadosStore
      *   - sql_label   : SQL con :n que devuelve {numero, nombre}. Opcional.
      *   - label       : nombre legible para diagnóstico.
      *
-     * Si en tu Logicclass la tabla se llama distinto o el campo "activo"
+     * Si en tu Sage la tabla se llama distinto o el campo "activo"
      * usa otra convención, añade aquí la consulta que toque.
      */
     private const CANDIDATAS = [
-        // 1) Patrón clásico Logicclass: tabla PERSONAL con CodigoEmpleado y FechaBaja
+        // 1) Patrón clásico Sage: tabla PERSONAL con CodigoEmpleado y FechaBaja
         [
             'label'      => 'PERSONAL · CodigoEmpleado',
             'sql_exists' => "SELECT TOP 1 1 FROM PERSONAL

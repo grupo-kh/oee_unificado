@@ -80,7 +80,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <div class="view-card-footer metric-legend metric-legend-compact mant-no-print">
             <div class="metric-legend-text">
-                <p><strong>Planificador de tareas</strong> · datos del fichero <code>Z:\Mantenimiento\…</code> (hoja <em>PROXIMAS REV.</em>). Se muestran las tareas cuya próxima revisión cae en el rango seleccionado, agrupadas por máquina y ordenadas por fecha. Se excluyen las ya marcadas como hechas desde la web.</p>
+                <p><strong>Planificador de tareas</strong> · datos del Excel de mantenimiento (hoja <em>PROXIMAS REV.</em>). Se muestran las tareas cuya próxima revisión cae en el rango seleccionado, agrupadas por máquina y ordenadas por fecha. Se excluyen las ya marcadas como hechas desde la web.</p>
                 <p class="metric-legend-note" id="footer-actualizado">Fichero actualizado: —</p>
             </div>
         </div>

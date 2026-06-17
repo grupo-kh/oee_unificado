@@ -1,10 +1,10 @@
 <?php
 /**
- * Diagnóstico: localiza la tabla de empleados en Sage (Logicclass).
+ * Diagnóstico: localiza la tabla de empleados en Sage (Sage).
  *
  * Lista las tablas cuyo nombre contiene EMPL/PERSONA/OPERAR/USUARIO/TRABAJ
  * y muestra sus columnas, para identificar exactamente la que se usa en
- * tu Logicclass. Acceso: solo rol técnico.
+ * tu Sage. Acceso: solo rol técnico.
  *
  * URL: views/diag_sage_empleados.php
  *      views/diag_sage_empleados.php?probar=1234  (prueba un código concreto)

@@ -57,7 +57,7 @@ class PanelMetaBuilder
         }
         $itemsPlan[] = ['label' => 'Hoja', 'value' => 'PLANIFICACIÓN'];
         $itemsPlan[] = ['label' => 'Sección leída', 'value' => 'Top section (rows 4-360, cols A,D,F,I,N) + Cross-table (header con valor 0,59375 en col C)'];
-        $itemsPlan[] = ['label' => 'Carpeta origen', 'value' => PlanExcelReader::EXCEL_BASE_PATH];
+        $itemsPlan[] = ['label' => 'Carpeta origen', 'value' => PlanExcelReader::excelBase()];
 
         $secciones[] = [
             'titulo' => 'Plan (Excel de planificación diaria)',
@@ -113,7 +113,7 @@ class PanelMetaBuilder
                     'QV cap por artículo SOLO en sus horas planificadas — penaliza producir el artículo correcto en hora equivocada. Esta app cuenta el match con independencia de la hora exacta. Diferencia importante en máquinas con cruce de planes intra-turno.',
                     'QV no aplica fuzzy match entre artículos similares; esta app sí. En máquinas que producen variantes "hermanas" del SKU planificado, esta app reporta PA más alto.',
                     'En el panel "Por Máquina" la app aplica una whitelist EXTENDIDA (incluye TBE30, TBE35, TBE RAPIDFORM, PRENSA 3D, MONTAJE AUTOMATICO…). El cumplimiento Global y Por Sección sí se ciñen al whitelist oficial de QV.',
-                    'Si en Z:\\…\\Planificaciones diarias hay un "Copia de…" más reciente, esta app lo prefiere; QV puede tener otra preferencia.',
+                    'Si en la carpeta de Planificaciones diarias hay un "Copia de…" más reciente, esta app lo prefiere; QV puede tener otra preferencia.',
                 ],
             ];
         }
@@ -188,7 +188,7 @@ class PanelMetaBuilder
     /** Lista las fechas (DateTime[]) de los .xlsm presentes, deduplicadas y DESC. */
     private static function listAvailableDatesDesc(): array
     {
-        $files = glob(PlanExcelReader::EXCEL_BASE_PATH . '\\*.xlsm') ?: [];
+        $files = glob(PlanExcelReader::excelBase() . '\\*.xlsm') ?: [];
         $byYmd = [];
         foreach ($files as $f) {
             if (preg_match('/(\d{2})\.(\d{2})\.(\d{4})\.xlsm$/', $f, $m)) {
@@ -216,7 +216,7 @@ class PanelMetaBuilder
         }
         if (!$fileDate) return null;
         $dmy = $fileDate->format('d.m.Y');
-        $candidates = glob(PlanExcelReader::EXCEL_BASE_PATH . '\\*' . $dmy . '.xlsm') ?: [];
+        $candidates = glob(PlanExcelReader::excelBase() . '\\*' . $dmy . '.xlsm') ?: [];
         if (!$candidates) return null;
         usort($candidates, fn($a, $b) => filemtime($b) <=> filemtime($a));
         $path = $candidates[0];

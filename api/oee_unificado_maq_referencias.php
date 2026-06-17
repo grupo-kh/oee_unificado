@@ -29,7 +29,8 @@ try {
     $sql = "
         SELECT LTRIM(RTRIM(oee.Cod_producto)) AS cod_ref, MAX(oee.Desc_producto) AS desc_ref,
                SUM(oee.Unidades_OK) AS ok, SUM(oee.Unidades_NOK) AS nok,
-               SUM(oee.Unidades_Total) AS total, SUM(oee.M) AS mseg
+               SUM(oee.Unidades_Total) AS total, SUM(oee.M) AS mseg,
+               SUM(oee.M_OKNOK_TEO) AS MOT, SUM(oee.PPERF) AS PP, SUM(oee.PCALIDAD) AS PC
         FROM F_his_ct('WORKCENTER','DAY','TURNOS, WO, PRODUCTOS',
                       ? + ' 00:00:00', ? + ' 23:59:59', 16) oee
         WHERE " . implode(' AND ', $where) . "
@@ -57,6 +58,8 @@ try {
     foreach ($rows as $r) {
         $cr = (string)$r['cod_ref']; if ($cr === '') continue;
         $horas = ((float)$r['mseg']) / 3600;
+        $M = (float)$r['mseg']; $MOT = (float)$r['MOT']; $PP = (float)$r['PP']; $PC = (float)$r['PC'];
+        $rend = ($M + $PP + $PC) > 0 ? ($MOT + $PC) / ($M + $PP + $PC) * 100 : 0;
         $refs[] = [
             'cod'        => $cr,
             'desc'       => trim((string)($r['desc_ref'] ?: $cr)),
@@ -67,6 +70,7 @@ try {
             'horas'      => round($horas, 2),
             'ok_h'       => $horas > 0 ? round($r['ok']  / $horas, 1) : 0,
             'nok_h'      => $horas > 0 ? round($r['nok'] / $horas, 1) : 0,
+            'rend'       => round($rend, 1),
         ];
     }
     usort($refs, fn($a, $b) => $b['uds_total'] <=> $a['uds_total']);

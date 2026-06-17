@@ -245,7 +245,7 @@ class PlanAttainmentAgg
     {
         if (self::$fileDatesCache !== null) return self::$fileDatesCache;
 
-        $basePath = PlanExcelReader::EXCEL_BASE_PATH;
+        $basePath = PlanExcelReader::excelBase();
         $files = glob($basePath . '\\*.xlsm') ?: [];
         // Deduplicar por fecha: si hay varios ficheros para el mismo día
         // (p. ej. "F13057... 27.04.2026.xlsm" y "Copia de ... 27.04.2026.xlsm")

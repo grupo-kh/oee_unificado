@@ -1,159 +1,74 @@
-# Plan Attainment · Dashboard Web KH
+# Plan Attainment · Dashboard Web
 
-Dashboard web de **solo lectura** que replica el dashboard Plan Attainment de QlikView.
+Dashboard web de **solo lectura** para seguimiento de producción (Plan Attainment),
+OEE, rendimiento por máquina/sección y mantenimiento preventivo.
 
-Incluye **home con 5 accesos grandes** a cada vista individual:
+## ✨ Vistas
 
-1. **Plan Attainment** — Gauge grande con cumplimiento global + métricas OEE
-2. **Por Sección** — Barras horizontales ranking de secciones
-3. **Por Máquina** — Barras verticales con porcentaje por máquina
-4. **Evolución** — Serie temporal amarilla (estilo QlikView)
-5. **Detalle Plan / Producido** — Tabla pivote con Plan vs. Prod por fecha y colores semafóricos
+1. **Plan Attainment** — Gauge de cumplimiento global + métricas OEE.
+2. **Por Sección** — Ranking de secciones (barras horizontales).
+3. **Por Máquina** — Cumplimiento por máquina.
+4. **Evolución** — Serie temporal.
+5. **Detalle Plan / Producido** — Tabla pivote Plan vs. Producido con semáforo.
 
-## 📁 Estructura
+Incluye además OEE unificado, análisis de rendimiento con drill-down, escandallo de
+referencias y un módulo móvil para operarios de mantenimiento.
+
+## 🧱 Stack
+
+- **PHP 8.1** sobre Apache (XAMPP en producción).
+- **PostgreSQL** (datos de la aplicación) vía PDO `pgsql`.
+- **SQL Server** (orígenes MAPEX y SAGE) vía `pdo_sqlsrv` / `msodbcsql18`.
+- **Composer**: PhpSpreadsheet (lectura de Excel) y mPDF (exportación PDF).
+- Frontend en HTML + JS vanilla.
+
+## 🚀 Puesta en marcha
+
+```bash
+# 1. Dependencias PHP
+composer install
+
+# 2. Configuración: copia la plantilla y rellena tus valores
+cp .env.example .env
+#   Edita .env con los datos de TU entorno (hosts de BD, credenciales,
+#   rutas a los Excel, etc.). Ver descripción de cada clave en .env.example.
+
+# 3. Base de datos PostgreSQL
+#   Crea la BD y aplica el esquema correspondiente.
+```
+
+Sirve el proyecto desde la raíz web de Apache y accede vía navegador.
+
+## ⚙️ Configuración (`.env`)
+
+**Toda** la configuración sensible (hosts, bases de datos, usuarios, contraseñas y
+rutas locales/de red) se inyecta exclusivamente por variables de entorno desde `.env`.
+
+- `.env` **nunca** se versiona (está en `.gitignore`).
+- El repositorio **no contiene** ningún host, IP, ruta de red ni credencial real:
+  los valores por defecto en código están vacíos.
+- Usa [`.env.example`](.env.example) como referencia de las claves disponibles.
+
+Las contraseñas de los logins de mantenimiento se almacenan como **hash bcrypt**
+(`MANT_*_PASS_HASH`), nunca en texto plano.
+
+## 📂 Estructura
 
 ```
 PLAN_ATTAINMENT/
-├── index.php                      Home con 5 botones
-├── config/
-│   └── database.php               ⚠️ Credenciales BD (editar)
-├── includes/
-│   ├── header.php                 Cabecera común (logo + filtros)
-│   └── helpers.php                JSON, parámetros
-├── api/
-│   ├── plan_attainment.php        KPI global + OEE
-│   ├── por_seccion.php            Cumplimiento por sección
-│   ├── por_maquina.php            Cumplimiento por máquina
-│   ├── evolucion.php              Serie temporal
-│   └── grid.php                   Tabla pivote Plan/Prod
-├── views/
-│   ├── plan_attainment.php
-│   ├── por_seccion.php
-│   ├── por_maquina.php
-│   ├── evolucion.php
-│   └── grid.php
-└── assets/
-    ├── css/style.css              Azul corporativo + semáforo
-    └── js/
-        ├── common.js              Filtros compartidos + utils
-        ├── view_gauge.js
-        ├── view_seccion.js
-        ├── view_maquina.js
-        ├── view_evolucion.js
-        └── view_grid.js
-```
-
-## 🎨 Estilo visual
-
-Replica exactamente la estética del dashboard QlikView original:
-
-- **Cabecera azul oscuro** con logo KH (3 puntos rojos) y filtros verdes
-- **Colores semafóricos** en tablas: verde (cumplido), ámbar (parcial), rojo (incumplido)
-- **Línea de objetivo 75%** punteada verde en todos los gráficos
-- **Tipografía Arial** como el original
-- **Filtros persistentes** entre vistas (localStorage) — al navegar entre vistas mantiene fecha y turno
-
-## 🚀 Instalación
-
-### 1. Copiar archivos
-
-Copia toda la carpeta `PLAN_ATTAINMENT` a:
-```
-C:\xampp\htdocs\PLAN_ATTAINMENT\
-```
-
-### 2. Activar driver SQL Server en PHP
-
-XAMPP **no trae el driver `sqlsrv` activo**. Pasos:
-
-**a)** Descarga el driver oficial de Microsoft:
-https://learn.microsoft.com/es-es/sql/connect/php/download-drivers-php-sql-server
-
-Elige el ZIP que **coincida con tu versión de PHP** (ejecuta `php -v` en CMD para saberla).
-
-**b)** Copia estos DLLs a `C:\xampp\php\ext\`:
-- `php_sqlsrv_XX_ts_x64.dll`
-- `php_pdo_sqlsrv_XX_ts_x64.dll`
-
-(Donde `XX` = versión de PHP, `ts` = thread-safe, `x64` = 64 bits)
-
-**c)** Edita `C:\xampp\php\php.ini` y añade al final:
-```ini
-extension=sqlsrv
-extension=pdo_sqlsrv
-```
-
-**d)** Instala también el **ODBC Driver 17 (o 18) for SQL Server**:
-https://learn.microsoft.com/es-es/sql/connect/odbc/download-odbc-driver-for-sql-server
-
-**e)** Reinicia Apache desde el panel XAMPP.
-
-**f)** Verifica abriendo `http://localhost/dashboard/phpinfo.php` que aparezca `sqlsrv`.
-
-### 3. Configurar credenciales
-
-Edita `config/database.php` y pon las contraseñas reales:
-```php
-define('DB_MAPEX_PASS', 'TU_PASSWORD_REAL');
-define('DB_SAGE_PASS',  'TU_PASSWORD_REAL');
-```
-
-### 4. Acceder
-
-```
-http://localhost/PLAN_ATTAINMENT/
+├── index.php            Home
+├── config/database.php  Conexiones (valores vía .env)
+├── includes/            Cabecera, helpers (env, JSON)
+├── api/                 Endpoints JSON
+├── views/               Vistas HTML/PHP
+├── lib/                 Lógica (lectura Excel, agregaciones, stores)
+├── assets/              JS y CSS
+├── mobile-operario/     Módulo móvil de mantenimiento
+└── vendor/              Dependencias Composer
 ```
 
 ## 🔒 Seguridad
 
-- Todas las queries son **SELECT** (solo lectura) — validado en `fetchAll()`
-- Consultas **parametrizadas** (anti SQL-injection)
-- Fechas validadas con regex
-- Turnos con whitelist (M/T/N)
-
-**Recomendación**: el usuario `sa` tiene permisos totales. Pide a IT un usuario solo-lectura dedicado.
-
-## 🧪 Probar las APIs directamente
-
-```
-http://localhost/PLAN_ATTAINMENT/api/plan_attainment.php?fecha_desde=2026-04-15&fecha_hasta=2026-04-22
-http://localhost/PLAN_ATTAINMENT/api/por_seccion.php?fecha_desde=2026-04-15&fecha_hasta=2026-04-22
-http://localhost/PLAN_ATTAINMENT/api/por_maquina.php?fecha_desde=2026-04-15&fecha_hasta=2026-04-22
-http://localhost/PLAN_ATTAINMENT/api/evolucion.php?fecha_desde=2026-03-22&fecha_hasta=2026-04-22
-http://localhost/PLAN_ATTAINMENT/api/grid.php?fecha_desde=2026-04-15&fecha_hasta=2026-04-22
-```
-
-## 🐛 Troubleshooting
-
-| Error | Causa | Solución |
-|-------|-------|----------|
-| `could not find driver` | Driver sqlsrv no activo | Revisa paso 2 |
-| `Login failed for user` | Password incorrecta | Revisa `database.php` |
-| `SQLSTATE[08001]` | Sin conectividad a servidor | Firewall / VPN |
-| Gauge/charts vacíos | Sin datos en rango | Amplía rango de fechas |
-| Grid vacío | Falta campo `Cantidad_plan` | Ver nota abajo |
-| Cache del navegador | Cambios no se ven | `Ctrl + F5` |
-
-## ⚠️ Posibles ajustes según tu BD
-
-El **grid** usa `his_fase.Cantidad_plan` para los planificados. Si ese campo no existe en tu instalación de MAPEX, los planificados saldrán vacíos (el producido sí saldrá). En ese caso dime y lo ajustamos al campo correcto.
-
-Lo mismo con los nombres de columnas de `F_his_ct`: si alguno difiere (p.ej. `M_OKNOK_TEO` se llama distinto), se ajusta rápido.
-
-## 📝 Cómo se calcula el Plan Attainment
-
-Basado en las fórmulas oficiales de MAPEX (tal y como aparecen en el script original `Transformación.qvs`):
-
-```
-Disponibilidad  = M / (M + PNP)
-Calidad         = M_OK_TEO / M_OKNOK_TEO
-Rendimiento     = M_OKNOK_TEO / M_Teo   ← ESTE es el Plan Attainment
-OEE             = Disponibilidad × Calidad × Rendimiento
-```
-
-Donde:
-- `M` = tiempo marcha
-- `PNP` = paros no programados
-- `M_OK_TEO` = tiempo productivo con piezas OK (teórico)
-- `M_OKNOK_TEO` = tiempo productivo total (OK + NOK teórico)
-- `M_Teo` = tiempo marcha teórico (planificado)
+- Secretos y configuración del entorno **solo** en `.env` (no versionado).
+- El secreto de firma de tokens QR (`config/qr_secret.dat`) está excluido del repo.
+- Dashboard de solo lectura sobre los orígenes de datos.

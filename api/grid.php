@@ -130,7 +130,8 @@ try {
     $rowsProd = fetchAll('mapex', $sqlProd, $paramsProd);
 
     // ============ PLAN por hora ============
-    // Se lee de los Excel de planificación diaria en Z:\Produccion\... replicando
+    // Se lee de los Excel de planificación diaria (carpeta configurada en .env:
+    // EXCEL_BASE_PATH) replicando
     // la lógica de QlikView (hoja PLANIFICACIÓN: top section + cross-table de slots
     // 30 min desde 14:15). El parser cachea el resultado en JSON.
     require_once __DIR__ . '/../lib/PlanExcelReader.php';

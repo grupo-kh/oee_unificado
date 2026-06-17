@@ -8,9 +8,9 @@
  * principal de planificacion.
  *
  * Coloca el .xlsx (renombrado o no) en uno de estos sitios:
- *   1) C:\xampp\htdocs\PLAN_ATTAINMENT\input\mant_prev_input.xlsx
- *   2) C:\xampp\htdocs\PLAN_ATTAINMENT\tools\mant_prev_input.xlsx
- *   3) Z:\Mantenimiento\260507_Ordenes Mant Prev copia.xlsx (ruta de red)
+ *   1) input\mant_prev_input.xlsx   (dentro del proyecto)
+ *   2) tools\mant_prev_input.xlsx
+ *   3) la ruta configurada en `.env` (MANT_XLSX_PATH)
  *
  * Ejecucion (recomendada por navegador, asi Apache carga zip):
  *   http://localhost/PLAN_ATTAINMENT/tools/mant_prev_inspect.php
@@ -38,12 +38,11 @@ if (!$isCli) header('Content-Type: text/plain; charset=UTF-8');
 // ---------------------------------------------------------------
 $CANDIDATES = [
     __DIR__ . '/../input/mant_prev_input.xlsx',
-    __DIR__ . '/../input/260507_Ordenes Mant Prev copia.xlsx',
     __DIR__ . '/mant_prev_input.xlsx',
-    __DIR__ . '/260507_Ordenes Mant Prev copia.xlsx',
-    'Z:\\Mantenimiento\\260507_Ordenes Mant Prev copia.xlsx',
-    'Z:\\Mantenimiento\\Copia de 260507_Ordenes Mant Prev.xlsx',
 ];
+// Ruta configurada por entorno (.env: MANT_XLSX_PATH), si está disponible.
+$envXlsx = getenv('MANT_XLSX_PATH');
+if ($envXlsx) { array_unshift($CANDIDATES, $envXlsx); }
 $INPUT_FILE = null;
 foreach ($CANDIDATES as $p) { if (is_file($p)) { $INPUT_FILE = $p; break; } }
 
