@@ -14,7 +14,7 @@ if (-not $isAdmin) {
 }
 
 $TaskName    = "PlanAttainment_Backup"
-$ScriptPath  = "C:\xampp\htdocs\PLAN_ATTAINMENT\tools\backup_postgres.ps1"
+$ScriptPath  = "C:\xampp\htdocs\oee_unificado\tools\backup_postgres.ps1"
 $RunHour     = 2     # 02:13 AM (minuto :13 para no clavarnos en :00)
 $RunMin      = 13
 

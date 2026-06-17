@@ -17,7 +17,7 @@ if (-not $isAdmin) {
 }
 
 $TaskName    = "PlanAttainment_VerifyBackup"
-$ScriptPath  = "C:\xampp\htdocs\PLAN_ATTAINMENT\tools\verify_backup.ps1"
+$ScriptPath  = "C:\xampp\htdocs\oee_unificado\tools\verify_backup.ps1"
 
 if (-not (Test-Path $ScriptPath)) {
     Write-Host "ERROR: no existe $ScriptPath" -ForegroundColor Red

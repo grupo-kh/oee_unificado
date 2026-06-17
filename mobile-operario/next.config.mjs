@@ -22,7 +22,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8080/PLAN_ATTAINMENT/api/:path*',
+        destination: 'http://localhost:8080/oee_unificado/api/:path*',
       },
     ];
   },
