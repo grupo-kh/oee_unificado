@@ -219,6 +219,11 @@ tbody tr:hover{background:#f9fafb}
 .mod-paros .breadcrumb b{color:#8c181a}
 .mod-paros td{color:#6e6d6b}
 .breadcrumb{font-size:12px;color:#9ca3af;margin-bottom:14px}
+.rdtbl{width:100%;border-collapse:collapse;font-size:13px}
+.rdtbl th{background:#f3f6fa;color:#1e3a5f;font-weight:700;text-align:left;padding:7px 12px;border-bottom:1px solid #e3e9f0;position:sticky;top:0}
+.rdtbl td{padding:7px 12px;border-bottom:1px solid #f1f4f8}
+.rdtbl th.r,.rdtbl td.r{text-align:right;font-variant-numeric:tabular-nums}
+.rdtbl tbody tr:hover{background:#f6f9fc}
 .breadcrumb b{color:#374151}
 .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
 .legend span{display:flex;align-items:center;gap:6px;font-size:12px}
@@ -440,16 +445,21 @@ const App={
       else{
         const unit=esRef?'h':'%';
         const max=esRef?Math.max(...items.map(i=>i.valor),1):100;
-        const clickable=(State.metrica==='disponibilidad'||State.metrica==='oee');
+        const rdtoMaq=(State.metrica==='rendimiento'&&!esRef);   // rdto por máquina → referencias fabricadas
+        const clickable=(State.metrica==='disponibilidad'||State.metrica==='oee'||rdtoMaq);
+        const hint=rdtoMaq?'Haz clic en una máquina para ver sus referencias fabricadas (se abre debajo).'
+                          :`Haz clic en una ${esRef?'referencia':'máquina'} para analizarla (se abre debajo).`;
         machBody.innerHTML=this.barList(items,{
           name:i=>i.maquina,val:i=>i.valor,unit,max,
           color:i=>unit==='%'?this.semColor(i.valor):'#3a6aa3',clickable
-        })+(clickable?`<div class="hint">Haz clic en una ${esRef?'referencia':'máquina'} para analizarla (se abre debajo).</div>`:'');
+        })+(clickable?`<div class="hint">${hint}</div>`:'');
         if(clickable){
           [...machBody.querySelectorAll('.brow')].forEach((row,ix)=>{
-            row.onclick=()=>esRef
-              ? this.refMotivos(items[ix].cod_maquina,items[ix].maquina)
-              : this.machineSelector(items[ix].cod_maquina,items[ix].maquina);
+            row.onclick=()=>rdtoMaq
+              ? this.rdMaqRefs(items[ix].cod_maquina,items[ix].maquina)
+              : (esRef
+                  ? this.refMotivos(items[ix].cod_maquina,items[ix].maquina)
+                  : this.machineSelector(items[ix].cod_maquina,items[ix].maquina));
           });
         }
       }
@@ -1040,6 +1050,51 @@ const App={
     });
   },
   loadMainDebounced(){clearTimeout(this._t);this._t=setTimeout(()=>this.loadMain(),350);},
+
+  /* ---------- RENDIMIENTO: referencias fabricadas en una máquina → OFs ---------- */
+  async rdMaqRefs(cod,name){
+    const ov=this.push('Referencias fabricadas · '+name,
+      State.seccion+' · piezas/hora OK y NOK por referencia · clic en una referencia para ver sus OFs',
+      this.loadingHtml());
+    const self=this;
+    try{
+      const d=await this.get('oee_unificado_maq_referencias.php',this.common({cod_maquina:cod}));
+      const refs=d.referencias||[];
+      if(!refs.length){this.body(ov).innerHTML='<div class="empty">Sin referencias fabricadas en el rango</div>';return;}
+      const labels=refs.map(r=>r.desc+(r.nom_sage?(' · '+r.nom_sage):''));
+      const h=Math.min(1600,Math.max(280,refs.length*30+150));
+      this.body(ov).innerHTML=`<div class="breadcrumb">${refs.length} referencias · barras = piezas/hora (OK verde · NOK rojo). Haz clic en una referencia para ver sus OFs.</div>`
+        +`<div class="chartbox" style="height:${h}px"><canvas class="cvr"></canvas></div>`
+        +`<div class="rdofs" style="margin-top:18px"></div>`;
+      const wrap=this.body(ov), el=wrap.querySelector('.cvr'), detail=wrap.querySelector('.rdofs');
+      this.chartDestroy(el);
+      new Chart(el,{type:'bar',data:{labels,datasets:[
+        {label:'OK/h',data:refs.map(r=>r.ok_h),backgroundColor:'#10b981'},
+        {label:'NOK/h',data:refs.map(r=>r.nok_h),backgroundColor:'#c8102e'}
+      ]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'bottom'},datalabels:{display:false},
+          tooltip:{callbacks:{afterBody:items=>{const r=refs[items[0].dataIndex];return 'Total: '+(r.uds_total).toLocaleString('es-ES')+' uds · '+r.horas+' h';}}}},
+        onClick:(e,els)=>{if(els.length){const r=refs[els[0].index];self.rdRefOfs(detail,cod,r.cod,r.desc,r.nom_sage);}},
+        scales:{x:{beginAtZero:true,title:{display:true,text:'piezas / hora'}},y:{ticks:{font:{size:10},autoSkip:false}}}}});
+    }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+  async rdRefOfs(detail,cod,refCod,refName,nomSage){
+    const ttl=`OFs · ${refName}${nomSage?(' · '+nomSage):''}`;
+    detail.innerHTML=`<div class="sec-title" style="margin:0 0 8px">${ttl}</div>`+this.loadingHtml();
+    try{
+      const d=await this.get('oee_unificado_maq_ref_ofs.php',this.common({cod_maquina:cod,cod_producto:refCod}));
+      const ofs=d.ofs||[];
+      const fU=n=>(Number(n)||0).toLocaleString('es-ES');
+      const fmtF=s=>{if(!s)return'—';const p=s.split(' ');const [y,m,dd]=p[0].split('-');return dd+'/'+m+'/'+y.slice(2)+' '+(p[1]||'').slice(0,5);};
+      if(!ofs.length){detail.innerHTML=`<div class="sec-title" style="margin:0 0 8px">${ttl}</div><div class="empty">Sin OFs en el rango</div>`;return;}
+      let h=`<div class="sec-title" style="margin:0 0 8px">${ttl} <small style="font-weight:500;color:#9ca3af">(${ofs.length} OF${ofs.length===1?'':'s'})</small></div>`;
+      h+='<table class="rdtbl"><thead><tr><th>OF</th><th>Fecha</th><th class="r">OEE %</th><th class="r">Piezas fab.</th><th class="r">Pzas OK</th><th class="r">Pzas NOK</th></tr></thead><tbody>';
+      ofs.forEach(o=>h+=`<tr><td>${o.cod_of}</td><td>${fmtF(o.fecha)}</td><td class="r">${o.oee}%</td><td class="r">${fU(o.piezas)}</td><td class="r">${fU(o.ok)}</td><td class="r">${fU(o.nok)}</td></tr>`);
+      h+='</tbody></table>';
+      detail.innerHTML=h;
+      detail.scrollIntoView({behavior:'smooth',block:'nearest'});
+    }catch(e){detail.innerHTML=`<div class="error">${e.message}</div>`;}
+  },
 
   /* ---------- HISTOGRAMA (ApexCharts rangeBar / Gantt) ---------- */
   // Barra de fechas para acotar el rango del cronograma dentro de su popup
