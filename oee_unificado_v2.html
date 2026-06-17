@@ -224,6 +224,14 @@ tbody tr:hover{background:#f9fafb}
 .rdtbl td{padding:7px 12px;border-bottom:1px solid #f1f4f8}
 .rdtbl th.r,.rdtbl td.r{text-align:right;font-variant-numeric:tabular-nums}
 .rdtbl tbody tr:hover{background:#f6f9fc}
+.rdtbl tbody tr.ofrow{cursor:pointer}
+.ofp-sub{font-size:12.5px;color:#5b6f86;margin:4px 0 12px}
+.ofk-row{display:flex;gap:8px;margin-bottom:12px}
+.ofk{flex:1;color:#fff;border-radius:8px;padding:8px 10px;text-align:center}
+.ofk-l{font-size:10px;opacity:.9;text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+.ofk-v{font-size:18px;font-weight:800;line-height:1.1}
+.ofp-pz{font-size:13px;color:#374151;margin-bottom:12px}
+.ofp-h{font-size:13.5px;font-weight:700;color:#1e3a5f;margin:6px 0 8px}
 .breadcrumb b{color:#374151}
 .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
 .legend span{display:flex;align-items:center;gap:6px;font-size:12px}
@@ -1069,13 +1077,17 @@ const App={
       const wrap=this.body(ov), el=wrap.querySelector('.cvr'), detail=wrap.querySelector('.rdofs');
       this.chartDestroy(el);
       new Chart(el,{type:'bar',data:{labels,datasets:[
-        {label:'OK/h',data:refs.map(r=>r.ok_h),backgroundColor:'#10b981'},
-        {label:'NOK/h',data:refs.map(r=>r.nok_h),backgroundColor:'#c8102e'}
+        {label:'OK/h',data:refs.map(r=>r.ok_h),backgroundColor:'#8c181a'},
+        {label:'NOK/h',data:refs.map(r=>r.nok_h),backgroundColor:'#e0902a'}
       ]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{position:'bottom'},datalabels:{display:false},
+        layout:{padding:{right:48}},
+        plugins:{legend:{position:'bottom'},
+          datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]>0,anchor:'end',align:'right',
+            color:'#1f2937',font:{size:11,weight:'700'},formatter:v=>Math.round(v).toLocaleString('es-ES')},
           tooltip:{callbacks:{afterBody:items=>{const r=refs[items[0].dataIndex];return 'Total: '+(r.uds_total).toLocaleString('es-ES')+' uds · '+r.horas+' h';}}}},
         onClick:(e,els)=>{if(els.length){const r=refs[els[0].index];self.rdRefOfs(detail,cod,r.cod,r.desc,r.nom_sage);}},
-        scales:{x:{beginAtZero:true,title:{display:true,text:'piezas / hora'}},y:{ticks:{font:{size:10},autoSkip:false}}}}});
+        scales:{x:{beginAtZero:true,title:{display:true,text:'piezas / hora'}},
+          y:{ticks:{font:{size:12,weight:'700'},color:'#1f2937',autoSkip:false}}}}});
     }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}
   },
   async rdRefOfs(detail,cod,refCod,refName,nomSage){
@@ -1089,11 +1101,36 @@ const App={
       if(!ofs.length){detail.innerHTML=`<div class="sec-title" style="margin:0 0 8px">${ttl}</div><div class="empty">Sin OFs en el rango</div>`;return;}
       let h=`<div class="sec-title" style="margin:0 0 8px">${ttl} <small style="font-weight:500;color:#9ca3af">(${ofs.length} OF${ofs.length===1?'':'s'})</small></div>`;
       h+='<table class="rdtbl"><thead><tr><th>OF</th><th>Fecha</th><th class="r">OEE %</th><th class="r">Piezas fab.</th><th class="r">Pzas OK</th><th class="r">Pzas NOK</th></tr></thead><tbody>';
-      ofs.forEach(o=>h+=`<tr><td>${o.cod_of}</td><td>${fmtF(o.fecha)}</td><td class="r">${o.oee}%</td><td class="r">${fU(o.piezas)}</td><td class="r">${fU(o.ok)}</td><td class="r">${fU(o.nok)}</td></tr>`);
+      ofs.forEach(o=>h+=`<tr class="ofrow" data-of="${o.cod_of}" title="Ver disponibilidad de la OF"><td>${o.cod_of}</td><td>${fmtF(o.fecha)}</td><td class="r">${o.oee}%</td><td class="r">${fU(o.piezas)}</td><td class="r">${fU(o.ok)}</td><td class="r">${fU(o.nok)}</td></tr>`);
       h+='</tbody></table>';
       detail.innerHTML=h;
+      const self=this;
+      [...detail.querySelectorAll('.ofrow')].forEach(tr=>tr.onclick=()=>self.ofDispPopup(tr.dataset.of,cod));
       detail.scrollIntoView({behavior:'smooth',block:'nearest'});
     }catch(e){detail.innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+
+  async ofDispPopup(codOf,maqCod){
+    const ov=document.createElement('div'); ov.className='of-pop';
+    ov.innerHTML=`<div class="of-pop-card"><div class="of-pop-head"><h3>Disponibilidad · OF ${codOf}</h3><button class="mclose" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;line-height:1">×</button></div><div class="of-pop-body">${this.loadingHtml()}</div></div>`;
+    document.body.appendChild(ov);
+    const close=()=>ov.remove();
+    ov.querySelector('.mclose').onclick=close; ov.onclick=e=>{if(e.target===ov)close();};
+    const body=ov.querySelector('.of-pop-body');
+    try{
+      const d=await this.get('oee_unificado_of_paros.php',this.common({cod_of:codOf,cod_maquina:maqCod}));
+      const fU=n=>(Number(n)||0).toLocaleString('es-ES');
+      const kpi=(l,v,c)=>`<div class="ofk" style="background:${c}"><div class="ofk-l">${l}</div><div class="ofk-v">${v}%</div></div>`;
+      let h=`<div class="ofp-sub">${d.desc_producto||d.producto||''}${d.fecha_ini?(' · '+d.fecha_ini.slice(0,16).replace('T',' ')):''}${d.fecha_fin?(' → '+d.fecha_fin.slice(11,16)):''}</div>`;
+      h+=`<div class="ofk-row">${kpi('Disp',d.disp,'#2d4d7a')}${kpi('Rend',d.rend,'#c45a2c')}${kpi('Cal',d.cal,'#1d5938')}${kpi('OEE',d.oee,'#3a6aa3')}</div>`;
+      h+=`<div class="ofp-pz">Piezas: <b>${fU(d.piezas)}</b> · OK ${fU(d.ok)} · NOK ${fU(d.nok)}</div>`;
+      const mot=d.motivos||[];
+      h+=`<div class="ofp-h">Motivos de paro · total <b>${(d.total_horas_paro||0).toFixed(1)} h</b></div>`;
+      if(mot.length){const max=Math.max(...mot.map(m=>m.horas||0),1);
+        h+=this.barList(mot,{name:m=>m.motivo,val:m=>m.horas||0,unit:'h',max,color:()=>'#8c181a',clickable:false});}
+      else h+='<div class="empty">Sin paros registrados en esta OF</div>';
+      body.innerHTML=h;
+    }catch(e){body.innerHTML=`<div class="error">${e.message}</div>`;}
   },
 
   /* ---------- HISTOGRAMA (ApexCharts rangeBar / Gantt) ---------- */
