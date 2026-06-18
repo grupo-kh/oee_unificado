@@ -233,6 +233,7 @@ try {
         $w = [
             "CAST(hp.Dia_productivo AS DATE) BETWEEN ? AND ?",
             "cp.Cod_paro <> 11",
+            "cp.Id_actividad <> 1",   // excluir actividad CERRADA (igual que Matriz 2)
             "hpp.Fecha_fin IS NOT NULL",
         ];
         $p = [$fdesde, $fhasta];
