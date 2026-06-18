@@ -108,6 +108,14 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .mtx2-tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
 .mtx2-tbl .mtx2-tot{background:#f0eeee;font-weight:700}
 .mtx2-tbl tr.mtx2-totrow td{background:#ece4e4;font-weight:700;position:sticky;top:52px;z-index:2}
+.mtx2-tbl tr.mtx2-maqrow td{background:#3a2426;color:#fff;font-weight:700}
+.mtx2-tbl tr.mtx2-maqrow td.mtx2-act{background:#2b1a1c;color:#fff}
+.mtx2-tbl tr.mtx2-refrow{cursor:pointer}
+.mtx2-tbl tr.mtx2-refrow:hover td{background:#f4eeef}
+.mtx2-exp{display:inline-block;width:12px;color:#8c181a;font-size:9px}
+.mtx2-tbl td.mtx2-paro-cell{position:sticky;left:0;z-index:1;background:#fbf9f9;text-align:left;padding-left:22px;color:#5a4446;font-size:11px}
+.mtx2-tbl td.mtx2-paro-cell small{color:#a8989a;margin-left:6px}
+.mtx2-tbl tr.mtx2-pararow td{font-size:11px;color:#6a5658}
 /* popup a pantalla completa (Top máquinas / Top motivos) */
 .fullpop{position:fixed;inset:0;background:#fff;z-index:1500;display:flex;flex-direction:column;overflow:hidden}
 .fullpop-head{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid #f0eeee}
@@ -1774,47 +1782,77 @@ const App={
     try{
       const d=await this.get('oee_unificado_matriz2.php',this.common({seccion:State.seccion}));
       this._mtx2=d;
-      body.innerHTML=this.matriz2Tabla(d);
-      // Filtro de referencia en vivo.
+      const wire=()=>{
+        // Expandir/contraer el detalle por paro al clicar una referencia.
+        body.querySelectorAll('.mtx2-refrow').forEach(tr=>{tr.onclick=()=>{
+          const id=tr.dataset.tgt; const exp=tr.querySelector('.mtx2-exp');
+          const filas=body.querySelectorAll('tr.'+id);
+          const open=filas.length&&filas[0].style.display==='none';
+          filas.forEach(f=>f.style.display=open?'':'none');
+          if(exp)exp.textContent=open?'▼':'▶';
+        };});
+      };
+      body.innerHTML=this.matriz2Tabla(d); wire();
+      // Filtro: por referencia o por máquina, en vivo.
       const sb=ov.querySelector('.mtx2-search');
       sb.oninput=()=>{const q=(sb.value||'').toLowerCase().trim();
-        const filt={...d,referencias:d.referencias.filter(r=>!q||r.cod.toLowerCase().includes(q)||(r.desc||'').toLowerCase().includes(q))};
-        body.innerHTML=this.matriz2Tabla(filt);};
+        const filt={...d,maquinas:d.maquinas.map(m=>({...m,
+          referencias:m.referencias.filter(r=>!q||r.cod.toLowerCase().includes(q)||(r.desc||'').toLowerCase().includes(q)||m.maquina.toLowerCase().includes(q))
+        })).filter(m=>m.referencias.length||m.maquina.toLowerCase().includes(q))};
+        body.innerHTML=this.matriz2Tabla(filt); wire();};
     }catch(e){body.innerHTML=`<div class="error">${e.message}</div>`;}
   },
   matriz2Tabla(d){
-    // Misma lógica que la Matriz original: UNA tabla, filas = referencias,
-    // columnas = categoría de paro agrupada por actividad (cabecera 2 niveles),
-    // fila TOTAL arriba. Compacto y legible.
-    const acts=d.actividades||[], cats=d.categorias||[], refs=d.referencias||[];
-    if(!refs.length)return '<div class="empty">Sin paros para el filtro seleccionado</div>';
+    // Como la Matriz original: filas agrupadas Máquina → Referencia. Columnas =
+    // categoría de paro (Tipo Paro 1) agrupada por actividad (cabecera 2 niveles).
+    // Cada referencia es expandible: muestra el detalle por paro individual.
+    const acts=d.actividades||[], cats=d.categorias||[], maqs=d.maquinas||[];
+    const parosPorCat=d.paros_por_categoria||{};
+    if(!maqs.length)return '<div class="empty">Sin paros para el filtro seleccionado</div>';
     const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     const f2=v=>(v==null||v===0)?'':(Math.round(v*100)/100).toFixed(2);
     const cellCol=v=>v==null||v===0?'':v>8?'background:#e08a3c;color:#fff':v>4?'background:#d9a441':v>2?'background:#f0e2c0':v>0?'background:#f7f1e3':'';
-    // Solo columnas (actividad×categoría) con algún dato en el conjunto.
-    const colKeys=[]; // {act,cat,key}
-    for(const a of acts)for(const c of cats){
-      const k=a+'||'+c;
-      if(refs.some(r=>r.celdas[k]>0)) colKeys.push({act:a,cat:c,key:k});
-    }
-    // Cabecera nivel 1: actividad (colspan por nº de categorías visibles bajo ella).
+    // Columnas (actividad×categoría) con algún dato en el conjunto.
+    const has=(k)=>maqs.some(m=>m.celdas[k]>0);
+    const colKeys=[];
+    for(const a of acts)for(const c of cats){const k=a+'||'+c;if(has(k))colKeys.push({act:a,cat:c,key:k});}
     const actCols={}; colKeys.forEach(c=>actCols[c.act]=(actCols[c.act]||0)+1);
+    const ncol=colKeys.length;
     let h='<div class="mtx2-scroll"><table class="mtx2-tbl"><thead>';
-    h+='<tr><th class="mtx2-acth" rowspan="2">Referencia</th>';
+    h+='<tr><th class="mtx2-acth" rowspan="2">Máquina / Referencia</th>';
     for(const a of acts){ if(actCols[a]) h+=`<th class="mtx2-acttop" colspan="${actCols[a]}">${e(a)}</th>`; }
     h+='<th class="mtx2-tot" rowspan="2">TOTAL (h)</th></tr><tr>';
     for(const c of colKeys) h+=`<th class="mtx2-paroh">${e(c.cat)}</th>`;
     h+='</tr></thead><tbody>';
-    // Fila TOTAL (arriba), por columna.
+    // Fila TOTAL general (arriba).
     h+='<tr class="mtx2-totrow"><td class="mtx2-act"><b>TOTAL</b></td>';
     let gtot=0;
-    for(const c of colKeys){let t=0;for(const r of refs)t+=r.celdas[c.key]||0;gtot+=t;h+=`<td class="num"><b>${f2(t)}</b></td>`;}
+    for(const c of colKeys){let t=0;for(const m of maqs)t+=m.celdas[c.key]||0;gtot+=t;h+=`<td class="num"><b>${f2(t)}</b></td>`;}
     h+=`<td class="num"><b>${f2(gtot)}</b></td></tr>`;
-    // Una fila por referencia.
-    for(const ref of refs){
-      h+=`<tr><td class="mtx2-ref-cell" title="${e(ref.cod)}">${e(ref.desc)}<small>${e(ref.cod)}</small></td>`;
-      for(const c of colKeys){const v=ref.celdas[c.key]||0;h+=`<td class="num" style="${cellCol(v)}">${f2(v)}</td>`;}
-      h+=`<td class="num mtx2-tot"><b>${f2(ref.total_horas)}</b></td></tr>`;
+    let rid=0;
+    for(const mq of maqs){
+      // Fila de máquina (cabecera de grupo).
+      h+=`<tr class="mtx2-maqrow"><td class="mtx2-act">🏭 ${e(mq.maquina)}</td>`;
+      for(const c of colKeys)h+=`<td class="num"><b>${f2(mq.celdas[c.key]||0)}</b></td>`;
+      h+=`<td class="num mtx2-tot"><b>${f2(mq.total_horas)}</b></td></tr>`;
+      for(const ref of mq.referencias){
+        const id='m2r'+(rid++);
+        // Fila de referencia (clic = expandir/contraer detalle por paro).
+        h+=`<tr class="mtx2-refrow" data-tgt="${id}"><td class="mtx2-ref-cell" title="${e(ref.cod)}"><span class="mtx2-exp">▶</span> ${e(ref.desc)}<small>${e(ref.cod)}</small></td>`;
+        for(const c of colKeys){const v=ref.celdas[c.key]||0;h+=`<td class="num" style="${cellCol(v)}">${f2(v)}</td>`;}
+        h+=`<td class="num mtx2-tot"><b>${f2(ref.total_horas)}</b></td></tr>`;
+        // Filas de detalle por paro (una por paro presente, ocultas por defecto).
+        const parosUsados=[];
+        for(const c of cats){for(const p of (parosPorCat[c]||[])){
+          if(acts.some(a=>ref.celdas[a+'||'+c+'||'+p]>0)) parosUsados.push({cat:c,paro:p});
+        }}
+        for(const pp of parosUsados){
+          h+=`<tr class="mtx2-pararow ${id}" style="display:none"><td class="mtx2-paro-cell">↳ ${e(pp.paro)} <small>${e(pp.cat)}</small></td>`;
+          let tp=0;
+          for(const c of colKeys){const v=ref.celdas[c.act+'||'+c.cat+'||'+pp.paro]||0;tp+=v;h+=`<td class="num" style="${cellCol(v)}">${f2(v)}</td>`;}
+          h+=`<td class="num">${f2(tp)}</td></tr>`;
+        }
+      }
     }
     h+='</tbody></table></div>';
     return h;

@@ -80,47 +80,62 @@ try {
         }
     } catch (\Throwable $e) { /* sin mapeo: cae a "Otros" más abajo */ }
 
-    // Consolidar por referencia, filtrando por sección (vía tipo de máquina).
-    $refs = [];          // cod => datos
-    $actSet = [];        // actividades presentes (eje filas)
-    $catSet = [];        // categorías de paro presentes (eje columnas)
+    // Consolidar por MÁQUINA → REFERENCIA (como la Matriz original).
+    // Celdas con dos granularidades:
+    //   - "act||categoria"        → resumen por categoría (Tipo Paro 1)
+    //   - "act||categoria||paro"  → detalle por paro individual (nivel extra)
+    $maqs = [];          // maquina => ['referencias'=>[cod=>...], 'total'=>..]
+    $actSet = [];        // actividades presentes
+    $catSet = [];        // categorías presentes
+    $parosPorCat = [];   // categoria => [paro => true] (para las filas de paro)
     foreach ($rows as $r) {
-        // Sección a partir de la máquina (misma lógica que el resto de la app).
-        if ($seccion !== '' && PlanAttainmentAgg::MAQUINA_TO_SECCION_EXT[$r['maquina']] !== $seccion) {
-            // Si no mapea o no coincide la sección pedida, se descarta.
-            if (($seccion === 'VARILLAS' || $seccion === 'TROQUELADOS')) continue;
+        $maq = (string) $r['maquina'];
+        if ($seccion !== '' && in_array($seccion, ['VARILLAS','TROQUELADOS'], true)
+            && (PlanAttainmentAgg::MAQUINA_TO_SECCION_EXT[$maq] ?? null) !== $seccion) {
+            continue;
         }
-        $cod = (string) $r['cod'];
-        $act = (string) $r['actividad'];
-        $par = (string) $r['paro'];
-        // Agrupar el paro en su categoría (Tipo Paro 1). Sin mapeo → "Otros".
-        $cate = $cat[mb_strtoupper($par, 'UTF-8')] ?? 'Otros';
-        $h   = (int) $r['segundos'] / 3600.0;
-        if (!isset($refs[$cod])) {
-            $refs[$cod] = ['cod' => $cod, 'desc' => trim((string)$r['descr']) ?: $cod,
-                           'total_horas' => 0.0, 'celdas' => [], 'catSet' => []];
+        $cod  = (string) $r['cod'];
+        $act  = (string) $r['actividad'];
+        $par  = (string) $r['paro'];
+        $cate = $cat[mb_strtoupper($par, 'UTF-8')] ?? 'Otros';   // Tipo Paro 1
+        $h    = (int) $r['segundos'] / 3600.0;
+
+        if (!isset($maqs[$maq])) $maqs[$maq] = ['maquina' => $maq, 'total_horas' => 0.0, 'celdas' => [], 'referencias' => []];
+        if (!isset($maqs[$maq]['referencias'][$cod])) {
+            $maqs[$maq]['referencias'][$cod] = ['cod' => $cod, 'desc' => trim((string)$r['descr']) ?: $cod,
+                                                'total_horas' => 0.0, 'celdas' => []];
         }
-        $key = $act . '||' . $cate;
-        $refs[$cod]['celdas'][$key] = ($refs[$cod]['celdas'][$key] ?? 0) + $h;
-        $refs[$cod]['total_horas']  += $h;
-        $refs[$cod]['catSet'][$cate] = true;
+        $kCat = $act . '||' . $cate;
+        $kPar = $act . '||' . $cate . '||' . $par;
+        // Acumular en referencia y en máquina (ambos niveles, ambas granularidades).
+        $maqs[$maq]['referencias'][$cod]['celdas'][$kCat] = ($maqs[$maq]['referencias'][$cod]['celdas'][$kCat] ?? 0) + $h;
+        $maqs[$maq]['referencias'][$cod]['celdas'][$kPar] = ($maqs[$maq]['referencias'][$cod]['celdas'][$kPar] ?? 0) + $h;
+        $maqs[$maq]['referencias'][$cod]['total_horas']  += $h;
+        $maqs[$maq]['celdas'][$kCat] = ($maqs[$maq]['celdas'][$kCat] ?? 0) + $h;
+        $maqs[$maq]['celdas'][$kPar] = ($maqs[$maq]['celdas'][$kPar] ?? 0) + $h;
+        $maqs[$maq]['total_horas']  += $h;
+
         $actSet[$act]  = true;
         $catSet[$cate] = true;
+        $parosPorCat[$cate][$par] = true;
     }
 
-    // Redondeo y limpieza de salida.
+    // Salida: máquinas (orden por más horas) con sus referencias (idem).
     $out = [];
-    foreach ($refs as $cod => $rf) {
-        $celdas = [];
-        foreach ($rf['celdas'] as $k => $v) $celdas[$k] = round($v, 2);
-        $out[] = [
-            'cod'         => $cod,
-            'desc'        => $rf['desc'],
-            'total_horas' => round($rf['total_horas'], 2),
-            'celdas'      => $celdas,
-        ];
+    foreach ($maqs as $mq) {
+        $refsOut = [];
+        foreach ($mq['referencias'] as $rf) {
+            $cel = [];
+            foreach ($rf['celdas'] as $k => $v) $cel[$k] = round($v, 2);
+            $refsOut[] = ['cod' => $rf['cod'], 'desc' => $rf['desc'],
+                          'total_horas' => round($rf['total_horas'], 2), 'celdas' => $cel];
+        }
+        usort($refsOut, fn($a, $b) => $b['total_horas'] <=> $a['total_horas']);
+        $celM = [];
+        foreach ($mq['celdas'] as $k => $v) $celM[$k] = round($v, 2);
+        $out[] = ['maquina' => $mq['maquina'], 'total_horas' => round($mq['total_horas'], 2),
+                  'celdas' => $celM, 'referencias' => $refsOut];
     }
-    // Referencias por más horas de paro primero.
     usort($out, fn($a, $b) => $b['total_horas'] <=> $a['total_horas']);
 
     // Ordenar actividades por un orden lógico conocido y el resto alfabético.
@@ -141,12 +156,16 @@ try {
         $ia = $ia === false ? 999 : $ia; $ib = $ib === false ? 999 : $ib;
         return $ia === $ib ? strcmp($a, $b) : $ia <=> $ib;
     });
+    // Paros individuales por categoría (para el nivel de detalle, ordenados).
+    $parosPorCategoria = [];
+    foreach ($parosPorCat as $c => $set) { $p = array_keys($set); sort($p); $parosPorCategoria[$c] = $p; }
 
     jsonOk([
-        'seccion'     => $seccion,
-        'actividades' => $actividades,
-        'categorias'  => $categorias,
-        'referencias' => $out,
+        'seccion'             => $seccion,
+        'actividades'         => $actividades,
+        'categorias'          => $categorias,
+        'paros_por_categoria' => $parosPorCategoria,
+        'maquinas'            => $out,
     ]);
 } catch (Exception $e) {
     jsonError('Error: ' . $e->getMessage(), 500);
