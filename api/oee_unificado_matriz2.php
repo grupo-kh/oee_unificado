@@ -40,12 +40,13 @@ function matriz2Data(): array
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fhasta)) throw new Exception('fecha_hasta inválida');
     $turnos = array_values(array_filter(getListParam('turnos'), fn($t) => in_array($t, ['M','T','N'], true)));
 
-    // Mismos filtros que la Matriz original para que los totales coincidan:
-    // excluir solo el paro 11 (CERRADA) y paros sin cerrar. Los paros SIN producto
-    // asignado SÍ se cuentan (se agrupan bajo «Sin referencia»), como en Matriz.
+    // Filtros: excluir el paro 11 (CERRADA) y, además, toda la actividad CERRADA
+    // (Id_actividad = 1) — no debe aparecer ni sumar en Matriz 2. Los paros sin
+    // producto SÍ se cuentan (se agrupan bajo «Sin referencia»).
     $where  = [
         "CAST(hp.Dia_productivo AS DATE) BETWEEN ? AND ?",
-        "cp.Cod_paro <> 11",          // excluir CERRADA (igual que la Matriz original)
+        "cp.Cod_paro <> 11",          // excluir paro CERRADA
+        "cp.Id_actividad <> 1",       // excluir toda la actividad CERRADA
         "hpp.Fecha_fin IS NOT NULL",
     ];
     $params = [$fdesde, $fhasta];
