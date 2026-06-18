@@ -673,6 +673,7 @@ const App={
     let html=`
       <div class="art-kpis">
         <div class="art-kpi art-kpi-acc"><span class="kl">Media uds fabricadas/hora</span><span class="kv">${this.fU(t.media_uds_hora)} u/h</span></div>
+        <div class="art-kpi"><span class="kl">Unidades fabricadas</span><span class="kv">${this.fU(t.unidades)}</span></div>
         <div class="art-kpi"><span class="kl">Horas dedicadas</span><span class="kv">${this.fU(t.horas_dedicadas)}</span></div>
         <div class="art-kpi"><span class="kl">Horas perdidas</span><span class="kv">${this.fU(t.horas_perdidas)}</span></div>
         <div class="art-kpi"><span class="kl">Nº de OFs</span><span class="kv">${this.fU(ofs.length)}</span></div>
@@ -707,7 +708,7 @@ const App={
         <td class="num">${this.fU(o.ok)}</td><td class="num">${this.fU(o.nok)}</td></tr>`;
     }
     html+=`</tbody></table></div>
-      <div class="art-chart-title">Cantidades fabricadas por OF · color = uds fabricadas/hora · etiqueta = OF + rendimiento % + uds fabricadas · clic en una barra = detalle OEE de la OF</div>
+      <div class="art-chart-title">Cantidades fabricadas por OF · color = uds fabricadas/hora · clic en una barra = detalle OEE de la OF</div>
       <div class="art-chart-scroll"><div class="chartbox tall" style="min-width:${Math.max(600,ofs.length*120)}px"><canvas class="art-cv"></canvas></div></div>`;
     body.innerHTML=html;
     // Etiqueta del eje X en 3 líneas: OF completa + rendimiento % + uds fabricadas.
