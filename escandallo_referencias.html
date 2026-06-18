@@ -65,7 +65,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
   </div>
 </div>
 <script>
-const API='/oee_unificado/api/';
+const API='api/'; // ruta relativa: funciona con la carpeta actual y tras renombrarla
 let REFS=[], CUR=null;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
