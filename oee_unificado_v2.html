@@ -411,7 +411,7 @@ const App={
     metricSeg.querySelectorAll('button').forEach(b=>b.onclick=()=>{
       metricSeg.querySelectorAll('button').forEach(x=>x.classList.remove('active'));
       b.classList.add('active'); State.metrica=b.dataset.m;
-      porSeg.style.display=(State.metrica==='disponibilidad'||State.metrica==='oee')?'':'none';
+      porSeg.style.display=(State.metrica==='disponibilidad'||State.metrica==='oee'||State.metrica==='rendimiento')?'':'none';
       if(porSeg.style.display==='none'){State.por='maquina';this.setPorActive();}
       this.loadMachines();
     });
@@ -506,11 +506,15 @@ const App={
       const items=d.maquinas||[];
       if(!items.length){machBody.innerHTML='<div class="empty">Sin datos para esta selección</div>';}
       else{
-        const unit=esRef?'h':'%';
-        const max=esRef?Math.max(...items.map(i=>i.valor),1):100;
-        const rdtoMaq=(State.metrica==='rendimiento'&&!esRef);   // rdto por máquina → referencias fabricadas
-        const clickable=(State.metrica==='disponibilidad'||State.metrica==='oee'||rdtoMaq);
+        // Rendimiento siempre se mide en % (sea por máquina o por referencia).
+        const esRend=(State.metrica==='rendimiento');
+        const unit=(esRef&&!esRend)?'h':'%';
+        const max=(esRef&&!esRend)?Math.max(...items.map(i=>i.valor),1):100;
+        const rdtoMaq=(esRend&&!esRef);            // rdto por máquina → referencias fabricadas
+        const rdtoRef=(esRend&&esRef);             // rdto por referencia → análisis histórico del artículo
+        const clickable=(State.metrica==='disponibilidad'||State.metrica==='oee'||rdtoMaq||rdtoRef);
         const hint=rdtoMaq?'Haz clic en una máquina para ver sus referencias fabricadas (se abre debajo).'
+                  :rdtoRef?'Haz clic en una referencia para ver su análisis histórico de OFs (ventana).'
                           :`Haz clic en una ${esRef?'referencia':'máquina'} para analizarla (se abre debajo).`;
         machBody.innerHTML=this.barList(items,{
           name:i=>i.maquina,val:i=>i.valor,unit,max,
@@ -518,7 +522,9 @@ const App={
         })+(clickable?`<div class="hint">${hint}</div>`:'');
         if(clickable){
           [...machBody.querySelectorAll('.brow')].forEach((row,ix)=>{
-            row.onclick=()=>rdtoMaq
+            row.onclick=()=>rdtoRef
+              ? this.openArtAnalisis(items[ix].cod_maquina,items[ix].maquina)  // cod_maquina reusa el cod_referencia
+              : rdtoMaq
               ? this.rdMaqRefs(items[ix].cod_maquina,items[ix].maquina)
               : (esRef
                   ? this.refMotivos(items[ix].cod_maquina,items[ix].maquina)

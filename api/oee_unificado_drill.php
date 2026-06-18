@@ -125,6 +125,9 @@ try {
     // reutilizar el render del cliente sin duplicar lógica.
     if ($por === 'referencia' && in_array($metrica, ['disponibilidad', 'oee'], true)) {
         $maquinas = _refsParos($fdesde, $fhasta, $turnos, $codMaqsSeccion);
+    } elseif ($por === 'referencia' && $metrica === 'rendimiento') {
+        // Rendimiento por referencia: mismo cálculo OEE pero agrupado por producto.
+        $maquinas = _refsRendimiento($fdesde, $fhasta, $turnos, $seccion);
     }
 
     // ───── 2) Motivos según la métrica ─────
@@ -230,6 +233,81 @@ function _motivosParos(string $fdesde, string $fhasta, array $turnos, array $cod
             'pct_acum' => round(min($acum, 100), 2),
         ];
     }
+    return $out;
+}
+
+/**
+ * Listado superior para Rendimiento con el toggle en "Referencia": mismo cálculo
+ * OEE que por máquina (F_his_ct) pero agrupado por producto. Devuelve el
+ * rendimiento (%) por referencia. Reusa los campos cod_maquina/maquina para que
+ * el render del cliente lo trate como una fila más sin duplicar lógica.
+ */
+function _refsRendimiento(string $fdesde, string $fhasta, array $turnos, string $seccion): array
+{
+    $where = [
+        "CAST(oee.TimePeriod AS DATE) BETWEEN ? AND ?",
+        "oee.WorkGroup NOT IN ('Improductivos','AUX000','AUXI1','SOLD4','SOLD5')",
+        "LTRIM(RTRIM(oee.Cod_producto)) <> ''",
+        "LTRIM(RTRIM(oee.Cod_producto)) <> '--'",
+        "oee.Cod_producto IS NOT NULL",
+    ];
+    $params = [$fdesde, $fhasta];
+    if (!empty($turnos)) {
+        $ph = implode(',', array_fill(0, count($turnos), '?'));
+        $where[] = "oee.Cod_turno IN ($ph)";
+        $params = array_merge($params, $turnos);
+    }
+    // Para asignar sección necesitamos la máquina; agrupamos por (producto, máquina)
+    // y luego consolidamos por producto sumando solo las máquinas de la sección.
+    $sql = "
+        SELECT
+            LTRIM(RTRIM(oee.Cod_producto)) AS cod_referencia,
+            MAX(oee.Desc_producto)         AS referencia,
+            oee.WorkGroup                  AS cod_maquina,
+            mq.Desc_maquina                AS maquina,
+            SUM(oee.M)           AS M,
+            SUM(oee.M_Teo)       AS M_Teo,
+            SUM(oee.M_OKNOK_TEO) AS M_OKNOK_TEO,
+            SUM(oee.M_OK_TEO)    AS M_OK_TEO,
+            SUM(oee.PPERF)       AS PPERF,
+            SUM(oee.PCALIDAD)    AS PCALIDAD,
+            SUM(oee.PNP)         AS PNP
+        FROM F_his_ct('WORKCENTER','DAY','TURNOS, WO, PRODUCTOS',
+                      ? + ' 00:00:00', ? + ' 23:59:59', 16) oee
+        LEFT JOIN cfg_maquina mq ON mq.Cod_maquina = oee.WorkGroup
+        WHERE " . implode(' AND ', $where) . "
+        GROUP BY LTRIM(RTRIM(oee.Cod_producto)), oee.WorkGroup, mq.Desc_maquina
+        HAVING SUM(oee.M) > 0
+    ";
+    $rows = fetchAll('mapex', $sql, array_merge([$fdesde, $fhasta], $params));
+
+    // Consolidar por referencia, sumando solo máquinas de la sección pedida.
+    $acc = [];
+    foreach ($rows as $r) {
+        if (_seccion($r['maquina']) !== $seccion) continue;
+        $cod = (string) $r['cod_referencia'];
+        if (!isset($acc[$cod])) {
+            $acc[$cod] = ['ref' => (string)($r['referencia'] ?: $cod),
+                'M'=>0,'MT'=>0,'MOT'=>0,'MOKT'=>0,'PP'=>0,'PC'=>0,'PNP'=>0];
+        }
+        $acc[$cod]['M']   += (float)$r['M'];
+        $acc[$cod]['MT']  += (float)$r['M_Teo'];
+        $acc[$cod]['MOT'] += (float)$r['M_OKNOK_TEO'];
+        $acc[$cod]['MOKT']+= (float)$r['M_OK_TEO'];
+        $acc[$cod]['PP']  += (float)$r['PPERF'];
+        $acc[$cod]['PC']  += (float)$r['PCALIDAD'];
+        $acc[$cod]['PNP'] += (float)$r['PNP'];
+    }
+    $out = [];
+    foreach ($acc as $cod => $v) {
+        $drc = _drc($v['M'], $v['MT'], $v['MOT'], $v['MOKT'], $v['PP'], $v['PC'], $v['PNP']);
+        $out[] = [
+            'cod_maquina' => $cod,                 // reusa campo para el render
+            'maquina'     => $v['ref'],
+            'valor'       => $drc['rendimiento'],
+        ];
+    }
+    usort($out, fn($a, $b) => $a['valor'] <=> $b['valor']); // peores primero
     return $out;
 }
 
