@@ -1771,13 +1771,15 @@ const App={
       <div class="fullpop-head">
         <h2>🧮 Matriz 2 · Paros por referencia (Actividad × Tipo de paro)<small>${State.seccion} · ${fDesde.value} a ${fHasta.value} · horas de paro</small></h2>
         <div style="display:flex;gap:10px;align-items:center">
-          <input type="search" class="mtx2-search" placeholder="Filtrar referencia…" style="padding:7px 11px;border:1px solid #d9cccd;border-radius:7px;font-size:13px;min-width:220px">
+          <input type="search" class="mtx2-search" placeholder="Filtrar máquina o referencia…" style="padding:7px 11px;border:1px solid #d9cccd;border-radius:7px;font-size:13px;min-width:220px">
+          <button class="btn btn-pri mtx2Xlsx">⬇️ Excel</button>
           <button class="mtx2Close" style="background:#f3f4f6;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280">✕ Cerrar</button>
         </div>
       </div>
       <div class="fullpop-body"><div class="mtx2Body">${this.loadingHtml()}</div></div>`;
     document.body.appendChild(ov);
     ov.querySelector('.mtx2Close').onclick=()=>ov.remove();
+    ov.querySelector('.mtx2Xlsx').onclick=()=>window.open(API+'oee_unificado_matriz2_export.php?'+this.common({seccion:State.seccion}).toString());
     const body=ov.querySelector('.mtx2Body');
     try{
       const d=await this.get('oee_unificado_matriz2.php',this.common({seccion:State.seccion}));

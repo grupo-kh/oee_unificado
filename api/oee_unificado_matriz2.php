@@ -26,19 +26,27 @@ require_once __DIR__ . '/../lib/Db.php';
  *   } ]
  * }
  */
-try {
+/**
+ * Calcula el informe de Matriz 2 y lo DEVUELVE como array (sin emitir salida),
+ * para que tanto el endpoint JSON como la exportación a Excel lo reutilicen.
+ * Lanza Exception si los parámetros son inválidos.
+ */
+function matriz2Data(): array
+{
     $fdesde  = (string) getParam('fecha_desde');
     $fhasta  = (string) getParam('fecha_hasta');
     $seccion = strtoupper((string) getParam('seccion'));
-    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fdesde)) jsonError('fecha_desde inválida');
-    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fhasta)) jsonError('fecha_hasta inválida');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fdesde)) throw new Exception('fecha_desde inválida');
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fhasta)) throw new Exception('fecha_hasta inválida');
     $turnos = array_values(array_filter(getListParam('turnos'), fn($t) => in_array($t, ['M','T','N'], true)));
 
+    // Mismos filtros que la Matriz original para que los totales coincidan:
+    // excluir solo el paro 11 (CERRADA) y paros sin cerrar. Los paros SIN producto
+    // asignado SÍ se cuentan (se agrupan bajo «Sin referencia»), como en Matriz.
     $where  = [
         "CAST(hp.Dia_productivo AS DATE) BETWEEN ? AND ?",
+        "cp.Cod_paro <> 11",          // excluir CERRADA (igual que la Matriz original)
         "hpp.Fecha_fin IS NOT NULL",
-        "prod.Cod_producto IS NOT NULL",
-        "LTRIM(RTRIM(prod.Cod_producto)) NOT IN ('', '--')",
     ];
     $params = [$fdesde, $fhasta];
     if (!empty($turnos)) {
@@ -94,7 +102,10 @@ try {
             && (PlanAttainmentAgg::MAQUINA_TO_SECCION_EXT[$maq] ?? null) !== $seccion) {
             continue;
         }
-        $cod  = (string) $r['cod'];
+        // Paro sin producto asignado → «Sin referencia» (se cuenta, como en Matriz).
+        $cod  = trim((string) $r['cod']);
+        if ($cod === '' || $cod === '--') $cod = '__NOREF__';
+        $descr = $cod === '__NOREF__' ? 'Sin referencia' : (trim((string)$r['descr']) ?: $cod);
         $act  = (string) $r['actividad'];
         $par  = (string) $r['paro'];
         $cate = $cat[mb_strtoupper($par, 'UTF-8')] ?? 'Otros';   // Tipo Paro 1
@@ -102,7 +113,7 @@ try {
 
         if (!isset($maqs[$maq])) $maqs[$maq] = ['maquina' => $maq, 'total_horas' => 0.0, 'celdas' => [], 'referencias' => []];
         if (!isset($maqs[$maq]['referencias'][$cod])) {
-            $maqs[$maq]['referencias'][$cod] = ['cod' => $cod, 'desc' => trim((string)$r['descr']) ?: $cod,
+            $maqs[$maq]['referencias'][$cod] = ['cod' => $cod === '__NOREF__' ? '' : $cod, 'desc' => $descr,
                                                 'total_horas' => 0.0, 'celdas' => []];
         }
         $kCat = $act . '||' . $cate;
@@ -160,13 +171,20 @@ try {
     $parosPorCategoria = [];
     foreach ($parosPorCat as $c => $set) { $p = array_keys($set); sort($p); $parosPorCategoria[$c] = $p; }
 
-    jsonOk([
+    return [
         'seccion'             => $seccion,
         'actividades'         => $actividades,
         'categorias'          => $categorias,
         'paros_por_categoria' => $parosPorCategoria,
         'maquinas'            => $out,
-    ]);
-} catch (Exception $e) {
-    jsonError('Error: ' . $e->getMessage(), 500);
+    ];
+}
+
+// Si se invoca directamente como endpoint (no incluido por el export), responde JSON.
+if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === realpath(__FILE__)) {
+    try {
+        jsonOk(matriz2Data());
+    } catch (Exception $e) {
+        jsonError('Error: ' . $e->getMessage(), 500);
+    }
 }
