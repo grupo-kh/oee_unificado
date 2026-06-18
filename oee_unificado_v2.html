@@ -698,31 +698,36 @@ const App={
         <td class="num" style="color:#8c181a">${this.fU(o.ok)}</td><td class="num" style="color:#c8102e">${this.fU(o.nok)}</td></tr>`;
     }
     html+=`</tbody></table></div>
-      <div class="art-chart-title">Cantidades fabricadas por OF · etiqueta = OF + rendimiento % · clic en una barra = detalle OEE de la OF</div>
-      <div class="art-chart-scroll"><div class="chartbox tall" style="min-width:${Math.max(600,ofs.length*72)}px"><canvas class="art-cv"></canvas></div></div>`;
+      <div class="art-chart-title">Cantidades fabricadas por OF · color = uds fabricadas/hora · etiqueta = OF + rendimiento % + uds fabricadas · clic en una barra = detalle OEE de la OF</div>
+      <div class="art-chart-scroll"><div class="chartbox tall" style="min-width:${Math.max(600,ofs.length*120)}px"><canvas class="art-cv"></canvas></div></div>`;
     body.innerHTML=html;
-    // Etiqueta del eje X en dos líneas: código de OF abreviado + su rendimiento %.
-    const labels=ofs.map(o=>[this.ofCorto(o.cod_of), o.rend_c+'%']);
+    // Etiqueta del eje X en 3 líneas: OF completa + rendimiento % + uds fabricadas.
+    const labels=ofs.map(o=>[o.cod_of, o.rend_c+'% rdto', this.fU(o.unidades)+' uds']);
     const cv=body.querySelector('.art-cv');
-    // Barras = cantidades fabricadas; color por nivel de rendimiento de la OF.
+    // Barras = cantidades fabricadas. Color graduado según uds fabricadas/hora
+    // (valor de referencia), relativo al máximo del conjunto — escala neutra.
     const vals=ofs.map(o=>o.unidades);
-    const cols=ofs.map(o=>o.rend_c>=100?'#8c181a':(o.rend_c>=85?'#c45a2c':'#c8102e'));
+    const phMax=Math.max(...ofs.map(o=>o.pzas_hora_real||0),1);
+    const colPH=ph=>{const r=ph/phMax;
+      if(r>=0.85)return '#1f7a8c'; if(r>=0.65)return '#3a9ca8';
+      if(r>=0.45)return '#6aa9a0'; if(r>=0.25)return '#d9a441'; return '#e08a3c';};
+    const cols=ofs.map(o=>colPH(o.pzas_hora_real||0));
     const self=this;
     // Piezas reales vs piezas que se deberían haber hecho (al rendimiento 100%).
     const debidas=ofs.map(o=>o.rend_c>0?Math.round(o.unidades/(o.rend_c/100)):0);
     if(this._artChart){try{this._artChart.destroy();}catch(_){}}
     this._artChart=new Chart(cv,{data:{labels,datasets:[
         {type:'bar',label:'Cantidades fabricadas',data:vals,backgroundColor:cols,order:2,
-          datalabels:{anchor:'end',align:'top',color:'#3a2426',font:{size:13,weight:'bold'},formatter:v=>self.fU(v)}}
+          datalabels:{anchor:'end',align:'top',color:'#3a2426',font:{size:13,weight:'bold'},formatter:(v,ctx)=>self.fU(v)+'\n'+self.fU(ofs[ctx.dataIndex].pzas_hora_real)+' u/h'}}
       ]},
       options:{responsive:true,maintainAspectRatio:false,
         interaction:{mode:'index',intersect:false},
         plugins:{legend:{display:false},
           tooltip:{callbacks:{afterBody:items=>{const i=items[0].dataIndex;const o=ofs[i];
-            return ['Piezas reales: '+self.fU(o.unidades),
+            return ['▸ Uds fabricadas/hora: '+self.fU(o.pzas_hora_real)+' u/h',
+                    'Unidades fabricadas: '+self.fU(o.unidades),
                     'Piezas que se debían hacer (100%): '+self.fU(debidas[i]),
-                    'Rendimiento teórico: '+o.rend_c+'%',
-                    'Pzs/h real: '+self.fU(o.pzas_hora_real)];}}}},
+                    'Rendimiento teórico: '+o.rend_c+'%'];}}}},
         // Captura el clic en toda la columna X (intersect:false), así funciona
         // aunque se pulse sobre la etiqueta de datos o entre la barra y la línea.
         onClick:(e,els,chart)=>{
@@ -733,8 +738,8 @@ const App={
           }
           if(idx!=null&&ofs[idx]){const o=ofs[idx];self.openOfDetalle(o.cod_of,o.cod_maquina);}
         },
-        scales:{x:{ticks:{maxRotation:0,minRotation:0,autoSkip:false,font:{size:12,weight:'600'},color:'#3a2426'}},
-                y:{beginAtZero:true,grace:'14%',title:{display:true,text:'unidades fabricadas'}}}}});
+        scales:{x:{ticks:{maxRotation:0,minRotation:0,autoSkip:false,font:{size:11,weight:'600'},color:'#3a2426'}},
+                y:{beginAtZero:true,grace:'18%',title:{display:true,text:'unidades fabricadas'}}}}});
     // Refuerzo: listener nativo sobre el canvas. El onClick de Chart.js puede no
     // dispararse si el contenedor del modal tiene scroll; este lo cubre siempre.
     cv.style.cursor='pointer';
@@ -1103,7 +1108,16 @@ const App={
     });
   },
   metricLabel(m){return {disponibilidad:'Disponibilidad',rendimiento:'Rendimiento',calidad:'Calidad',oee:'OEE'}[m];},
-  semColor(v){return v>=75?'#8c181a':v>=60?'#c98a1a':'#b3402c';},
+  // Escala gradual por porcentaje. Se evita el rojo (induce a "error/mal"):
+  // alto = teal/azul, medio-alto = verde-azulado, medio = ámbar, bajo = naranja.
+  semColor(v){
+    if(v>=90)return '#1f7a8c';   // muy bueno  · teal
+    if(v>=75)return '#3a9ca8';   // bueno      · teal claro
+    if(v>=60)return '#6aa9a0';   // aceptable  · verde-azulado
+    if(v>=45)return '#d9a441';   // medio      · ámbar
+    if(v>=30)return '#e08a3c';   // bajo       · naranja
+    return '#c4703a';            // muy bajo   · cobre (no rojo alarma)
+  },
   barList(items,o){
     return '<div class="bars">'+items.map(i=>{
       const v=o.val(i),w=Math.max(0,Math.min(100,(v/o.max)*100));
