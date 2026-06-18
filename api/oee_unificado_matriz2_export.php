@@ -103,14 +103,22 @@ foreach ($maqs as $m) {
         $ws->setCellValue(Coordinate::stringFromColumnIndex($colTot) . $r, round($ref['total_horas'], 2));
         $ws->getStyle("A$r")->getFont()->setBold(true);
         $r++;
-        // Filas paro (informe expandido completo).
+        // Filas paro (informe expandido completo). El paro pertenece a UNA categoría
+        // ($cate): solo se escribe en columnas cuya categoría coincide (usar $c['cat'],
+        // no $cate, en la clave — si no, el valor se repetiría por toda la actividad).
         foreach ($cats as $cate) foreach (($parosPorCat[$cate] ?? []) as $paro) {
             $hayDato = false; $tp = 0;
-            foreach ($cols as $c) { $v = $ref['celdas'][$c['act'] . '||' . $cate . '||' . $paro] ?? 0; if ($v > 0) $hayDato = true; }
+            foreach ($cols as $c) {
+                if ($c['cat'] !== $cate) continue;
+                if (($ref['celdas'][$c['act'] . '||' . $cate . '||' . $paro] ?? 0) > 0) { $hayDato = true; break; }
+            }
             if (!$hayDato) continue;
             $ws->setCellValue("A$r", '        ↳ ' . $paro . ' · ' . $cate);
             $ci = 2;
-            foreach ($cols as $c) { $v = $ref['celdas'][$c['act'] . '||' . $cate . '||' . $paro] ?? 0; $tp += $v; $ws->setCellValue(Coordinate::stringFromColumnIndex($ci) . $r, $f2($v)); $ci++; }
+            foreach ($cols as $c) {
+                $v = ($c['cat'] === $cate) ? ($ref['celdas'][$c['act'] . '||' . $cate . '||' . $paro] ?? 0) : 0;
+                $tp += $v; $ws->setCellValue(Coordinate::stringFromColumnIndex($ci) . $r, $f2($v)); $ci++;
+            }
             $ws->setCellValue(Coordinate::stringFromColumnIndex($colTot) . $r, round($tp, 2));
             $ws->getStyle("A$r:" . Coordinate::stringFromColumnIndex($colTot) . $r)->getFont()->setSize(9)->getColor()->setRGB('6A5658');
             $r++;
