@@ -1143,13 +1143,18 @@ const App={
   metricLabel(m){return {disponibilidad:'Disponibilidad',rendimiento:'Rendimiento',calidad:'Calidad',oee:'OEE'}[m];},
   // Escala gradual por porcentaje. Se evita el rojo (induce a "error/mal"):
   // alto = teal/azul, medio-alto = verde-azulado, medio = ámbar, bajo = naranja.
+  // Semáforo gradual continuo: verde (valor bajo) → amarillo → rojo (valor alto).
+  // Interpola por tramos en RGB para una transición suave según el % (0..100).
   semColor(v){
-    if(v>=90)return '#1f7a8c';   // muy bueno  · teal
-    if(v>=75)return '#3a9ca8';   // bueno      · teal claro
-    if(v>=60)return '#6aa9a0';   // aceptable  · verde-azulado
-    if(v>=45)return '#d9a441';   // medio      · ámbar
-    if(v>=30)return '#e08a3c';   // bajo       · naranja
-    return '#c4703a';            // muy bajo   · cobre (no rojo alarma)
+    v=Math.max(0,Math.min(100,Number(v)||0));
+    const lerp=(a,b,t)=>Math.round(a+(b-a)*t);
+    const hex=(r,g,b)=>'#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+    // Paradas: 0=verde, 50=amarillo, 100=rojo.
+    const verde=[31,122,58], amar=[214,164,65], rojo=[176,42,42];
+    let c;
+    if(v<=50){const t=v/50;c=[lerp(verde[0],amar[0],t),lerp(verde[1],amar[1],t),lerp(verde[2],amar[2],t)];}
+    else{const t=(v-50)/50;c=[lerp(amar[0],rojo[0],t),lerp(amar[1],rojo[1],t),lerp(amar[2],rojo[2],t)];}
+    return hex(c[0],c[1],c[2]);
   },
   barList(items,o){
     return '<div class="bars">'+items.map(i=>{
