@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OEE Unificado</title>
+<link rel="icon" type="image/x-icon" href="assets/img/kh.ico">
+<title>OEE Unificado · KH</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
@@ -11,26 +12,28 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#eef1f5;color:#1f2937}
 .wrap{max-width:1600px;margin:0 auto;padding:18px}
-header{background:#fff;padding:18px 20px;border-radius:10px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-h1{font-size:22px;margin-bottom:16px;color:#111827}
+header{background:#fff;padding:18px 20px;border-radius:10px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);border-top:4px solid #A31416}
+.brand{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.brand-logo{height:46px;width:auto;flex-shrink:0}
+h1{font-size:22px;color:#111827;margin:0}
 .filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
 .fg{display:flex;flex-direction:column;position:relative}
 label{font-size:11px;font-weight:600;color:#6b7280;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px}
 input[type=date],select,.btn{padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;background:#fff}
-input[type=date]:focus,select:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,.12)}
+input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow:0 0 0 2px rgba(163,20,22,.15)}
 .turno-row{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
 .chk{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:500}
 .chk input{width:16px;height:16px;cursor:pointer}
 .quick{display:flex;gap:6px;margin-left:auto}
 .quick button{padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px}
 .quick button:hover{background:#e5e7eb}
-.quick button.active{background:#2563eb;color:#fff;border-color:#2563eb}
+.quick button.active{background:#A31416;color:#fff;border-color:#A31416}
 .btn{cursor:pointer;font-weight:600}
 .btn:hover{background:#f3f4f6}
-.btn-pri{background:#2563eb;color:#fff;border-color:#2563eb}
-.btn-pri:hover{background:#1d4ed8}
+.btn-pri{background:#A31416;color:#fff;border-color:#A31416}
+.btn-pri:hover{background:#7d0f11}
 .excl-toggle{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer}
-.excl-count{background:#2563eb;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;min-width:20px;text-align:center}
+.excl-count{background:#A31416;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700;min-width:20px;text-align:center}
 .excl-panel{position:absolute;top:100%;left:0;right:0;margin-top:4px;background:#fff;border:1px solid #d1d5db;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.15);z-index:50;display:none;max-height:340px;overflow:hidden;flex-direction:column;width:300px}
 .excl-panel.open{display:flex}
 .excl-search{padding:8px;border:none;border-bottom:1px solid #eee;font-size:13px;width:100%}
@@ -55,7 +58,7 @@ input[type=date]:focus,select:focus{outline:none;border-color:#2563eb;box-shadow
 .btn-hist:hover{background:#d9e7f8}
 .btn-cof{background:#fdeee7;color:#9a4420;border-color:#f0c9b6}
 .btn-cof:hover{background:#fadfd1}
-.btn-topm{background:#e6f3ec;color:#1d5938;border-color:#aedcc1}
+.btn-topm{background:#e6f3ec;color:#8c181a;border-color:#aedcc1}
 .btn-topm:hover{background:#d3eadd}
 .btn-topmot{background:#efe9fb;color:#5b3aa6;border-color:#cdbcf0}
 .btn-topmot:hover{background:#e3d9f7}
@@ -64,7 +67,7 @@ input[type=date]:focus,select:focus{outline:none;border-color:#2563eb;box-shadow
 /* tabla matriz (popup): cabecera y 1ª columna fijas, scroll horizontal */
 .mtx-wrap{overflow:auto;max-height:calc(100vh - 210px);border:1px solid #e5e7eb;border-radius:8px}
 .mtx{border-collapse:collapse;font-size:12px;white-space:nowrap}
-.mtx th,.mtx td{border:1px solid #eef0f3;padding:5px 9px;text-align:right}
+.mtx th,.mtx td{border:1px solid #f0eeee;padding:5px 9px;text-align:right}
 .mtx thead th{position:sticky;top:0;background:#2d4d7a;color:#fff;font-weight:700;z-index:2;text-align:center;white-space:normal;min-width:74px;max-width:120px}
 .mtx th.mtx-first,.mtx td.mtx-first{position:sticky;left:0;text-align:left;background:#fff;z-index:1;min-width:250px;max-width:250px;overflow:hidden;text-overflow:ellipsis}
 .mtx thead th.mtx-first{z-index:3;min-width:250px}
@@ -72,31 +75,31 @@ input[type=date]:focus,select:focus{outline:none;border-color:#2563eb;box-shadow
 .mtx tr.mtx-maq td.mtx-first{background:#dce6f4;color:#1e40af;cursor:pointer}
 .mtx tr.mtx-maq td.mtx-first:hover{background:#cbdcf0;text-decoration:underline}
 .mtx td.mtx-ref{padding-left:24px;color:#1e40af;font-weight:500;cursor:pointer}
-.mtx td.mtx-ref:hover{background:#eef3fb;text-decoration:underline}
+.mtx td.mtx-ref:hover{background:#f6f3f4;text-decoration:underline}
 .mtx tr.mtx-tot td{background:#2d4d7a;color:#fff;font-weight:700}
-.mtx td.mtx-disp{font-weight:700;color:#1d5938;text-align:center}
+.mtx td.mtx-disp{font-weight:700;color:#8c181a;text-align:center}
 .mtx tr.mtx-tot td.mtx-disp{color:#fff}
 .mtx td.mtx-fab{font-size:11px;color:#555;text-align:center;white-space:nowrap}
-.mtx td.mtx-real{text-align:right;font-weight:600;color:#1e3a5f}
+.mtx td.mtx-real{text-align:right;font-weight:600;color:#3a2426}
 /* formato condicional: tonos salmón (override del fondo de fila con !important) */
 .mtx td.sal1{background:#fde2d8!important}
 .mtx td.sal2{background:#f9c3b0!important}
 .mtx td.sal3{background:#f3a088!important}
 /* barra de fechas dentro de los popups de histograma */
-.hist-datebar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;padding:12px 14px;background:#f8fafc;border:1px solid #eef0f3;border-radius:8px}
+.hist-datebar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;padding:12px 14px;background:#f8fafc;border:1px solid #f0eeee;border-radius:8px}
 .hist-datebar .hdb-l{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase}
 .hist-datebar input[type=date]{font-size:13px}
-.hist-datebar .hfReset{background:#eef3fb;color:#1e40af;border-color:#bcd3f0}
+.hist-datebar .hfReset{background:#f6f3f4;color:#1e40af;border-color:#bcd3f0}
 .hist-datebar .hdb-hint{font-size:12px;color:#9ca3af;font-style:italic;align-self:center}
 .hist-datebar .hdb-turnos{display:flex;gap:10px;align-items:center;padding-bottom:6px}
 .hist-datebar .hdb-chk{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;color:#374151;text-transform:none;cursor:pointer}
 .hist-datebar .hdb-chk input{cursor:pointer}
 /* popup a pantalla completa (Top máquinas / Top motivos) */
 .fullpop{position:fixed;inset:0;background:#fff;z-index:1500;display:flex;flex-direction:column;overflow:hidden}
-.fullpop-head{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid #eef0f3}
+.fullpop-head{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid #f0eeee}
 .fullpop-head h2{font-size:20px;font-weight:700;color:#111827}
 .fullpop-head h2 small{font-weight:500;color:#9ca3af;font-size:13px;margin-left:8px}
-.fullpop-filters{display:flex;gap:16px;align-items:flex-end;padding:14px 24px;background:#f8fafc;border-bottom:1px solid #eef0f3;flex-wrap:wrap}
+.fullpop-filters{display:flex;gap:16px;align-items:flex-end;padding:14px 24px;background:#f8fafc;border-bottom:1px solid #f0eeee;flex-wrap:wrap}
 .fullpop-filters label{display:flex;flex-direction:column;gap:5px;margin:0}
 .fullpop-body{flex:1;overflow-y:auto;padding:24px}
 .content{background:#fff;padding:20px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
@@ -105,15 +108,15 @@ input[type=date]:focus,select:focus{outline:none;border-color:#2563eb;box-shadow
 .kpi{flex:1;min-width:130px;padding:9px 14px;border-radius:8px;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px}
 .kpi .kl{font-size:11px;opacity:.9;text-transform:uppercase;letter-spacing:.4px;font-weight:600}
 .kpi .kv{font-size:20px;font-weight:800;line-height:1}
-.kpi.d{background:linear-gradient(135deg,#2d4d7a,#1e3a5f)}
+.kpi.d{background:linear-gradient(135deg,#2d4d7a,#3a2426)}
 .kpi.r{background:linear-gradient(135deg,#c45a2c,#9a4420)}
-.kpi.c{background:linear-gradient(135deg,#2a7a4b,#1d5938)}
+.kpi.c{background:linear-gradient(135deg,#8c181a,#8c181a)}
 .kpi.o{background:linear-gradient(135deg,#3a6aa3,#2a4d78)}
-.toolbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #eef0f3}
+.toolbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid #f0eeee}
 .seg{display:inline-flex;border:1px solid #d1d5db;border-radius:7px;overflow:hidden}
 .seg button{padding:8px 16px;border:none;background:#fff;font-size:13px;font-weight:600;cursor:pointer;color:#374151}
 .seg button+button{border-left:1px solid #d1d5db}
-.seg button.active{background:#2563eb;color:#fff}
+.seg button.active{background:#A31416;color:#fff}
 /* selector máquina/referencia: color distintivo granate */
 #porSeg{border-color:#8c181a}
 #porSeg button{color:#8c181a}
@@ -124,71 +127,111 @@ input[type=date]:focus,select:focus{outline:none;border-color:#2563eb;box-shadow
 .brow.clickable{cursor:pointer}
 .brow.clickable:hover{background:#f9fafb}
 .bname{min-width:190px;max-width:190px;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.btrack{flex:1;height:26px;background:#eef0f3;border-radius:5px;overflow:hidden;position:relative}
+.btrack{flex:1;height:26px;background:#f0eeee;border-radius:5px;overflow:hidden;position:relative}
 .bfill{height:100%;border-radius:5px;min-width:2px;transition:width .3s}
 .bval{min-width:96px;text-align:right;font-size:13px;font-weight:700}
 .hint{font-size:12px;color:#9ca3af;margin-top:12px;font-style:italic}
 .loading{text-align:center;padding:40px;color:#9ca3af}
-.spinner{display:inline-block;width:34px;height:34px;border:3px solid #eef0f3;border-top-color:#2563eb;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:14px}
+.spinner{display:inline-block;width:34px;height:34px;border:3px solid #f0eeee;border-top-color:#A31416;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:14px}
 @keyframes spin{to{transform:rotate(360deg)}}
 .error{background:#fef2f2;color:#b91c1c;padding:14px;border-radius:8px;border-left:4px solid #b91c1c}
 .empty{text-align:center;padding:40px;color:#9ca3af}
 /* módulo GENERAL (motivos de paro generales) — fondo más oscuro */
-.module-general{margin-top:18px;background:#e3ebf4;border:1px solid #93b2d4;border-radius:10px}
-.module-general .mg-head{padding:13px 18px;border-bottom:1px solid #bcd0e6;display:flex;align-items:center;gap:10px}
-.module-general .mg-title{font-size:15px;font-weight:700;color:#1e3a5f}
-.module-general .mg-title small{font-weight:500;color:#5a7596}
-.badge-gen{background:#1e3a5f;color:#fff;font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;letter-spacing:.6px}
+.module-general{margin-top:18px;background:#f4f1f2;border:1px solid #c2a8aa;border-radius:10px}
+.module-general .mg-head{padding:13px 18px;border-bottom:1px solid #d9cccd;display:flex;align-items:center;gap:10px}
+.module-general .mg-title{font-size:15px;font-weight:700;color:#3a2426}
+.module-general .mg-title small{font-weight:500;color:#8a6e70}
+.badge-gen{background:#3a2426;color:#fff;font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;letter-spacing:.6px}
 .module-general .mg-body{padding:16px 18px}
+/* ── Filtro de fechas dentro del popup de análisis ── */
+.art-fechas{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;background:#f6f3f4;border:1px solid #d9cccd;border-radius:9px}
+.art-fechas input[type=date]{padding:6px 9px;border:1px solid #c2a8aa;border-radius:6px;font-size:13px;background:#fff;color:#3a2426}
+.art-fechas .art-q{padding:5px 11px;border:1px solid #c2a8aa;border-radius:6px;background:#fff;color:#3a2426;font-size:12px;font-weight:600;cursor:pointer}
+.art-fechas .art-q:hover{background:#e8dede}
+.art-fechas .art-q.active{background:#3a6aa3;color:#fff;border-color:#3a6aa3}
+.art-fechas .art-q-sep{width:1px;height:22px;background:#d9cccd;margin:0 3px}
+/* ── Ventana emergente: Análisis histórico de OF por artículo ── */
+.art-overlay{position:fixed;inset:0;background:rgba(15,30,55,.45);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px}
+.art-overlay-2{z-index:1100;background:rgba(15,30,55,.35)}
+.art-overlay-3{z-index:1200;background:rgba(15,30,55,.3)}
+.of-dialog{width:min(900px,94vw)}
+.mot-clic tbody tr{cursor:pointer}
+.mot-clic tbody tr:hover{background:#f6f3f4}
+.art-dialog{background:#f4f1f2;border:1px solid #c2a8aa;border-radius:12px;width:min(1700px,98vw);max-height:94vh;display:flex;flex-direction:column;box-shadow:0 18px 50px rgba(0,0,0,.35)}
+.art-dlg-head{padding:14px 18px;border-bottom:1px solid #d9cccd;display:flex;align-items:center;gap:10px}
+.art-dlg-logo{height:26px;width:auto;flex-shrink:0;margin-right:2px}
+.art-dlg-title{font-size:15px;font-weight:700;color:#3a2426;flex:1}
+.art-dlg-title small{font-weight:500;color:#8a6e70}
+.art-dlg-x{border:none;background:#e8dede;color:#3a2426;width:30px;height:30px;border-radius:7px;font-size:15px;cursor:pointer;font-weight:700}
+.art-dlg-x:hover{background:#c8102e;color:#fff}
+.art-dlg-body{padding:16px 18px;overflow:auto}
+.art-kpis{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.art-kpi{flex:1 1 150px;background:#fff;border:1px solid #d9cccd;border-radius:9px;padding:10px 14px;display:flex;flex-direction:column;gap:3px}
+.art-kpi-acc{border-color:#c45a2c;background:#fdf3ee}
+.art-kpi .kl{font-size:11px;color:#8a6e70;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.art-kpi .kv{font-size:22px;font-weight:800;color:#3a2426}
+.art-detalle{max-height:min(520px,52vh);overflow:auto;border:1px solid #d9cccd;border-radius:8px;margin-bottom:14px;background:#fff}
+.art-chart-title{font-size:13px;font-weight:700;color:#3a2426;margin:6px 0 8px}
+/* Scroll horizontal del gráfico de OFs: da aire entre etiquetas cuando hay muchas. */
+.art-chart-scroll{overflow-x:auto;overflow-y:hidden;padding-bottom:6px}
+/* Detalle OEE de una OF (al clicar una barra) */
+.art-of-det{margin-top:16px;background:#fff;border:1px solid #c2a8aa;border-radius:10px;padding:14px 16px}
+.art-of-head{font-size:14px;font-weight:700;color:#3a2426;margin-bottom:12px}
+.art-of-head small{font-weight:500;color:#8a6e70}
+.art-of-kpis{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.art-of-k{flex:1 1 120px;background:#faf8f8;border:1px solid #d9cccd;border-radius:9px;padding:9px 13px;display:flex;flex-direction:column;gap:2px}
+.art-of-k .kl{font-size:11px;color:#8a6e70;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.art-of-k .kv{font-size:20px;font-weight:800;color:#3a2426}
+.art-of-subt{font-size:13px;font-weight:700;color:#3a2426;margin:4px 0 8px}
 /* ───── Rendimiento: histórico por referencia + comparativa por OF ───── */
-.rdto-mod .badge-gen{background:#1d5938}
+.rdto-mod .badge-gen{background:#8c181a}
 .rdto-controls{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
 .rdto-controls label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase}
 .rdto-controls .rdtoSearch{min-width:170px}
 .rdto-controls .rdtoSelect{min-width:340px;max-width:520px;font-size:13px;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px}
 .rdto-controls .chk{flex-direction:row;align-items:center;text-transform:none;color:#374151}
-.rdto-multi-n{background:#1d5938;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700}
+.rdto-multi-n{background:#8c181a;color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700}
 .rdto-quick{display:flex;gap:6px;align-self:center}
-.rdto-quick button{padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;background:#eef3ec;border:1px solid #aedcc1;border-radius:6px;color:#1d5938}
+.rdto-quick button{padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;background:#eef3ec;border:1px solid #aedcc1;border-radius:6px;color:#8c181a}
 .rdto-quick button:hover{background:#d3eadd}
 .rdtoScope{align-self:center}
-.rdtoResumen{display:flex;gap:22px;flex-wrap:wrap;background:#eef3f8;border-left:4px solid #1d5938;padding:8px 14px;border-radius:6px;margin-bottom:12px;font-size:13.5px}
+.rdtoResumen{display:flex;gap:22px;flex-wrap:wrap;background:#eef3f8;border-left:4px solid #8c181a;padding:8px 14px;border-radius:6px;margin-bottom:12px;font-size:13.5px}
 .rdtoResumen b{color:#111827}
 .rdto-table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border-radius:8px;overflow:hidden}
-.rdto-table th{background:#1d5938;color:#fff;font-weight:700;padding:8px 10px;text-align:left}
-.rdto-table td{border-bottom:1px solid #eef0f3;padding:6px 10px}
+.rdto-table th{background:#8c181a;color:#fff;font-weight:700;padding:8px 10px;text-align:left}
+.rdto-table td{border-bottom:1px solid #f0eeee;padding:6px 10px}
 .rdto-table td.num{text-align:right;font-variant-numeric:tabular-nums}
-.of-chip{background:#1d5938;color:#fff;border:0;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer}
+.of-chip{background:#8c181a;color:#fff;border:0;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer}
 .of-chip:hover{background:#16442b}
 .of-chip:disabled{background:#cbd5e1;cursor:default}
 .of-cell-chips{display:flex;flex-wrap:wrap;gap:5px}
-.of-maq-chip{background:#e6f3ec;color:#1d5938;border:1px solid #aedcc1;border-radius:12px;padding:2px 9px;font-size:11.5px;font-weight:600}
+.of-maq-chip{background:#e6f3ec;color:#8c181a;border:1px solid #aedcc1;border-radius:12px;padding:2px 9px;font-size:11.5px;font-weight:600}
 /* comparativa */
-.rdto-comp-overall{background:#eef3ec;border:1px solid #aedcc1;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13.5px;color:#1d5938}
+.rdto-comp-overall{background:#eef3ec;border:1px solid #aedcc1;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13.5px;color:#8c181a}
 .rdto-comp-rank{margin-top:8px;display:flex;flex-direction:column;gap:3px}
 .rdto-comp-rank .rk{display:grid;grid-template-columns:34px 1fr auto auto;gap:10px;font-size:12.5px;padding:2px 0}
 .rdto-comp-rank .rk.is-best{font-weight:700}
 .rdto-comp-machine{border:1px solid #e5e7eb;border-radius:10px;margin-bottom:16px;background:#fff}
-.rdto-comp-machine-head{display:flex;align-items:baseline;gap:8px;padding:10px 14px;border-bottom:1px solid #eef0f3}
+.rdto-comp-machine-head{display:flex;align-items:baseline;gap:8px;padding:10px 14px;border-bottom:1px solid #f0eeee}
 .rdto-comp-machine-head .axis{font-size:10px;font-weight:700;color:#9ca3af;letter-spacing:.5px}
 .rdto-comp-machine-head h4{font-size:15px;font-weight:700;color:#111827;margin:0}
 .rdto-comp-row{display:grid;grid-template-columns:1fr 220px;gap:14px;padding:12px 14px}
-.rdto-comp-axis-label{font-size:11px;font-weight:700;color:#5a7596;margin:4px 0}
+.rdto-comp-axis-label{font-size:11px;font-weight:700;color:#8a6e70;margin:4px 0}
 .rdto-comp-stats{display:flex;flex-direction:column;gap:8px}
-.rdto-comp-stats .st{background:#f8fafc;border:1px solid #eef0f3;border-radius:8px;padding:8px 10px}
+.rdto-comp-stats .st{background:#f8fafc;border:1px solid #f0eeee;border-radius:8px;padding:8px 10px}
 .rdto-comp-stats .st .l{font-size:11px;color:#6b7280;font-weight:600}
 .rdto-comp-stats .st .v{font-size:18px;font-weight:800;color:#111827}
-.rdto-comp-stats .st.ok .v{color:#1d5938}.rdto-comp-stats .st.nok .v{color:#c8102e}
+.rdto-comp-stats .st.ok .v{color:#8c181a}.rdto-comp-stats .st.nok .v{color:#c8102e}
 @media(max-width:900px){.rdto-comp-row{grid-template-columns:1fr}}
 /* paneles apilados debajo (en lugar de modales) */
 #panels{display:flex;flex-direction:column;gap:16px;margin-top:16px}
 .panel{background:#fff;border:1px solid #e5e7eb;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.07);scroll-margin-top:12px;animation:slidein .2s ease}
-.panel.general{background:#e3ebf4;border-color:#93b2d4}
-.panel.general .phead{background:#d3e0ee;border-bottom-color:#bcd0e6}
-.panel.general .pbody{background:#e3ebf4;border-radius:0 0 12px 12px}
-.panel:last-child{border-color:#2563eb;box-shadow:0 4px 16px rgba(37,99,235,.16)}
+.panel.general{background:#f4f1f2;border-color:#c2a8aa}
+.panel.general .phead{background:#e8dede;border-bottom-color:#d9cccd}
+.panel.general .pbody{background:#f4f1f2;border-radius:0 0 12px 12px}
+.panel:last-child{border-color:#A31416;box-shadow:0 4px 16px rgba(163,20,22,.16)}
 @keyframes slidein{from{opacity:.4;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
-.phead{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid #eef0f3}
+.phead{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid #f0eeee}
 .ptitle{font-size:17px;font-weight:700;color:#111827}
 .ptitle small{display:block;font-size:12px;font-weight:500;color:#9ca3af;margin-top:2px}
 .pclose{background:#f3f4f6;border:none;padding:7px 12px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280}
@@ -198,7 +241,7 @@ input[type=date]:focus,select:focus{outline:none;border-color:#2563eb;box-shadow
 .chartbox.tall{height:520px}
 .selgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
 .selcard{padding:24px 20px;border:2px solid #e5e7eb;border-radius:12px;cursor:pointer;text-align:center;transition:all .15s;background:#fff}
-.selcard:hover{border-color:#2563eb;background:#f8fafc;transform:translateY(-2px);box-shadow:0 8px 20px rgba(37,99,235,.12)}
+.selcard:hover{border-color:#A31416;background:#fdf6f6;transform:translateY(-2px);box-shadow:0 8px 20px rgba(163,20,22,.12)}
 .selcard .ic{font-size:34px;margin-bottom:10px}
 .selcard .t{font-size:16px;font-weight:700;color:#111827;margin-bottom:6px}
 .selcard .d{font-size:12px;color:#6b7280}
@@ -209,7 +252,7 @@ input[type=date]:focus,select:focus{outline:none;border-color:#2563eb;box-shadow
 .subctrl label{margin:0}
 .subctrl select,.subctrl input{min-width:150px}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;padding:10px 12px;background:#f8fafc;border-bottom:2px solid #eef0f3;font-weight:700;color:#6b7280;font-size:12px;text-transform:uppercase}
+th{text-align:left;padding:10px 12px;background:#f8fafc;border-bottom:2px solid #f0eeee;font-weight:700;color:#6b7280;font-size:12px;text-transform:uppercase}
 td{padding:9px 12px;border-bottom:1px solid #f3f4f6}
 tbody tr:hover{background:#f9fafb}
 /* módulo Paros individuales: etiquetas en color corporativo para distinguirlas */
@@ -220,7 +263,7 @@ tbody tr:hover{background:#f9fafb}
 .mod-paros td{color:#6e6d6b}
 .breadcrumb{font-size:12px;color:#9ca3af;margin-bottom:14px}
 .rdtbl{width:100%;border-collapse:collapse;font-size:13px}
-.rdtbl th{background:#f3f6fa;color:#1e3a5f;font-weight:700;text-align:left;padding:7px 12px;border-bottom:1px solid #e3e9f0;position:sticky;top:0}
+.rdtbl th{background:#f3f6fa;color:#3a2426;font-weight:700;text-align:left;padding:7px 12px;border-bottom:1px solid #e3e9f0;position:sticky;top:0}
 .rdtbl td{padding:7px 12px;border-bottom:1px solid #f1f4f8}
 .rdtbl th.r,.rdtbl td.r{text-align:right;font-variant-numeric:tabular-nums}
 .rdtbl tbody tr:hover{background:#f6f9fc}
@@ -233,14 +276,14 @@ tbody tr:hover{background:#f9fafb}
 .oa-kpi-v.neg{color:#ff7b6e;text-shadow:0 0 8px rgba(255,123,110,.35)}
 .oa-sech{background:#8a1538;color:#fff;font-weight:700;font-size:13.5px;padding:9px 14px;border-radius:7px;margin:18px 0 10px}
 .oa-tbl td.neg,.oa-tbl td.r.neg{color:#c8102e;font-weight:700}
-.oa-tbl tr.oa-tot td{background:#eef3f9;font-weight:800;color:#1e3a5f;border-top:2px solid #c9d6e4}
+.oa-tbl tr.oa-tot td{background:#f6f3f4;font-weight:800;color:#3a2426;border-top:2px solid #c9d6e4}
 .ofp-sub{font-size:12.5px;color:#5b6f86;margin:4px 0 12px}
 .ofk-row{display:flex;gap:8px;margin-bottom:12px}
 .ofk{flex:1;color:#fff;border-radius:8px;padding:8px 10px;text-align:center}
 .ofk-l{font-size:10px;opacity:.9;text-transform:uppercase;letter-spacing:.4px;font-weight:600}
 .ofk-v{font-size:18px;font-weight:800;line-height:1.1}
 .ofp-pz{font-size:13px;color:#374151;margin-bottom:12px}
-.ofp-h{font-size:13.5px;font-weight:700;color:#1e3a5f;margin:6px 0 8px}
+.ofp-h{font-size:13.5px;font-weight:700;color:#3a2426;margin:6px 0 8px}
 .breadcrumb b{color:#374151}
 .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
 .legend span{display:flex;align-items:center;gap:6px;font-size:12px}
@@ -248,8 +291,8 @@ tbody tr:hover{background:#f9fafb}
 /* popup detalle de OF */
 .of-pop{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px}
 .of-pop-card{background:#fff;border-radius:12px;max-width:580px;width:100%;box-shadow:0 24px 70px rgba(0,0,0,.4);overflow:hidden;animation:pop .15s ease}
-.of-pop-head{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #eef0f3}
-.of-pop-head h3{font-size:16px;font-weight:700;color:#1e3a5f}
+.of-pop-head{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #f0eeee}
+.of-pop-head h3{font-size:16px;font-weight:700;color:#3a2426}
 .of-pop-body{padding:8px 20px 18px}
 .of-pop-row{display:flex;gap:14px;padding:11px 2px;border-bottom:1px solid #f3f4f6}
 .of-pop-row:last-child{border-bottom:none}
@@ -260,7 +303,10 @@ tbody tr:hover{background:#f9fafb}
 <body>
 <div class="wrap">
   <header>
-    <h1>OEE Unificado · Disponibilidad de Máquinas</h1>
+    <div class="brand">
+      <img src="assets/img/logo-kh.png" alt="KH" class="brand-logo">
+      <h1>OEE Unificado · Disponibilidad de Máquinas</h1>
+    </div>
     <div class="filters">
       <div class="fg"><label>Desde</label><input type="date" id="fDesde"></div>
       <div class="fg"><label>Hasta</label><input type="date" id="fHasta"></div>
@@ -333,8 +379,8 @@ tbody tr:hover{background:#f9fafb}
 
 <script>
 const API='api/'; // ruta relativa: funciona con la carpeta actual y tras renombrarla
-const COL={oee:'#3a6aa3',disponibilidad:'#2d4d7a',rendimiento:'#c45a2c',calidad:'#2a7a4b'};
-const PALETTE=['#3a6aa3','#c45a2c','#2a7a4b','#7c3aed','#0891b2','#b45309','#be185d','#4d7c0f','#9a3412','#1e40af','#0f766e','#a16207'];
+const COL={oee:'#3a6aa3',disponibilidad:'#2d4d7a',rendimiento:'#c45a2c',calidad:'#8c181a'};
+const PALETTE=['#3a6aa3','#c45a2c','#8c181a','#7c3aed','#0891b2','#b45309','#be185d','#4d7c0f','#9a3412','#1e40af','#0f766e','#a16207'];
 
 if(window.ChartDataLabels){
   Chart.register(ChartDataLabels);
@@ -515,7 +561,7 @@ const App={
     this.chartDestroy(cv);
     new Chart(cv,{data:{labels,datasets:[
       {type:'bar',label:this.motivoValLabel(),data:vals,backgroundColor:'#2d4d7a',yAxisID:'y',order:2,
-        datalabels:{anchor:'end',align:'top',color:'#1e3a5f',formatter:v=>Math.round(v*10)/10}},
+        datalabels:{anchor:'end',align:'top',color:'#3a2426',formatter:v=>Math.round(v*10)/10}},
       {type:'line',label:'% acumulado',data:acum,borderColor:'#c45a2c',backgroundColor:'#c45a2c',yAxisID:'y1',order:1,tension:0,pointRadius:4,
         datalabels:{anchor:'end',align:'top',color:'#c45a2c',formatter:v=>Math.round(v)+'%'}}
     ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
@@ -527,6 +573,308 @@ const App={
         y1:{position:'right',beginAtZero:true,max:100,grid:{drawOnChartArea:false},title:{display:true,text:'% acumulado'}}
       }}});
   },
+  /* ===== Análisis histórico de OF por artículo (réplica QlikView) =====
+     Se abre en ventana emergente (modal) al clicar una referencia en
+     «Referencias fabricadas · {máquina}» (Rendimiento → por máquina).
+     Compara el rendimiento teórico del sistema (rend_c de F_his_ct) por OF
+     contra la media histórica del propio artículo. */
+  _artChart:null,
+  artModalClose(){
+    this.ofModalClose&&this.ofModalClose();   // cierra también el sub-modal de OF
+    const m=document.getElementById('artModal');
+    if(m)m.remove();
+    if(this._artChart){try{this._artChart.destroy();}catch(_){}this._artChart=null;}
+    document.removeEventListener('keydown',this._artEsc);
+  },
+  async openArtAnalisis(cod,name){
+    this.artModalClose();
+    // Estado propio del popup: fechas independientes del filtro principal, para
+    // poder reanalizar el artículo sin salir de la ventana. Inicia con el rango
+    // global activo.
+    this._art={cod,name,desde:fDesde.value,hasta:fHasta.value};
+    const ov=document.createElement('div');
+    ov.id='artModal'; ov.className='art-overlay';
+    ov.innerHTML=`<div class="art-dialog">
+        <div class="art-dlg-head">
+          <img src="assets/img/logo-kh.png" alt="KH" class="art-dlg-logo">
+          <span class="badge-gen">ARTÍCULO</span>
+          <span class="art-dlg-title">Análisis Histórico de OF por Artículo · ${this.esc(cod)}
+            <small> · ${this.esc(name||'')}</small></span>
+          <button class="art-dlg-x" title="Cerrar">✕</button>
+        </div>
+        <div class="art-dlg-body">
+          <div class="art-fechas" id="artFechas"></div>
+          <div id="artContenido">${this.loadingHtml()}</div>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('.art-dlg-x').onclick=()=>this.artModalClose();
+    ov.onclick=e=>{if(e.target===ov)this.artModalClose();};
+    this._artEsc=e=>{if(e.key==='Escape')this.artModalClose();};
+    document.addEventListener('keydown',this._artEsc);
+    this.renderArtFechas();
+    this.artRecargar();
+  },
+  // Barra de filtro de fechas dentro del popup (fechas + presets rápidos).
+  renderArtFechas(){
+    const host=document.getElementById('artFechas'); if(!host)return;
+    const presets=[['yesterday','Ayer'],['week','Semana actual'],['lastweek','Semana anterior'],
+      ['lastmonth','Mes anterior'],['3m','3 meses'],['6m','6 meses'],['year','Año']];
+    host.innerHTML=`<input type="date" id="artD" value="${this._art.desde}">
+      <span style="color:#8a6e70">→</span>
+      <input type="date" id="artH" value="${this._art.hasta}">
+      <span class="art-q-sep"></span>`+
+      presets.map(([k,l])=>`<button class="art-q" data-q="${k}">${l}</button>`).join('');
+    host.querySelector('#artD').onchange=e=>{this._art.desde=e.target.value;this.artRecargar();};
+    host.querySelector('#artH').onchange=e=>{this._art.hasta=e.target.value;this.artRecargar();};
+    host.querySelectorAll('.art-q').forEach(b=>b.onclick=()=>this.artPreset(b.dataset.q,b));
+  },
+  artPreset(k,btn){
+    const t=new Date(),d=new Date();
+    if(k==='yesterday'){t.setDate(t.getDate()-1);d.setDate(d.getDate()-1);}
+    else if(k==='week'){const day=t.getDay(),dm=(day===0?6:day-1);d.setDate(d.getDate()-dm);}
+    else if(k==='lastweek'){const day=t.getDay(),dm=(day===0?6:day-1);d.setDate(d.getDate()-dm-7);t.setDate(t.getDate()-dm-1);}
+    else if(k==='lastmonth'){d.setMonth(d.getMonth()-1,1);t.setDate(0);} // 1º a último día del mes anterior
+    else if(k==='3m'){d.setMonth(d.getMonth()-3);}
+    else if(k==='6m'){d.setMonth(d.getMonth()-6);}
+    else if(k==='year'){d.setFullYear(d.getFullYear()-1);}
+    this._art.desde=d.toISOString().slice(0,10); this._art.hasta=t.toISOString().slice(0,10);
+    const f=document.getElementById('artFechas');
+    if(f){f.querySelector('#artD').value=this._art.desde;f.querySelector('#artH').value=this._art.hasta;
+      f.querySelectorAll('.art-q').forEach(x=>x.classList.remove('active'));btn.classList.add('active');}
+    this.artRecargar();
+  },
+  async artRecargar(){
+    const cont=document.getElementById('artContenido'); if(!cont)return;
+    cont.innerHTML=this.loadingHtml();
+    const p=new URLSearchParams({cod_producto:this._art.cod,fecha_desde:this._art.desde,fecha_hasta:this._art.hasta});
+    const tu=this.turnos(); if(tu.length&&tu.length<3)p.set('turnos',tu.join(','));
+    try{
+      const d=await this.get('oee_unificado_art_analisis.php',p);
+      this.renderArtAnalisis(cont,d);
+    }catch(e){
+      cont.innerHTML=`<div class="error">Error cargando análisis: ${this.esc(e.message)}</div>`;
+    }
+  },
+  renderArtAnalisis(body,d){
+    const ofs=Array.isArray(d.ofs)?d.ofs:[]; const t=d.totales||{};
+    const hayNom=ofs.some(o=>o.pzas_hora_nominal!=null);
+    if(!ofs.length){body.innerHTML='<div class="empty">Sin OFs para este artículo en el rango seleccionado.</div>';return;}
+    // Rendimiento teórico del sistema vs su histórico: media histórica del artículo.
+    const rends=ofs.map(o=>o.rend_c||0);
+    const media=rends.reduce((a,b)=>a+b,0)/rends.length;
+    const mediaR=Math.round(media*10)/10;
+    let html=`
+      <div class="art-kpis">
+        <div class="art-kpi"><span class="kl">Unidades fabricadas</span><span class="kv">${this.fU(t.unidades)}</span></div>
+        <div class="art-kpi"><span class="kl">Horas dedicadas</span><span class="kv">${this.fU(t.horas_dedicadas)}</span></div>
+        <div class="art-kpi"><span class="kl">Horas perdidas</span><span class="kv">${this.fU(t.horas_perdidas)}</span></div>
+        <div class="art-kpi"><span class="kl">Nº de OFs</span><span class="kv">${this.fU(ofs.length)}</span></div>
+        <div class="art-kpi art-kpi-acc"><span class="kl">Rdto. medio histórico</span><span class="kv">${mediaR}%</span></div>
+      </div>
+      <div class="art-detalle"><table class="rdto-table"><thead><tr>
+        <th>Año</th><th>Mes</th><th>OF</th><th>Máquina</th>
+        <th class="num">Rdto. teó. %</th><th class="num">Δ vs hist.</th>
+        <th class="num">Pzs. reales</th><th class="num">Pzs. debidas</th><th class="num">% real/debido</th>
+        <th class="num">Pzs/h real</th>${hayNom?'<th class="num">Pzs/h nom.</th><th class="num">% nom.</th>':''}
+        <th class="num">H. dedic.</th><th class="num">H. perd.</th>
+        <th class="num">OK</th><th class="num">NOK</th></tr></thead><tbody>`;
+    for(const o of ofs){
+      const rcol=o.rend_c>=100?'#8c181a':(o.rend_c>=85?'#b45309':'#c8102e');
+      const dlt=Math.round((o.rend_c-media)*10)/10;
+      const dcol=dlt>=0?'#8c181a':'#c8102e';
+      // Piezas que se deberían haber hecho al rendimiento 100%, y % real/debido.
+      const debidas=o.rend_c>0?Math.round(o.unidades/(o.rend_c/100)):0;
+      const pctRD=debidas>0?Math.round(o.unidades/debidas*100):0;
+      html+=`<tr>
+        <td>${o.anio}</td><td>${o.mes}</td><td>${this.esc(o.cod_of)}</td><td>${this.esc(o.desc_maquina)}</td>
+        <td class="num" style="color:${rcol};font-weight:700">${o.rend_c}</td>
+        <td class="num" style="color:${dcol};font-weight:600">${dlt>=0?'+':''}${dlt}</td>
+        <td class="num">${this.fU(o.unidades)}</td><td class="num">${this.fU(debidas)}</td>
+        <td class="num" style="font-weight:600">${pctRD}%</td>
+        <td class="num">${this.fU(o.pzas_hora_real)}</td>
+        ${hayNom?`<td class="num">${o.pzas_hora_nominal!=null?this.fU(o.pzas_hora_nominal):'—'}</td><td class="num">${o.pct_nominal!=null?o.pct_nominal+'%':'—'}</td>`:''}
+        <td class="num">${o.horas_dedicadas}</td><td class="num">${o.horas_perdidas}</td>
+        <td class="num" style="color:#8c181a">${this.fU(o.ok)}</td><td class="num" style="color:#c8102e">${this.fU(o.nok)}</td></tr>`;
+    }
+    html+=`</tbody></table></div>
+      <div class="art-chart-title">Cantidades fabricadas por OF · etiqueta = OF + rendimiento % · clic en una barra = detalle OEE de la OF</div>
+      <div class="art-chart-scroll"><div class="chartbox tall" style="min-width:${Math.max(600,ofs.length*72)}px"><canvas class="art-cv"></canvas></div></div>`;
+    body.innerHTML=html;
+    // Etiqueta del eje X en dos líneas: código de OF abreviado + su rendimiento %.
+    const labels=ofs.map(o=>[this.ofCorto(o.cod_of), o.rend_c+'%']);
+    const cv=body.querySelector('.art-cv');
+    // Barras = cantidades fabricadas; color por nivel de rendimiento de la OF.
+    const vals=ofs.map(o=>o.unidades);
+    const cols=ofs.map(o=>o.rend_c>=100?'#8c181a':(o.rend_c>=85?'#c45a2c':'#c8102e'));
+    const self=this;
+    // Piezas reales vs piezas que se deberían haber hecho (al rendimiento 100%).
+    const debidas=ofs.map(o=>o.rend_c>0?Math.round(o.unidades/(o.rend_c/100)):0);
+    if(this._artChart){try{this._artChart.destroy();}catch(_){}}
+    this._artChart=new Chart(cv,{data:{labels,datasets:[
+        {type:'bar',label:'Cantidades fabricadas',data:vals,backgroundColor:cols,order:2,
+          datalabels:{anchor:'end',align:'top',color:'#3a2426',font:{size:13,weight:'bold'},formatter:v=>self.fU(v)}}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        plugins:{legend:{display:false},
+          tooltip:{callbacks:{afterBody:items=>{const i=items[0].dataIndex;const o=ofs[i];
+            return ['Piezas reales: '+self.fU(o.unidades),
+                    'Piezas que se debían hacer (100%): '+self.fU(debidas[i]),
+                    'Rendimiento teórico: '+o.rend_c+'%',
+                    'Pzs/h real: '+self.fU(o.pzas_hora_real)];}}}},
+        // Captura el clic en toda la columna X (intersect:false), así funciona
+        // aunque se pulse sobre la etiqueta de datos o entre la barra y la línea.
+        onClick:(e,els,chart)=>{
+          let idx=els&&els.length?els[0].index:null;
+          if(idx==null){
+            const pts=chart.getElementsAtEventForMode(e,'index',{intersect:false},false);
+            if(pts.length)idx=pts[0].index;
+          }
+          if(idx!=null&&ofs[idx]){const o=ofs[idx];self.openOfDetalle(o.cod_of,o.cod_maquina);}
+        },
+        scales:{x:{ticks:{maxRotation:0,minRotation:0,autoSkip:false,font:{size:12,weight:'600'},color:'#3a2426'}},
+                y:{beginAtZero:true,grace:'14%',title:{display:true,text:'unidades fabricadas'}}}}});
+    // Refuerzo: listener nativo sobre el canvas. El onClick de Chart.js puede no
+    // dispararse si el contenedor del modal tiene scroll; este lo cubre siempre.
+    cv.style.cursor='pointer';
+    cv.onclick=(ev)=>{
+      const pts=self._artChart.getElementsAtEventForMode(ev,'index',{intersect:false},true);
+      if(pts&&pts.length){const o=ofs[pts[0].index];
+        if(o)self.openOfDetalle(o.cod_of,o.cod_maquina);}
+    };
+  },
+  // Abrevia el código de OF largo (2026-SEC02-549-2026-3043 → 549-3043) para que
+  // las etiquetas del eje X se lean horizontales sin solaparse.
+  ofCorto(cod){const p=String(cod).split('-');return p.length>=4?p[2]+'-'+p[p.length-1]:cod;},
+  // Detalle OEE pormenorizado de una OF (D/R/C/OEE + motivos de paro), como el
+  // apartado «Disponibilidad» pero para la OF concreta. Usa oee_unificado_of_paros.
+  ofModalClose(){this.motTmpClose&&this.motTmpClose();   // cierra también el modal temporal (nivel 3)
+    const m=document.getElementById('ofModal');if(m)m.remove();
+    document.removeEventListener('keydown',this._ofEsc);},
+  // Sub-modal de disponibilidad de una OF (encima del popup de artículo).
+  async openOfDetalle(codOf,codMaq){
+    this.ofModalClose();
+    const ov=document.createElement('div');
+    ov.id='ofModal'; ov.className='art-overlay art-overlay-2';
+    ov.innerHTML=`<div class="art-dialog of-dialog">
+        <div class="art-dlg-head"><img src="assets/img/logo-kh.png" alt="KH" class="art-dlg-logo"><span class="badge-gen" style="background:#8c181a">OF</span>
+          <span class="art-dlg-title">Disponibilidad de la OF · ${this.esc(codOf)}</span>
+          <button class="art-dlg-x" title="Cerrar">✕</button></div>
+        <div class="art-dlg-body" id="ofDlgBody">${this.loadingHtml()}</div>
+      </div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('.art-dlg-x').onclick=()=>this.ofModalClose();
+    ov.onclick=e=>{if(e.target===ov)this.ofModalClose();};
+    this._ofEsc=e=>{if(e.key==='Escape')this.ofModalClose();};
+    document.addEventListener('keydown',this._ofEsc);
+    const body=ov.querySelector('#ofDlgBody');
+    const p=new URLSearchParams({cod_of:codOf,cod_maquina:codMaq,
+      fecha_desde:this._art?this._art.desde:fDesde.value,fecha_hasta:this._art?this._art.hasta:fHasta.value});
+    const tu=this.turnos(); if(tu.length&&tu.length<3)p.set('turnos',tu.join(','));
+    try{
+      const d=await this.get('oee_unificado_of_paros.php',p);
+      const g=(v)=>v!=null?v:0;
+      const sc=v=>v>=85?'#8c181a':(v>=60?'#b45309':'#c8102e');
+      let h=`<div class="art-of-head">${this.esc(d.desc_producto||d.producto||'')}<small> · ${this.fFecha(this._art?this._art.desde:fDesde.value)} a ${this.fFecha(this._art?this._art.hasta:fHasta.value)}</small></div>
+        <div class="art-of-kpis">
+          <div class="art-of-k" style="border-color:${sc(g(d.oee))}"><span class="kl">OEE</span><span class="kv" style="color:${sc(g(d.oee))}">${g(d.oee)}%</span></div>
+          <div class="art-of-k"><span class="kl">Disponibilidad</span><span class="kv">${g(d.disp)}%</span></div>
+          <div class="art-of-k"><span class="kl">Rendimiento</span><span class="kv">${g(d.rend)}%</span></div>
+          <div class="art-of-k"><span class="kl">Calidad</span><span class="kv">${g(d.cal)}%</span></div>
+          <div class="art-of-k"><span class="kl">Piezas OK</span><span class="kv" style="color:#8c181a">${this.fU(d.ok)}</span></div>
+          <div class="art-of-k"><span class="kl">Piezas NOK</span><span class="kv" style="color:#c8102e">${this.fU(d.nok)}</span></div>
+          <div class="art-of-k"><span class="kl">Horas de paro</span><span class="kv">${this.fU(d.total_horas_paro)}</span></div>
+        </div>`;
+      const mot=Array.isArray(d.motivos)?d.motivos:[];
+      if(mot.length){
+        h+=`<div class="art-of-subt">Motivos de paro de la OF (disponibilidad) <small style="font-weight:500;color:#8a6e70">· clic en un motivo = distribución temporal (fechas y horas)</small></div><div class="art-detalle"><table class="rdto-table mot-clic"><thead><tr><th>Motivo</th><th class="num">Horas</th><th class="num">% del paro</th></tr></thead><tbody>`;
+        const tot=mot.reduce((a,m)=>a+(+m.horas||0),0)||1;
+        mot.sort((a,b)=>(+b.horas||0)-(+a.horas||0)).forEach(m=>{h+=`<tr class="mot-row" data-motivo="${this.esc(m.motivo||'')}"><td>${this.esc(m.motivo||'—')}</td><td class="num">${this.fU(Math.round((+m.horas||0)*100)/100)}</td><td class="num">${Math.round((+m.horas||0)/tot*100)}%</td></tr>`;});
+        h+='</tbody></table></div>';
+      }else{h+='<div class="hint">Sin paros registrados para esta OF en el rango.</div>';}
+      body.innerHTML=h;
+      // Cada fila de motivo abre el modal temporal (nivel 3).
+      body.querySelectorAll('.mot-row').forEach(tr=>{tr.onclick=()=>this.openMotivoTemporal(tr.dataset.motivo,codMaq,codOf);});
+    }catch(e){body.innerHTML=`<div class="error">Error cargando disponibilidad de la OF: ${this.esc(e.message)}</div>`;}
+  },
+  motTmpClose(){const m=document.getElementById('motTmpModal');if(m)m.remove();
+    if(this._motChart){try{this._motChart.destroy();}catch(_){}this._motChart=null;}
+    document.removeEventListener('keydown',this._motEsc);},
+  // Modal nivel 3: distribución temporal de un motivo de paro (días → horas) en
+  // el rango del popup. Usa oee_unificado_maq_motivo_temporal (por_dia/por_hora_dia).
+  async openMotivoTemporal(motivo,codMaq,codOf){
+    this.motTmpClose();
+    const desde=this._art?this._art.desde:fDesde.value, hasta=this._art?this._art.hasta:fHasta.value;
+    const ov=document.createElement('div');
+    ov.id='motTmpModal'; ov.className='art-overlay art-overlay-3';
+    ov.innerHTML=`<div class="art-dialog of-dialog">
+        <div class="art-dlg-head"><img src="assets/img/logo-kh.png" alt="KH" class="art-dlg-logo"><span class="badge-gen" style="background:#8c181a">MOTIVO</span>
+          <span class="art-dlg-title">${this.esc(motivo)}<small> · ${this.esc(codMaq)} · ${this.fFecha(desde)} a ${this.fFecha(hasta)}</small></span>
+          <button class="art-dlg-x" title="Cerrar">✕</button></div>
+        <div class="art-dlg-body" id="motTmpBody">${this.loadingHtml()}</div>
+      </div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('.art-dlg-x').onclick=()=>this.motTmpClose();
+    ov.onclick=e=>{if(e.target===ov)this.motTmpClose();};
+    this._motEsc=e=>{if(e.key==='Escape')this.motTmpClose();};
+    document.addEventListener('keydown',this._motEsc);
+    this._motCtx={motivo,codMaq,desde,hasta};
+    const body=ov.querySelector('#motTmpBody');
+    const p=new URLSearchParams({mode:'por_dia',cod_maquina:codMaq,motivo,fecha_desde:desde,fecha_hasta:hasta,por:'maquina'});
+    const tu=this.turnos(); if(tu.length&&tu.length<3)p.set('turnos',tu.join(','));
+    try{
+      const d=await this.get('oee_unificado_maq_motivo_temporal.php',p);
+      this.renderMotivoTemporal(body,d);
+    }catch(e){body.innerHTML=`<div class="error">Error cargando distribución temporal: ${this.esc(e.message)}</div>`;}
+  },
+  renderMotivoTemporal(body,d){
+    const dias=(Array.isArray(d.dias)?d.dias:[]).filter(x=>(+x.horas||0)>0);
+    if(!dias.length){body.innerHTML='<div class="hint">Sin paros de este motivo en el rango.</div>';return;}
+    const totH=dias.reduce((a,x)=>a+(+x.horas||0),0), totP=dias.reduce((a,x)=>a+(+x.num_paros||0),0);
+    let h=`<div class="art-of-kpis">
+        <div class="art-of-k"><span class="kl">Horas totales</span><span class="kv">${this.fU(Math.round(totH*100)/100)}</span></div>
+        <div class="art-of-k"><span class="kl">Nº de paros</span><span class="kv">${this.fU(totP)}</span></div>
+        <div class="art-of-k"><span class="kl">Días afectados</span><span class="kv">${this.fU(dias.length)}</span></div>
+      </div>
+      <div class="art-of-subt">Distribución por día <small style="font-weight:500;color:#8a6e70">· clic en un día = reparto por hora</small></div>
+      <div class="chartbox" style="height:340px"><canvas class="mot-cv"></canvas></div>
+      <div id="motHoraWrap"></div>`;
+    body.innerHTML=h;
+    const labels=dias.map(x=>this.fFecha(x.dia)), vals=dias.map(x=>Math.round((+x.horas||0)*100)/100);
+    const self=this, cv=body.querySelector('.mot-cv');
+    if(this._motChart){try{this._motChart.destroy();}catch(_){}}
+    this._motChart=new Chart(cv,{type:'bar',data:{labels,datasets:[{label:'Horas de paro',data:vals,backgroundColor:'#8c181a',
+        datalabels:{anchor:'end',align:'top',color:'#3a2426',font:{size:9,weight:'bold'},formatter:v=>v>0?v:''}}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{ticks:{maxRotation:60,minRotation:30,font:{size:13,weight:'600'},color:'#3a2426'}},y:{beginAtZero:true,grace:'14%',title:{display:true,text:'horas'}}}}});
+    cv.style.cursor='pointer';
+    cv.onclick=(ev)=>{const pts=self._motChart.getElementsAtEventForMode(ev,'index',{intersect:false},true);
+      if(pts&&pts.length)self.renderMotivoHoras(dias[pts[0].index].dia);};
+  },
+  async renderMotivoHoras(dia){
+    const wrap=document.getElementById('motHoraWrap'); if(!wrap)return;
+    wrap.innerHTML=`<div class="art-of-subt">Reparto horario · ${this.fFecha(dia)}</div>${this.loadingHtml()}`;
+    const c=this._motCtx;
+    const p=new URLSearchParams({mode:'por_hora_dia',cod_maquina:c.codMaq,motivo:c.motivo,dia,fecha_desde:c.desde,fecha_hasta:c.hasta,por:'maquina'});
+    const tu=this.turnos(); if(tu.length&&tu.length<3)p.set('turnos',tu.join(','));
+    try{
+      const d=await this.get('oee_unificado_maq_motivo_temporal.php',p);
+      const horas=(Array.isArray(d.horas)?d.horas:[]);
+      const hay=horas.some(x=>(+x.horas||0)>0);
+      if(!hay){wrap.innerHTML=`<div class="art-of-subt">Reparto horario · ${this.fFecha(dia)}</div><div class="hint">Sin detalle horario para ese día.</div>`;return;}
+      wrap.innerHTML=`<div class="art-of-subt">Reparto horario · ${this.fFecha(dia)}</div><div class="chartbox" style="height:300px"><canvas class="mot-hcv"></canvas></div>`;
+      const cv=wrap.querySelector('.mot-hcv');
+      if(this._motHChart){try{this._motHChart.destroy();}catch(_){}}
+      this._motHChart=new Chart(cv,{type:'bar',data:{labels:horas.map(x=>String(x.hora).padStart(2,'0')+'h'),
+          datasets:[{label:'Horas de paro',data:horas.map(x=>Math.round((+x.horas||0)*100)/100),backgroundColor:'#e0902a',
+            datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]>0,anchor:'end',align:'top',color:'#3a2426',font:{size:8,weight:'bold'},formatter:v=>v>0?v:''}}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+          scales:{x:{ticks:{font:{size:12,weight:'600'},color:'#3a2426'}},y:{beginAtZero:true,grace:'14%',title:{display:true,text:'horas'}}}}});
+      wrap.scrollIntoView({behavior:'smooth',block:'nearest'});
+    }catch(e){wrap.innerHTML=`<div class="error">Error: ${this.esc(e.message)}</div>`;}
+  },
+
   /* ===== Rendimiento: histórico por referencia + comparativa por OF ===== */
   _rd:{refs:[],ofs:[],cod:'',desde:'',hasta:''},
   fU(n){return (Number(n)||0).toLocaleString('es-ES');},
@@ -537,16 +885,10 @@ const App={
   // Usa el rango de fechas del filtro principal.
   async rdRefModulos(host,cod,name){
     this._rd.cod=cod; this._rd.desde=fDesde.value; this._rd.hasta=fHasta.value;
+    // Solo se muestra «Comparativa de rendimiento por OF»: el histórico de
+    // producción y el detalle OFs+referencia ya están en el popup de análisis.
     host.innerHTML=`
       <div class="module-general rdto-mod" style="margin-top:18px">
-        <div class="mg-head"><span class="badge-gen">RDTO</span>
-          <span class="mg-title">Histórico de producción · ${this.esc(name)}<small> · OFs de la referencia · clic en una OF = desglose horario</small></span></div>
-        <div class="mg-body">
-          <div class="rdtoResumen" style="display:none"></div>
-          <div class="rdtoHistWrap">${this.loadingHtml()}</div>
-        </div>
-      </div>
-      <div class="module-general rdto-mod">
         <div class="mg-head"><span class="badge-gen">RDTO</span>
           <span class="mg-title">Comparativa de rendimiento por OF<small> · piezas/hora y OK/NOK por OF, separado por máquina</small></span></div>
         <div class="mg-body">
@@ -555,10 +897,7 @@ const App={
           <div class="rdtoCompEmpty hint" style="display:none"></div>
         </div>
       </div>`;
-    const W=host.querySelector('.rdtoHistWrap');
     const qs=new URLSearchParams({cod_producto:cod,fecha_desde:this._rd.desde,fecha_hasta:this._rd.hasta});
-    try{ const d=await this.get('oee_unificado_ref_historico.php',qs); this.rdRenderHist(host,d); }
-    catch(e){ W.innerHTML=`<div class="error">${e.message}</div>`; }
     try{ const c=await this.get('oee_unificado_ref_comparativa.php',qs); this.rdRenderComp(host,c); }
     catch(e){ this.rdCompEmpty(host); }
   },
@@ -566,7 +905,7 @@ const App={
     const ofs=Array.isArray(d.ofs)?d.ofs:[]; const t=d.totales||{};
     this._rd.ofs=ofs; this._rd.desc=d.desc_producto||this._rd.cod;
     const R=host.querySelector('.rdtoResumen'); R.style.display='flex';
-    R.innerHTML=`<span>OFs: <b>${this.fU(t.num_ofs)}</b></span><span>Máquinas: <b>${this.fU(t.num_maquinas)}</b></span><span>Días con producción: <b>${this.fU(t.dias)}</b></span><span>Total OK: <b style="color:#1d5938">${this.fU(t.unidades_ok)}</b></span><span>Total NOK: <b style="color:#c8102e">${this.fU(t.unidades_nok)}</b></span>`;
+    R.innerHTML=`<span>OFs: <b>${this.fU(t.num_ofs)}</b></span><span>Máquinas: <b>${this.fU(t.num_maquinas)}</b></span><span>Días con producción: <b>${this.fU(t.dias)}</b></span><span>Total OK: <b style="color:#8c181a">${this.fU(t.unidades_ok)}</b></span><span>Total NOK: <b style="color:#c8102e">${this.fU(t.unidades_nok)}</b></span>`;
     const W=host.querySelector('.rdtoHistWrap');
     if(!ofs.length){W.innerHTML='<div class="empty">Sin producción en el rango.</div>';return;}
     let h='<table class="rdto-table"><thead><tr><th>OF</th><th>Máquina(s)</th><th class="num">Días</th><th class="num">Unidades OK</th><th class="num">Unidades NOK</th></tr></thead><tbody>';
@@ -600,7 +939,7 @@ const App={
       const valid=udsH.filter(v=>v>0), maxV=valid.length?Math.max(...valid):0, minV=valid.length?Math.min(...valid):0, avgV=valid.length?valid.reduce((a,b)=>a+b,0)/valid.length:0;
       const tOk=ok.reduce((a,b)=>a+b,0), tNok=nok.reduce((a,b)=>a+b,0), tAll=tOk+tNok;
       this.apex(host.querySelector('.rdUp_'+id),{chart:{type:'bar',height:240,toolbar:{show:false},animations:{enabled:false}},series:[{name:'piezas/hora',data:udsH}],colors:['#3a6aa3'],plotOptions:{bar:{columnWidth:'45%',borderRadius:2}},xaxis:{categories:cats,labels:{style:{fontSize:'11px',fontWeight:700}}},yaxis:{min:0,labels:{formatter:v=>this.fU(Math.round(v))}},dataLabels:{enabled:cats.length<=14,formatter:v=>v>0?this.fU(Math.round(v)):'',style:{fontSize:'10px',colors:['#fff']}},legend:{show:false},tooltip:{y:{formatter:v=>this.fU(Math.round(v))+' uds/h'}}});
-      this.apex(host.querySelector('.rdDn_'+id),{chart:{type:'bar',stacked:true,height:240,toolbar:{show:false},animations:{enabled:false}},series:[{name:'OK',data:ok},{name:'NOK',data:nok}],colors:['#10b981','#c8102e'],plotOptions:{bar:{columnWidth:'45%',borderRadius:2}},xaxis:{categories:cats,labels:{style:{fontSize:'11px',fontWeight:700}}},yaxis:{min:0,labels:{formatter:v=>this.fU(Math.round(v))}},dataLabels:{enabled:false},legend:{position:'bottom',fontSize:'11px'},tooltip:{shared:true,intersect:false,y:{formatter:v=>this.fU(Math.round(v))+' uds'}}});
+      this.apex(host.querySelector('.rdDn_'+id),{chart:{type:'bar',stacked:true,height:240,toolbar:{show:false},animations:{enabled:false}},series:[{name:'OK',data:ok},{name:'NOK',data:nok}],colors:['#8c181a','#c8102e'],plotOptions:{bar:{columnWidth:'45%',borderRadius:2}},xaxis:{categories:cats,labels:{style:{fontSize:'11px',fontWeight:700}}},yaxis:{min:0,labels:{formatter:v=>this.fU(Math.round(v))}},dataLabels:{enabled:false},legend:{position:'bottom',fontSize:'11px'},tooltip:{shared:true,intersect:false,y:{formatter:v=>this.fU(Math.round(v))+' uds'}}});
       const f2=v=>Number(v).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});
       host.querySelector('.rdSt_'+id).innerHTML=`<div class="st"><div class="l">Máx piezas/hora</div><div class="v">${f2(maxV)}</div></div><div class="st"><div class="l">Mín piezas/hora</div><div class="v">${f2(minV)}</div></div><div class="st"><div class="l">Promedio piezas/hora</div><div class="v">${f2(avgV)}</div></div><div class="st ok"><div class="l">Total OK</div><div class="v">${this.fU(tOk)}</div></div><div class="st nok"><div class="l">Total NOK</div><div class="v">${this.fU(tNok)}</div></div><div class="st"><div class="l">% OK · NOK</div><div class="v">${f2(tAll>0?tOk/tAll*100:0)}% · ${f2(tAll>0?tNok/tAll*100:0)}%</div></div>`;
     });
@@ -660,10 +999,10 @@ const App={
       const vf=this.motivoValField();
       const max=Math.max(...det.map(x=>x[vf]||0),1);
       let html=`<div class="breadcrumb">Desglose del motivo <b>${motivo}</b> por ${ent} y distribución horaria global.</div>`;
-      html+=`<div style="font-size:13px;font-weight:700;color:#1e3a5f;margin:6px 0 10px">Por ${ent} <small style="font-weight:500;color:#5a7596">${esRef?'':'(clic en una máquina para ver su distribución horaria detallada)'}</small></div>`;
+      html+=`<div style="font-size:13px;font-weight:700;color:#3a2426;margin:6px 0 10px">Por ${ent} <small style="font-weight:500;color:#8a6e70">${esRef?'':'(clic en una máquina para ver su distribución horaria detallada)'}</small></div>`;
       html+=this.barList(det,{name:x=>x.maquina,val:x=>x[vf]||0,unit:State.metrica==='calidad'?'u':'h',max,
         color:()=>'#2d4d7a',clickable:!esRef});
-      html+=`<div style="font-size:13px;font-weight:700;color:#1e3a5f;margin:18px 0 6px">Distribución horaria del motivo · franja y duración por ${ent}</div>`;
+      html+=`<div style="font-size:13px;font-weight:700;color:#3a2426;margin:18px 0 6px">Distribución horaria del motivo · franja y duración por ${ent}</div>`;
       html+=`<div class="hint" style="margin-top:0">Cada barra ocupa la franja horaria en la que la ${ent} estuvo parada por este motivo; su longitud = duración real.</div>`;
       html+=ph?'<div class="cvh"></div>':'<div class="empty">Sin desglose horario disponible</div>';
       this.body(ov).innerHTML=html;
@@ -764,7 +1103,7 @@ const App={
     });
   },
   metricLabel(m){return {disponibilidad:'Disponibilidad',rendimiento:'Rendimiento',calidad:'Calidad',oee:'OEE'}[m];},
-  semColor(v){return v>=75?'#2a7a4b':v>=60?'#c98a1a':'#b3402c';},
+  semColor(v){return v>=75?'#8c181a':v>=60?'#c98a1a':'#b3402c';},
   barList(items,o){
     return '<div class="bars">'+items.map(i=>{
       const v=o.val(i),w=Math.max(0,Math.min(100,(v/o.max)*100));
@@ -1057,9 +1396,11 @@ const App={
             color:'#1f2937',font:{size:11,weight:'700'},formatter:v=>Math.round(v).toLocaleString('es-ES')},
           tooltip:{callbacks:{afterBody:items=>{const r=refs[items[0].dataIndex];return 'Total: '+(r.uds_total).toLocaleString('es-ES')+' uds · '+r.horas+' h · Rendimiento '+(r.rend!=null?r.rend:0)+'%';}}}},
         onClick:(e,els)=>{if(els.length){const r=refs[els[0].index];
-          detail.innerHTML='<div class="rd-ofs"></div><div class="rd-mods"></div>';
-          self.rdRefOfs(detail.querySelector('.rd-ofs'),cod,r.cod,r.desc,r.nom_sage);
+          // Solo comparativa de rendimiento por OF + popup de análisis histórico.
+          detail.innerHTML='<div class="rd-mods"></div>';
           self.rdRefModulos(detail.querySelector('.rd-mods'),r.cod,r.desc);
+          // Análisis histórico de OF por artículo (réplica QlikView) en ventana emergente.
+          self.openArtAnalisis(r.cod,r.desc);
           detail.scrollIntoView({behavior:'smooth',block:'nearest'});
         }},
         scales:{x:{beginAtZero:true,title:{display:true,text:'piezas / hora'}},
@@ -1098,7 +1439,7 @@ const App={
       const fU=n=>(Number(n)||0).toLocaleString('es-ES');
       const kpi=(l,v,c)=>`<div class="ofk" style="background:${c}"><div class="ofk-l">${l}</div><div class="ofk-v">${v}%</div></div>`;
       let h=`<div class="ofp-sub">${d.desc_producto||d.producto||''}${d.fecha_ini?(' · '+d.fecha_ini.slice(0,16).replace('T',' ')):''}${d.fecha_fin?(' → '+d.fecha_fin.slice(11,16)):''}</div>`;
-      h+=`<div class="ofk-row">${kpi('Disp',d.disp,'#2d4d7a')}${kpi('Rend',d.rend,'#c45a2c')}${kpi('Cal',d.cal,'#1d5938')}${kpi('OEE',d.oee,'#3a6aa3')}</div>`;
+      h+=`<div class="ofk-row">${kpi('Disp',d.disp,'#2d4d7a')}${kpi('Rend',d.rend,'#c45a2c')}${kpi('Cal',d.cal,'#8c181a')}${kpi('OEE',d.oee,'#3a6aa3')}</div>`;
       h+=`<div class="ofp-pz">Piezas: <b>${fU(d.piezas)}</b> · OK ${fU(d.ok)} · NOK ${fU(d.nok)}</div>`;
       const mot=d.motivos||[];
       h+=`<div class="ofp-h">Motivos de paro · total <b>${(d.total_horas_paro||0).toFixed(1)} h</b></div>`;

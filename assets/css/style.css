@@ -16,13 +16,13 @@
     --white:         #ffffff;
     --off-white:     #f0f4f8;
 
-    --kh-red:        #c8102e;
-    --kh-red-dark:   #8b1622;
+    --kh-red:        #A31416;  /* rojo corporativo exacto del logo KH */
+    --kh-red-dark:   #7d0f11;
 
     /* Semáforo */
-    --ok-strong:     #27ae60;
-    --ok-bg:         #a8e6a3;
-    --ok-bg-light:   #c9f0c5;
+    --ok-strong:     #8c181a;
+    --ok-bg:         #f0c9c9;
+    --ok-bg-light:   #f6dede;
     --warn:          #f59e0b;
     --warn-bg:       #ffe0a3;
     --bad-strong:    #dc2626;
@@ -81,42 +81,15 @@ a { text-decoration: none; color: inherit; }
     border-right: 2px solid rgba(255,255,255,0.15);
 }
 
-.logo-icon {
-    position: relative;
-    width: 40px;
+/* Logo corporativo real (PNG). Fondo blanco para que el texto gris del logo,
+   pensado para fondo claro, contraste sobre la topbar oscura. */
+.logo-kh-img {
     height: 40px;
-}
-
-.logo-dot {
-    position: absolute;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: var(--kh-red);
-}
-
-.logo-dot-1 { top: 4px;   left: 4px; }
-.logo-dot-2 { top: 22px;  left: 4px; background: var(--kh-red-dark); }
-.logo-dot-3 { top: 13px;  left: 22px; background: var(--kh-red); }
-
-.logo-text {
-    display: flex;
-    flex-direction: column;
-    line-height: 1;
-}
-
-.logo-kh-text {
-    font-size: 24px;
-    font-weight: 700;
-    color: var(--white);
-    letter-spacing: 1px;
-}
-
-.logo-know {
-    font-size: 9px;
-    color: var(--blue-pale);
-    letter-spacing: 2px;
-    margin-top: 2px;
+    width: auto;
+    display: block;
+    background: #fff;
+    padding: 5px 10px;
+    border-radius: 6px;
 }
 
 .page-title {
@@ -266,7 +239,7 @@ a { text-decoration: none; color: inherit; }
 }
 .home-section-title + .home-grid { margin-bottom: 32px; }
 .home-section-title-oee {
-    border-left-color: #10b981;
+    border-left-color: #8c181a;
     margin-top: 8px;
 }
 
@@ -328,7 +301,7 @@ a { text-decoration: none; color: inherit; }
     font-weight: 700;
     letter-spacing: 0.5px;
     text-transform: uppercase;
-    background: #10b981;
+    background: #8c181a;
     color: #ffffff;
     border-radius: 3px;
     vertical-align: middle;
@@ -512,8 +485,8 @@ a { text-decoration: none; color: inherit; }
     color: #6a7f9a;
 }
 
-.drc-card-good  { border-left-color: #10b981; }
-.drc-card-good  .drc-card-icon  { color: #10b981; }
+.drc-card-good  { border-left-color: #8c181a; }
+.drc-card-good  .drc-card-icon  { color: #8c181a; }
 .drc-card-good  .drc-card-value { color: #0d7d5c; }
 
 .drc-card-warn  { border-left-color: #f59e0b; }
@@ -1176,7 +1149,7 @@ html { scroll-padding-top: calc(var(--pa-stick-top, 64px) + 10px); }
     align-items: center;
     gap: 6px;
     padding: 6px 14px;
-    background: linear-gradient(180deg, #16a34a 0%, #15803d 100%);
+    background: linear-gradient(180deg, #8c181a 0%, #15803d 100%);
     border: 1px solid #14532d;
     color: #ffffff;
     border-radius: 6px;
@@ -1375,7 +1348,7 @@ html { scroll-padding-top: calc(var(--pa-stick-top, 64px) + 10px); }
     font-size: 13px;
     margin-bottom: 12px;
 }
-.metric-legend-formula .formula-num { color: #10b981; font-weight: 700; }
+.metric-legend-formula .formula-num { color: #8c181a; font-weight: 700; }
 .metric-legend-formula .formula-bar { color: var(--blue-mid); font-weight: 700; }
 .metric-legend-formula .formula-den { color: #c8102e; font-weight: 700; }
 .metric-legend-formula .formula-note {
@@ -1971,7 +1944,7 @@ html { scroll-padding-top: calc(var(--pa-stick-top, 64px) + 10px); }
     display: inline-block;
     width: 8px; height: 8px;
     border-radius: 50%;
-    background: #10b981;
+    background: #8c181a;
     margin-right: 6px;
     vertical-align: middle;
 }
@@ -2352,7 +2325,7 @@ html { scroll-padding-top: calc(var(--pa-stick-top, 64px) + 10px); }
 /* Botón "Marcar hecha" en filas de próximas revisiones */
 .mant-action-btn {
     padding: 5px 10px;
-    background: #10b981;
+    background: #8c181a;
     color: #ffffff;
     border: none;
     border-radius: 4px;
@@ -2843,8 +2816,8 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 .mant-stat-vencidas .mant-stat-value { color: #c8102e; }
 .mant-stat-urgentes { border-left-color: #f59e0b; }
 .mant-stat-urgentes .mant-stat-value { color: #f59e0b; }
-.mant-stat-en-plazo { border-left-color: #10b981; }
-.mant-stat-en-plazo .mant-stat-value { color: #10b981; }
+.mant-stat-en-plazo { border-left-color: #8c181a; }
+.mant-stat-en-plazo .mant-stat-value { color: #8c181a; }
 .mant-stat-total    { border-left-color: var(--blue-mid); }
 
 .mant-table-wrap {
@@ -2909,7 +2882,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 .mant-machine-group-row:hover td { background: #eef3f8; }
 .mant-machine-group-vencida td:first-child { border-left: 4px solid #c8102e; }
 .mant-machine-group-urgente td:first-child { border-left: 4px solid #f59e0b; }
-.mant-machine-group-en_plazo td:first-child { border-left: 4px solid #10b981; }
+.mant-machine-group-en_plazo td:first-child { border-left: 4px solid #8c181a; }
 .mant-group-toggle,
 .mant-group-open-btn {
     display: inline-flex;
@@ -2962,7 +2935,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 }
 .mant-dias-vencida  { color: #c8102e; }
 .mant-dias-urgente  { color: #d97706; }
-.mant-dias-en_plazo { color: #10b981; }
+.mant-dias-en_plazo { color: #8c181a; }
 .mant-truncado {
     padding: 10px 14px;
     background: #fff7e6;
@@ -3080,9 +3053,9 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 }
 .acc-btn:hover  { transform: translateY(-1px); }
 .acc-btn:active { transform: translateY(0); }
-.acc-btn-primary   { background: #3a6aa3; color: #ffffff; }
-.acc-btn-primary:hover   { background: #2d5586; }
-.acc-btn-success   { background: #10b981; color: #ffffff; }
+.acc-btn-primary   { background: var(--kh-red); color: #ffffff; }
+.acc-btn-primary:hover   { background: var(--kh-red-dark); }
+.acc-btn-success   { background: #8c181a; color: #ffffff; }
 .acc-btn-success:hover   { background: #059669; }
 .acc-btn-secondary { background: #e8eef5; color: #1a2d4a; }
 .acc-btn-secondary:hover { background: #d5dfe8; }
@@ -3766,7 +3739,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 }
 .mant-export-btn:hover { filter: brightness(1.08); }
 .mant-export-print { background: #3a6aa3; }
-.mant-export-csv   { background: #10b981; }
+.mant-export-csv   { background: #8c181a; }
 .mant-export-excel { background: #1d4ed8; }
 .mant-export-hint  { color: #5b8cc7; font-size: 12px; font-style: italic; }
 
@@ -3950,7 +3923,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 }
 .mant-action-quitar-pendiente:hover { background: #b45309 !important; }
 .mant-action-hecha {
-    background: #10b981 !important;
+    background: #8c181a !important;
 }
 .mant-action-hecha:hover { background: #059669 !important; }
 
@@ -4486,7 +4459,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     align-items: flex-start;
     gap: 12px;
     background: #fff;
-    border: 2px solid #10b981;
+    border: 2px solid #8c181a;
     border-radius: 6px;
     padding: 10px 14px;
     margin: 0 0 10px 0;
@@ -4495,7 +4468,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 .ref-comp-overall-body { flex: 1 1 auto; }
 .ref-comp-overall-title {
     font-size: 11.5px;
-    color: #10b981;
+    color: #8c181a;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: .5px;
@@ -4513,7 +4486,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     margin-top: 2px;
     line-height: 1.4;
 }
-.ref-comp-overall-detail strong { color: #10b981; }
+.ref-comp-overall-detail strong { color: #8c181a; }
 .ref-comp-overall-ranking { margin-top: 8px; }
 .ref-comp-overall-rank-title {
     font-size: 11px;
@@ -4534,7 +4507,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     border-bottom: 1px solid #f0e0e0;
 }
 .ref-comp-overall-rank-item:last-child { border-bottom: none; }
-.ref-comp-overall-rank-item.is-best { color: #10b981; font-weight: 700; }
+.ref-comp-overall-rank-item.is-best { color: #8c181a; font-weight: 700; }
 .ref-comp-overall-rank-item .rk-pos { font-weight: 700; color: #3a6aa3; }
 .ref-comp-overall-rank-item .rk-val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .ref-comp-overall-rank-item .rk-pct { text-align: right; font-size: 11px; color: #1a4a7a; }
@@ -4635,8 +4608,8 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
 .cmp-stat-max { border-left-color: #2d4d7a; }
 .cmp-stat-min { border-left-color: #f59e0b; }
 .cmp-stat-avg { border-left-color: #3a6aa3; }
-.cmp-stat-ok  { border-left-color: #10b981; }
-.cmp-stat-ok  .cmp-stat-value { color: #10b981; }
+.cmp-stat-ok  { border-left-color: #8c181a; }
+.cmp-stat-ok  .cmp-stat-value { color: #8c181a; }
 .cmp-stat-nok { border-left-color: #c8102e; }
 .cmp-stat-nok .cmp-stat-value { color: #c8102e; }
 .cmp-stat-pct {
@@ -4652,7 +4625,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     font-size: 14px;
     margin-top: 1px;
 }
-.cmp-stat-pct-ok  { color: #10b981; }
+.cmp-stat-pct-ok  { color: #8c181a; }
 .cmp-stat-pct-nok { color: #c8102e; }
 .cmp-stat-pct-sep { color: #888; }
 .cmp-stat-divider {
@@ -4761,7 +4734,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     color: #2d4d7a;
 }
 .ref-hist-resumen-item strong { color: #3a6aa3; }
-.ref-hist-resumen-ok  span    { color: #10b981; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ref-hist-resumen-ok  span    { color: #8c181a; font-weight: 700; font-variant-numeric: tabular-nums; }
 .ref-hist-resumen-nok span    { color: #c8102e; font-weight: 700; font-variant-numeric: tabular-nums; }
 .ref-hist-tabla-wrap {
     max-height: 420px;
@@ -5152,7 +5125,7 @@ body[data-role="operario"] .role-tecnico-only { display: none !important; }
     background: #fff;
     outline: none;
 }
-.maq-excl-search:focus { border-color: #3a6aa3; }
+.maq-excl-search:focus { border-color: var(--kh-red); }
 .maq-excl-panel-close {
     width: 22px;
     height: 22px;

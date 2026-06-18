@@ -25,6 +25,7 @@ $_cssVer  = file_exists($_cssPath) ? filemtime($_cssPath) : time();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($pageTitle, ENT_QUOTES) ?> · KH</title>
+    <link rel="icon" type="image/x-icon" href="<?= $isHome ? '' : '../' ?>assets/img/kh.ico">
     <meta name="csrf-token" content="<?= htmlspecialchars($_csrfToken, ENT_QUOTES) ?>">
     <link href="https://fonts.googleapis.com/css2?family=Arial:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= $isHome ? '' : '../' ?>assets/css/style.css?v=<?= $_cssVer ?>">
@@ -47,15 +48,7 @@ $_cssVer  = file_exists($_cssPath) ? filemtime($_cssPath) : time();
 <header class="topbar">
     <div class="topbar-left">
         <div class="logo-kh">
-            <div class="logo-icon">
-                <span class="logo-dot logo-dot-1"></span>
-                <span class="logo-dot logo-dot-2"></span>
-                <span class="logo-dot logo-dot-3"></span>
-            </div>
-            <div class="logo-text">
-                <span class="logo-kh-text">KH</span>
-                <span class="logo-know">KNOW HOW</span>
-            </div>
+            <img src="<?= $isHome ? '' : '../' ?>assets/img/logo-kh.png" alt="KH · Know How" class="logo-kh-img">
         </div>
         <h1 class="page-title"><?= htmlspecialchars($pageTitle, ENT_QUOTES) ?></h1>
     </div>

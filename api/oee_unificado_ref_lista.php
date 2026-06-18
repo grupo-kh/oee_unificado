@@ -17,7 +17,22 @@ require_once __DIR__ . '/../includes/helpers.php';
  */
 
 try {
-    $umbralDesde = (new DateTime('-1 year'))->format('Y-m-d');
+    // Si llegan fecha_desde/fecha_hasta (rango del filtro principal), solo se
+    // listan las referencias con OF/producción dentro de ese rango. Si no, se
+    // mantiene el comportamiento previo: referencias del último año.
+    $fdesde = (string) getParam('fecha_desde');
+    $fhasta = (string) getParam('fecha_hasta');
+    $usaRango = preg_match('/^\d{4}-\d{2}-\d{2}$/', $fdesde) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fhasta);
+
+    if ($usaRango) {
+        $fechaWhere = "CAST(hp.Dia_productivo AS DATE) BETWEEN ? AND ?";
+        $params     = [$fdesde, $fhasta];
+        $umbral     = $fdesde;
+    } else {
+        $umbral     = (new DateTime('-1 year'))->format('Y-m-d');
+        $fechaWhere = "CAST(hp.Dia_productivo AS DATE) >= ?";
+        $params     = [$umbral];
+    }
 
     $sql = "
         SELECT pr.Cod_producto AS cod_producto,
@@ -32,18 +47,18 @@ try {
         WHERE pr.Cod_producto IS NOT NULL
           AND LTRIM(RTRIM(pr.Cod_producto)) <> ''
           AND LTRIM(RTRIM(pr.Cod_producto)) <> '--'
-          AND CAST(hp.Dia_productivo AS DATE) >= ?
+          AND $fechaWhere
         GROUP BY pr.Cod_producto, pr.Desc_producto
         ORDER BY desc_producto
     ";
-    $rows = fetchAll('mapex', $sql, [$umbralDesde]);
+    $rows = fetchAll('mapex', $sql, $params);
 
     $multi = 0;
     foreach ($rows as $r) if ((int)$r['num_maquinas'] > 1) $multi++;
 
     jsonOk([
         'refs'        => $rows,
-        'desde'       => $umbralDesde,
+        'desde'       => $umbral,
         'multi_count' => $multi,
     ]);
 } catch (Exception $e) {

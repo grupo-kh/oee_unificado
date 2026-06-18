@@ -49,7 +49,7 @@ include __DIR__ . '/../includes/header.php';
                 <button id="filter-clear" class="machine-selector-clear" type="button" title="Quita máquina y deja el rango en día anterior">× Quitar filtros</button>
                 <button id="cumpl-export-xlsx" class="machine-selector-clear" type="button"
                         title="Descargar el informe de cumplimiento en XLSX con los filtros actuales"
-                        style="background:#10b981;color:#fff">&#x2B07; Informe XLSX</button>
+                        style="background:#8c181a;color:#fff">&#x2B07; Informe XLSX</button>
                 <button id="cumpl-export-pdf" class="machine-selector-clear" type="button"
                         title="Descargar el informe de cumplimiento en PDF imprimible"
                         style="background:#c8102e;color:#fff">&#x2B07; Informe PDF</button>

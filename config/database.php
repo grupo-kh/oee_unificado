@@ -36,6 +36,13 @@ define('DB_SAGE_NAME', env('DB_SAGE_NAME', ''));
 define('DB_SAGE_USER', env('DB_SAGE_USER', ''));
 define('DB_SAGE_PASS', env('DB_SAGE_PASS', ''));
 
+// Logicclass (SQL Server, server2) — productividad nominal Oper_Formula.UnidadesHora.
+// Tercera conexión del QlikView original (User ID=khapps, BD Logicclass).
+define('DB_LOGIC_HOST', env('DB_LOGIC_HOST', ''));
+define('DB_LOGIC_NAME', env('DB_LOGIC_NAME', ''));
+define('DB_LOGIC_USER', env('DB_LOGIC_USER', ''));
+define('DB_LOGIC_PASS', env('DB_LOGIC_PASS', ''));
+
 define('DB_PG_HOST',   env('DB_PG_HOST',   '127.0.0.1'));
 define('DB_PG_PORT',   env('DB_PG_PORT',   '5432'));
 define('DB_PG_NAME',   env('DB_PG_NAME',   'plan_attainment'));
@@ -62,6 +69,10 @@ function getConnection($bd = 'mapex') {
             case 'sage':
                 $host = DB_SAGE_HOST; $name = DB_SAGE_NAME;
                 $user = DB_SAGE_USER; $pass = DB_SAGE_PASS;
+                break;
+            case 'logicclass':
+                $host = DB_LOGIC_HOST; $name = DB_LOGIC_NAME;
+                $user = DB_LOGIC_USER; $pass = DB_LOGIC_PASS;
                 break;
             default:
                 throw new Exception("Base de datos desconocida: $bd");

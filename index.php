@@ -22,7 +22,7 @@ include __DIR__ . '/includes/header.php';
                     <path d="M10 55 A40 40 0 0 1 90 55" stroke="#c8102e" stroke-width="10" fill="none" stroke-linecap="round"/>
                     <path d="M10 55 A40 40 0 0 1 35 18" stroke="#ef4444" stroke-width="10" fill="none" stroke-linecap="round" opacity="0.4"/>
                     <path d="M50 15 A40 40 0 0 1 75 22" stroke="#f59e0b" stroke-width="10" fill="none" stroke-linecap="round" opacity="0.7"/>
-                    <path d="M75 22 A40 40 0 0 1 90 55" stroke="#10b981" stroke-width="10" fill="none" stroke-linecap="round"/>
+                    <path d="M75 22 A40 40 0 0 1 90 55" stroke="#8c181a" stroke-width="10" fill="none" stroke-linecap="round"/>
                     <circle cx="50" cy="55" r="6" fill="#ffffff"/>
                     <line x1="50" y1="55" x2="65" y2="28" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
                 </svg>
@@ -49,7 +49,7 @@ include __DIR__ . '/includes/header.php';
                     <rect x="10" y="18" width="14" height="36" rx="2" fill="#c8102e"/>
                     <rect x="30" y="10" width="14" height="44" rx="2" fill="#f59e0b"/>
                     <rect x="50" y="22" width="14" height="32" rx="2" fill="#3a6aa3"/>
-                    <rect x="70" y="6"  width="14" height="48" rx="2" fill="#10b981"/>
+                    <rect x="70" y="6"  width="14" height="48" rx="2" fill="#8c181a"/>
                     <line x1="5" y1="54" x2="95" y2="54" stroke="#1a2d4a" stroke-width="1.5"/>
                 </svg>
             </div>

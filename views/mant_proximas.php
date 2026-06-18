@@ -36,7 +36,7 @@ include __DIR__ . '/../includes/header.php';
     }
     .mant-row.mant-row-vencida  { border-left-color: #c8102e; }   /* rojo  */
     .mant-row.mant-row-urgente  { border-left-color: #f59e0b; }   /* ámbar */
-    .mant-row.mant-row-en_plazo { border-left-color: #10b981; }   /* verde */
+    .mant-row.mant-row-en_plazo { border-left-color: #8c181a; }   /* verde */
 
     /* Filas ya hechas: muy sutiles. Mantienen el borde para no perder
        el estado, pero el contenido se difumina. */
@@ -383,7 +383,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <div class="mant-modal-footer">
             <button type="button" class="machine-selector-clear mant-modal-btn-cancel" id="mark-modal-cancel" style="background:#a3b8d1">Cancelar</button>
-            <button type="button" class="machine-selector-clear mant-modal-btn-ok" id="mark-modal-ok" style="background:#10b981">✓ Marcar como hecha</button>
+            <button type="button" class="machine-selector-clear mant-modal-btn-ok" id="mark-modal-ok" style="background:#8c181a">✓ Marcar como hecha</button>
         </div>
     </div>
 </div>

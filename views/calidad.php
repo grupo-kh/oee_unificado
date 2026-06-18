@@ -20,7 +20,7 @@ include __DIR__ . '/../includes/header.php';
                 <svg viewBox="0 0 100 60" fill="none">
                     <path d="M10 52 A32 32 0 0 1 90 52" stroke="#c8102e" stroke-width="9" fill="none"/>
                     <path d="M14 38 A32 32 0 0 1 28 22" stroke="#f59e0b" stroke-width="9" fill="none"/>
-                    <path d="M28 22 A32 32 0 0 1 90 52" stroke="#10b981" stroke-width="9" fill="none"/>
+                    <path d="M28 22 A32 32 0 0 1 90 52" stroke="#8c181a" stroke-width="9" fill="none"/>
                     <circle cx="50" cy="52" r="5" fill="#ffffff"/>
                     <line x1="50" y1="52" x2="78" y2="36" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
                 </svg>
@@ -44,7 +44,7 @@ include __DIR__ . '/../includes/header.php';
                     <circle cx="65" cy="18" r="3" fill="#f4c430"/>
                     <circle cx="80" cy="12" r="3" fill="#f4c430"/>
                     <circle cx="95" cy="15" r="3" fill="#f4c430"/>
-                    <line x1="3" y1="8" x2="97" y2="8" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3,2"/>
+                    <line x1="3" y1="8" x2="97" y2="8" stroke="#8c181a" stroke-width="1.5" stroke-dasharray="3,2"/>
                 </svg>
             </div>
             <div class="tile-body">

@@ -59,3 +59,5 @@ config/qr_secret.dat
 docs/
 input/
 SETUP_POSTGRES.md
+oee_unificado
+load/

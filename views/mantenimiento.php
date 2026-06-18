@@ -77,7 +77,7 @@ include __DIR__ . '/../includes/header.php';
                     <line x1="20" y1="30" x2="48" y2="30" stroke="#ffffff" stroke-width="1.2"/>
                     <line x1="20" y1="38" x2="50" y2="38" stroke="#ffffff" stroke-width="1.2"/>
                     <line x1="20" y1="46" x2="44" y2="46" stroke="#ffffff" stroke-width="1.2"/>
-                    <circle cx="78" cy="36" r="14" fill="#10b981" stroke="#ffffff" stroke-width="2"/>
+                    <circle cx="78" cy="36" r="14" fill="#8c181a" stroke="#ffffff" stroke-width="2"/>
                     <line x1="78" y1="29" x2="78" y2="43" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
                     <line x1="71" y1="36" x2="85" y2="36" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
                 </svg>
@@ -103,8 +103,8 @@ include __DIR__ . '/../includes/header.php';
                     <line x1="70" y1="22" x2="70" y2="54" stroke="#ffffff" stroke-width="1"/>
                     <circle cx="20" cy="32" r="2.5" fill="#ef4444"/>
                     <circle cx="40" cy="32" r="2.5" fill="#f59e0b"/>
-                    <circle cx="60" cy="44" r="2.5" fill="#10b981"/>
-                    <circle cx="80" cy="44" r="2.5" fill="#10b981"/>
+                    <circle cx="60" cy="44" r="2.5" fill="#8c181a"/>
+                    <circle cx="80" cy="44" r="2.5" fill="#8c181a"/>
                 </svg>
             </div>
             <div class="tile-body">
@@ -120,7 +120,7 @@ include __DIR__ . '/../includes/header.php';
                     <path d="M10 50 A30 30 0 0 1 90 50" stroke="#3a6aa3" stroke-width="9" fill="none"/>
                     <path d="M10 50 A30 30 0 0 1 30 25" stroke="#c8102e" stroke-width="9" fill="none"/>
                     <path d="M30 25 A30 30 0 0 1 50 18" stroke="#f59e0b" stroke-width="9" fill="none"/>
-                    <path d="M50 18 A30 30 0 0 1 90 50" stroke="#10b981" stroke-width="9" fill="none"/>
+                    <path d="M50 18 A30 30 0 0 1 90 50" stroke="#8c181a" stroke-width="9" fill="none"/>
                     <line x1="50" y1="50" x2="68" y2="22" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
                     <circle cx="50" cy="50" r="4" fill="#ffffff"/>
                 </svg>
@@ -165,7 +165,7 @@ include __DIR__ . '/../includes/header.php';
                     <circle cx="78" cy="22" r="7"  fill="#5b8cc7"/>
                     <path  d="M64 50 q14 -14 28 0" fill="#5b8cc7"/>
                     <!-- Tick de capacitación -->
-                    <path d="M88 12 l-6 6 -3 -3" stroke="#10b981" stroke-width="3" fill="none"/>
+                    <path d="M88 12 l-6 6 -3 -3" stroke="#8c181a" stroke-width="3" fill="none"/>
                 </svg>
             </div>
             <div class="tile-body">

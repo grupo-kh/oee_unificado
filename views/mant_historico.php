@@ -178,7 +178,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <div class="mant-modal-footer">
             <button type="button" class="machine-selector-clear" id="hist-edit-cancel" style="background:#a3b8d1">Cancelar</button>
-            <button type="button" class="machine-selector-clear" id="hist-edit-save" style="background:#10b981;color:#fff">Guardar</button>
+            <button type="button" class="machine-selector-clear" id="hist-edit-save" style="background:#8c181a;color:#fff">Guardar</button>
         </div>
     </div>
 </div>

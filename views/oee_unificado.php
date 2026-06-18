@@ -134,7 +134,7 @@ sort($_maquinasHist);
                 </label>
                 <label class="evolucion-toggle evo-toggle-c" title="Calidad">
                     <input type="checkbox" data-evo-serie="calidad">
-                    <span class="evolucion-toggle-dot" style="background:#2a7a4b"></span>
+                    <span class="evolucion-toggle-dot" style="background:#8c181a"></span>
                     <span>Calidad</span>
                 </label>
             </div>
@@ -205,7 +205,7 @@ sort($_maquinasHist);
                             </label>
                             <label class="evolucion-toggle evo-toggle-c">
                                 <input type="checkbox" data-evo-maq-serie="calidad">
-                                <span class="evolucion-toggle-dot" style="background:#2a7a4b"></span>
+                                <span class="evolucion-toggle-dot" style="background:#8c181a"></span>
                                 <span>Calidad</span>
                             </label>
                         </div>
@@ -528,7 +528,7 @@ sort($_maquinasHist);
                 </div>
                 <button type="button" id="hist-maq-aplicar" class="top-aplicar-btn" style="flex:0 0 auto">Aplicar</button>
                 <button type="button" id="hist-maq-xlsx" title="Exporta los paros visibles con sus motivos, máquinas y duraciones a un fichero Excel listo para trabajar"
-                        style="flex:0 0 auto;background:#10b981;color:#fff;border:0;padding:7px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;box-shadow:0 1px 3px rgba(16,185,129,0.30)">⬇ Exportar XLSX</button>
+                        style="flex:0 0 auto;background:#8c181a;color:#fff;border:0;padding:7px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px;box-shadow:0 1px 3px rgba(16,185,129,0.30)">⬇ Exportar XLSX</button>
             </div>
             <div id="hist-maq-resumen" style="display:none;background:#eef3f8;border-left:4px solid #1a4a7a;padding:8px 12px;border-radius:6px;margin:0 8px 10px 8px;font-size:13.5px;color:#1a2d4a">—</div>
             <div id="hist-maq-empty" class="top-empty" style="padding:24px;text-align:center;color:#5b6f86;font-style:italic">Pulsa Aplicar para ver el histograma (por defecto, todas las máquinas).</div>
@@ -958,7 +958,7 @@ $_jsView   = __DIR__ . '/../assets/js/view_oee_unificado.js';
         // posición. Si un motivo no tiene eventos lo saltamos.
         const paleta = [
             '#1a4a7a','#c45a2c','#1f8a3c','#5b3fb8','#c8102e',
-            '#2d4d7a','#d97706','#2a7a4b','#8a6fd1','#c8102e',
+            '#2d4d7a','#d97706','#8c181a','#8a6fd1','#c8102e',
             '#3a6aa3','#e0a458','#7ab87c','#5b8cc7','#6b6b6b',
             '#5b8cc7','#9e9e9e',
         ];
@@ -1538,7 +1538,7 @@ $_jsView   = __DIR__ . '/../assets/js/view_oee_unificado.js';
         // Cada cambio es una columna; eje X = orden cronológico
         // (1, 2, 3…), eje Y = duración en minutos. Coloreamos por motivo.
         const paleta = ['#1a4a7a','#c45a2c','#1f8a3c','#5b3fb8','#c8102e',
-                        '#2d4d7a','#d97706','#2a7a4b','#3a6aa3','#6b6b6b'];
+                        '#2d4d7a','#d97706','#8c181a','#3a6aa3','#6b6b6b'];
         const motCol = new Map();
         const data = eventos.map((ev, i) => {
             if (!motCol.has(ev.motivo)) motCol.set(ev.motivo, paleta[motCol.size % paleta.length]);

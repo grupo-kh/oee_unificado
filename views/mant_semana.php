@@ -120,7 +120,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
         <div class="mant-modal-footer">
             <button type="button" class="machine-selector-clear mant-modal-btn-cancel" id="mark-modal-cancel" style="background:#a3b8d1">Cancelar</button>
-            <button type="button" class="machine-selector-clear mant-modal-btn-ok" id="mark-modal-ok" style="background:#10b981">✓ Marcar como hecha</button>
+            <button type="button" class="machine-selector-clear mant-modal-btn-ok" id="mark-modal-ok" style="background:#8c181a">✓ Marcar como hecha</button>
         </div>
     </div>
 </div>
