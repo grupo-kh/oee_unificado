@@ -94,6 +94,19 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .hist-datebar .hdb-turnos{display:flex;gap:10px;align-items:center;padding-bottom:6px}
 .hist-datebar .hdb-chk{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;color:#374151;text-transform:none;cursor:pointer}
 .hist-datebar .hdb-chk input{cursor:pointer}
+/* ── Matriz 2: una matriz Actividad × Tipo de paro por referencia ── */
+.mtx2-ref{margin-bottom:22px;border:1px solid #d9cccd;border-radius:10px;overflow:hidden;background:#fff}
+.mtx2-ref-head{padding:10px 14px;background:#f4f1f2;border-bottom:1px solid #d9cccd;font-weight:700;color:#3a2426;font-size:14px}
+.mtx2-ref-head small{font-weight:500;color:#8a6e70}
+.mtx2-scroll{overflow-x:auto}
+.mtx2-tbl{border-collapse:collapse;font-size:12px;width:100%}
+.mtx2-tbl th,.mtx2-tbl td{border:1px solid #ece4e4;padding:5px 9px;white-space:nowrap}
+.mtx2-tbl th.mtx2-paroh{background:#3a2426;color:#fff;font-weight:600;writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);max-height:130px;font-size:11px}
+.mtx2-tbl th.mtx2-acth{background:#3a2426;color:#fff;text-align:left;position:sticky;left:0;z-index:2}
+.mtx2-tbl td.mtx2-act{font-weight:600;color:#3a2426;background:#faf8f8;position:sticky;left:0;text-align:left}
+.mtx2-tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
+.mtx2-tbl .mtx2-tot{background:#f0eeee;font-weight:700}
+.mtx2-tbl tr.mtx2-totrow td{background:#ece4e4;font-weight:700}
 /* popup a pantalla completa (Top máquinas / Top motivos) */
 .fullpop{position:fixed;inset:0;background:#fff;z-index:1500;display:flex;flex-direction:column;overflow:hidden}
 .fullpop-head{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid #f0eeee}
@@ -350,6 +363,7 @@ tbody tr:hover{background:#f9fafb}
       <button class="btn btn-topm" onclick="App.topModule('maquinas')">🏭 Top máquinas</button>
       <button class="btn btn-topmot" onclick="App.topModule('motivos')">🔧 Top motivos</button>
       <button class="btn btn-matriz" onclick="App.openMatriz()">🧮 Matriz</button>
+      <button class="btn btn-matriz" onclick="App.openMatriz2()">🧮 Matriz 2</button>
       <button class="btn btn-pri" onclick="App.exportExcel()">⬇️ Excel</button>
     </div>
   </div>
@@ -1740,6 +1754,64 @@ const App={
         td.onclick=()=>this.histReferencia(td.dataset.cod,td.dataset.ref,td.dataset.maq);
       });
     }catch(e){body.innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+  /* ---------- Matriz 2: por referencia, Actividad × Tipo de Paro ---------- */
+  async openMatriz2(){
+    const ov=document.createElement('div'); ov.className='fullpop';
+    ov.innerHTML=`
+      <div class="fullpop-head">
+        <h2>🧮 Matriz 2 · Paros por referencia (Actividad × Tipo de paro)<small>${State.seccion} · ${fDesde.value} a ${fHasta.value} · horas de paro</small></h2>
+        <div style="display:flex;gap:10px;align-items:center">
+          <input type="search" class="mtx2-search" placeholder="Filtrar referencia…" style="padding:7px 11px;border:1px solid #d9cccd;border-radius:7px;font-size:13px;min-width:220px">
+          <button class="mtx2Close" style="background:#f3f4f6;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280">✕ Cerrar</button>
+        </div>
+      </div>
+      <div class="fullpop-body"><div class="mtx2Body">${this.loadingHtml()}</div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('.mtx2Close').onclick=()=>ov.remove();
+    const body=ov.querySelector('.mtx2Body');
+    try{
+      const d=await this.get('oee_unificado_matriz2.php',this.common({seccion:State.seccion}));
+      this._mtx2=d;
+      body.innerHTML=this.matriz2Tabla(d);
+      // Filtro de referencia en vivo.
+      const sb=ov.querySelector('.mtx2-search');
+      sb.oninput=()=>{const q=(sb.value||'').toLowerCase().trim();
+        const filt={...d,referencias:d.referencias.filter(r=>!q||r.cod.toLowerCase().includes(q)||(r.desc||'').toLowerCase().includes(q))};
+        body.innerHTML=this.matriz2Tabla(filt);};
+    }catch(e){body.innerHTML=`<div class="error">${e.message}</div>`;}
+  },
+  matriz2Tabla(d){
+    const acts=d.actividades||[], paros=d.paros||[], refs=d.referencias||[];
+    if(!refs.length)return '<div class="empty">Sin paros para el filtro seleccionado</div>';
+    const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const f2=v=>(v==null||v===0)?'':(Math.round(v*100)/100).toFixed(2);
+    // Color gradual por horas (escala neutra, sin rojo de alarma).
+    const cellCol=v=>v==null||v===0?'':v>8?'background:#e08a3c;color:#fff':v>4?'background:#d9a441':v>2?'background:#f0e2c0':v>0?'background:#f7f1e3':'';
+    let h='';
+    for(const ref of refs){
+      // Solo actividades/paros con datos en esta referencia (matriz compacta por ref).
+      const actsR=acts.filter(a=>paros.some(p=>ref.celdas[a+'||'+p]>0));
+      const parosR=paros.filter(p=>actsR.some(a=>ref.celdas[a+'||'+p]>0));
+      h+=`<div class="mtx2-ref">
+        <div class="mtx2-ref-head">${e(ref.desc)} <small>· ${e(ref.cod)} · total paro: <b>${f2(ref.total_horas)} h</b></small></div>
+        <div class="mtx2-scroll"><table class="mtx2-tbl"><thead><tr><th class="mtx2-acth">Actividad \\ Paro</th>`;
+      for(const p of parosR) h+=`<th class="mtx2-paroh">${e(p)}</th>`;
+      h+=`<th class="mtx2-tot">TOTAL</th></tr></thead><tbody>`;
+      for(const a of actsR){
+        let totA=0;
+        let row=`<tr><td class="mtx2-act">${e(a)}</td>`;
+        for(const p of parosR){const v=ref.celdas[a+'||'+p]||0;totA+=v;row+=`<td class="num" style="${cellCol(v)}">${f2(v)}</td>`;}
+        row+=`<td class="num mtx2-tot"><b>${f2(totA)}</b></td></tr>`;
+        h+=row;
+      }
+      // Fila TOTAL por tipo de paro.
+      h+=`<tr class="mtx2-totrow"><td class="mtx2-act"><b>TOTAL</b></td>`;
+      for(const p of parosR){let t=0;for(const a of actsR)t+=ref.celdas[a+'||'+p]||0;h+=`<td class="num"><b>${f2(t)}</b></td>`;}
+      h+=`<td class="num"><b>${f2(ref.total_horas)}</b></td></tr>`;
+      h+='</tbody></table></div></div>';
+    }
+    return h;
   },
   matrizTabla(d){
     const mots=d.motivos||[]; const maqs=d.maquinas||[];
