@@ -94,19 +94,20 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .hist-datebar .hdb-turnos{display:flex;gap:10px;align-items:center;padding-bottom:6px}
 .hist-datebar .hdb-chk{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;color:#374151;text-transform:none;cursor:pointer}
 .hist-datebar .hdb-chk input{cursor:pointer}
-/* ── Matriz 2: una matriz Actividad × Tipo de paro por referencia ── */
-.mtx2-ref{margin-bottom:22px;border:1px solid #d9cccd;border-radius:10px;overflow:hidden;background:#fff}
-.mtx2-ref-head{padding:10px 14px;background:#f4f1f2;border-bottom:1px solid #d9cccd;font-weight:700;color:#3a2426;font-size:14px}
-.mtx2-ref-head small{font-weight:500;color:#8a6e70}
-.mtx2-scroll{overflow-x:auto}
-.mtx2-tbl{border-collapse:collapse;font-size:12px;width:100%}
+/* ── Matriz 2: una tabla · filas = referencia · columnas = actividad/categoría ── */
+.mtx2-scroll{overflow:auto;max-height:78vh;border:1px solid #d9cccd;border-radius:8px}
+.mtx2-tbl{border-collapse:collapse;font-size:12px}
 .mtx2-tbl th,.mtx2-tbl td{border:1px solid #ece4e4;padding:5px 9px;white-space:nowrap}
-.mtx2-tbl th.mtx2-paroh{background:#3a2426;color:#fff;font-weight:600;writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);max-height:130px;font-size:11px}
-.mtx2-tbl th.mtx2-acth{background:#3a2426;color:#fff;text-align:left;position:sticky;left:0;z-index:2}
-.mtx2-tbl td.mtx2-act{font-weight:600;color:#3a2426;background:#faf8f8;position:sticky;left:0;text-align:left}
+.mtx2-tbl thead th{position:sticky;top:0;z-index:3;background:#3a2426;color:#fff}
+.mtx2-tbl th.mtx2-acttop{text-align:center;background:#2b1a1c;font-weight:700;border-bottom:2px solid #8c181a}
+.mtx2-tbl th.mtx2-paroh{font-weight:600;font-size:11px;top:30px}
+.mtx2-tbl th.mtx2-acth{text-align:left;left:0;z-index:5}
+.mtx2-tbl td.mtx2-ref-cell{position:sticky;left:0;z-index:1;background:#faf8f8;font-weight:600;color:#3a2426;text-align:left;max-width:300px;overflow:hidden;text-overflow:ellipsis}
+.mtx2-tbl td.mtx2-ref-cell small{display:block;color:#8a6e70;font-weight:500;font-size:10px}
+.mtx2-tbl td.mtx2-act{font-weight:700;color:#3a2426;background:#f0eeee;position:sticky;left:0;text-align:left}
 .mtx2-tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
 .mtx2-tbl .mtx2-tot{background:#f0eeee;font-weight:700}
-.mtx2-tbl tr.mtx2-totrow td{background:#ece4e4;font-weight:700}
+.mtx2-tbl tr.mtx2-totrow td{background:#ece4e4;font-weight:700;position:sticky;top:52px;z-index:2}
 /* popup a pantalla completa (Top máquinas / Top motivos) */
 .fullpop{position:fixed;inset:0;background:#fff;z-index:1500;display:flex;flex-direction:column;overflow:hidden}
 .fullpop-head{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid #f0eeee}
@@ -1782,35 +1783,40 @@ const App={
     }catch(e){body.innerHTML=`<div class="error">${e.message}</div>`;}
   },
   matriz2Tabla(d){
-    const acts=d.actividades||[], paros=d.paros||[], refs=d.referencias||[];
+    // Misma lógica que la Matriz original: UNA tabla, filas = referencias,
+    // columnas = categoría de paro agrupada por actividad (cabecera 2 niveles),
+    // fila TOTAL arriba. Compacto y legible.
+    const acts=d.actividades||[], cats=d.categorias||[], refs=d.referencias||[];
     if(!refs.length)return '<div class="empty">Sin paros para el filtro seleccionado</div>';
     const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     const f2=v=>(v==null||v===0)?'':(Math.round(v*100)/100).toFixed(2);
-    // Color gradual por horas (escala neutra, sin rojo de alarma).
     const cellCol=v=>v==null||v===0?'':v>8?'background:#e08a3c;color:#fff':v>4?'background:#d9a441':v>2?'background:#f0e2c0':v>0?'background:#f7f1e3':'';
-    let h='';
-    for(const ref of refs){
-      // Solo actividades/paros con datos en esta referencia (matriz compacta por ref).
-      const actsR=acts.filter(a=>paros.some(p=>ref.celdas[a+'||'+p]>0));
-      const parosR=paros.filter(p=>actsR.some(a=>ref.celdas[a+'||'+p]>0));
-      h+=`<div class="mtx2-ref">
-        <div class="mtx2-ref-head">${e(ref.desc)} <small>· ${e(ref.cod)} · total paro: <b>${f2(ref.total_horas)} h</b></small></div>
-        <div class="mtx2-scroll"><table class="mtx2-tbl"><thead><tr><th class="mtx2-acth">Actividad \\ Paro</th>`;
-      for(const p of parosR) h+=`<th class="mtx2-paroh">${e(p)}</th>`;
-      h+=`<th class="mtx2-tot">TOTAL</th></tr></thead><tbody>`;
-      for(const a of actsR){
-        let totA=0;
-        let row=`<tr><td class="mtx2-act">${e(a)}</td>`;
-        for(const p of parosR){const v=ref.celdas[a+'||'+p]||0;totA+=v;row+=`<td class="num" style="${cellCol(v)}">${f2(v)}</td>`;}
-        row+=`<td class="num mtx2-tot"><b>${f2(totA)}</b></td></tr>`;
-        h+=row;
-      }
-      // Fila TOTAL por tipo de paro.
-      h+=`<tr class="mtx2-totrow"><td class="mtx2-act"><b>TOTAL</b></td>`;
-      for(const p of parosR){let t=0;for(const a of actsR)t+=ref.celdas[a+'||'+p]||0;h+=`<td class="num"><b>${f2(t)}</b></td>`;}
-      h+=`<td class="num"><b>${f2(ref.total_horas)}</b></td></tr>`;
-      h+='</tbody></table></div></div>';
+    // Solo columnas (actividad×categoría) con algún dato en el conjunto.
+    const colKeys=[]; // {act,cat,key}
+    for(const a of acts)for(const c of cats){
+      const k=a+'||'+c;
+      if(refs.some(r=>r.celdas[k]>0)) colKeys.push({act:a,cat:c,key:k});
     }
+    // Cabecera nivel 1: actividad (colspan por nº de categorías visibles bajo ella).
+    const actCols={}; colKeys.forEach(c=>actCols[c.act]=(actCols[c.act]||0)+1);
+    let h='<div class="mtx2-scroll"><table class="mtx2-tbl"><thead>';
+    h+='<tr><th class="mtx2-acth" rowspan="2">Referencia</th>';
+    for(const a of acts){ if(actCols[a]) h+=`<th class="mtx2-acttop" colspan="${actCols[a]}">${e(a)}</th>`; }
+    h+='<th class="mtx2-tot" rowspan="2">TOTAL (h)</th></tr><tr>';
+    for(const c of colKeys) h+=`<th class="mtx2-paroh">${e(c.cat)}</th>`;
+    h+='</tr></thead><tbody>';
+    // Fila TOTAL (arriba), por columna.
+    h+='<tr class="mtx2-totrow"><td class="mtx2-act"><b>TOTAL</b></td>';
+    let gtot=0;
+    for(const c of colKeys){let t=0;for(const r of refs)t+=r.celdas[c.key]||0;gtot+=t;h+=`<td class="num"><b>${f2(t)}</b></td>`;}
+    h+=`<td class="num"><b>${f2(gtot)}</b></td></tr>`;
+    // Una fila por referencia.
+    for(const ref of refs){
+      h+=`<tr><td class="mtx2-ref-cell" title="${e(ref.cod)}">${e(ref.desc)}<small>${e(ref.cod)}</small></td>`;
+      for(const c of colKeys){const v=ref.celdas[c.key]||0;h+=`<td class="num" style="${cellCol(v)}">${f2(v)}</td>`;}
+      h+=`<td class="num mtx2-tot"><b>${f2(ref.total_horas)}</b></td></tr>`;
+    }
+    h+='</tbody></table></div>';
     return h;
   },
   matrizTabla(d){

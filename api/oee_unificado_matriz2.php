@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/helpers.php';
 require_once __DIR__ . '/../lib/PlanAttainmentAgg.php';
+require_once __DIR__ . '/../lib/Db.php';
 
 /**
  * Matriz 2 — Paros por referencia, en matriz Actividad × Tipo de Paro.
@@ -70,10 +71,19 @@ try {
     ";
     $rows = fetchAll('mapex', $sql, $params);
 
+    // Mapeo paro → Tipo Paro 1 (categoría agrupadora del árbol, en PostgreSQL).
+    // Compacta la matriz: ~7 categorías en vez de decenas de paros individuales.
+    $cat = [];
+    try {
+        foreach (Db::pgFetchAll('SELECT cod_paro, tipo_paro_1 FROM cfg_paro_categoria') as $c) {
+            $cat[mb_strtoupper((string)$c['cod_paro'], 'UTF-8')] = (string)$c['tipo_paro_1'];
+        }
+    } catch (\Throwable $e) { /* sin mapeo: cae a "Otros" más abajo */ }
+
     // Consolidar por referencia, filtrando por sección (vía tipo de máquina).
     $refs = [];          // cod => datos
     $actSet = [];        // actividades presentes (eje filas)
-    $paroSet = [];       // tipos de paro presentes (eje columnas)
+    $catSet = [];        // categorías de paro presentes (eje columnas)
     foreach ($rows as $r) {
         // Sección a partir de la máquina (misma lógica que el resto de la app).
         if ($seccion !== '' && PlanAttainmentAgg::MAQUINA_TO_SECCION_EXT[$r['maquina']] !== $seccion) {
@@ -83,17 +93,19 @@ try {
         $cod = (string) $r['cod'];
         $act = (string) $r['actividad'];
         $par = (string) $r['paro'];
+        // Agrupar el paro en su categoría (Tipo Paro 1). Sin mapeo → "Otros".
+        $cate = $cat[mb_strtoupper($par, 'UTF-8')] ?? 'Otros';
         $h   = (int) $r['segundos'] / 3600.0;
         if (!isset($refs[$cod])) {
             $refs[$cod] = ['cod' => $cod, 'desc' => trim((string)$r['descr']) ?: $cod,
-                           'total_horas' => 0.0, 'celdas' => [], 'parosSet' => []];
+                           'total_horas' => 0.0, 'celdas' => [], 'catSet' => []];
         }
-        $key = $act . '||' . $par;
+        $key = $act . '||' . $cate;
         $refs[$cod]['celdas'][$key] = ($refs[$cod]['celdas'][$key] ?? 0) + $h;
         $refs[$cod]['total_horas']  += $h;
-        $refs[$cod]['parosSet'][$par] = true;
+        $refs[$cod]['catSet'][$cate] = true;
         $actSet[$act]  = true;
-        $paroSet[$par] = true;
+        $catSet[$cate] = true;
     }
 
     // Redondeo y limpieza de salida.
@@ -106,7 +118,6 @@ try {
             'desc'        => $rf['desc'],
             'total_horas' => round($rf['total_horas'], 2),
             'celdas'      => $celdas,
-            'paros'       => array_keys($rf['parosSet']),
         ];
     }
     // Referencias por más horas de paro primero.
@@ -121,13 +132,20 @@ try {
         $ia = $ia === false ? 999 : $ia; $ib = $ib === false ? 999 : $ib;
         return $ia === $ib ? strcmp($a, $b) : $ia <=> $ib;
     });
-    $paros = array_keys($paroSet);
-    sort($paros);
+    // Categorías de paro (Tipo Paro 1) en orden lógico conocido.
+    $ordenCat = ['Interrupciones','Esperas','Ajustes y Programacion','Cambio MP/Utillajes',
+                 'Calidad','Mantenimiento','Mejoras','Otros'];
+    $categorias = array_keys($catSet);
+    usort($categorias, function ($a, $b) use ($ordenCat) {
+        $ia = array_search($a, $ordenCat); $ib = array_search($b, $ordenCat);
+        $ia = $ia === false ? 999 : $ia; $ib = $ib === false ? 999 : $ib;
+        return $ia === $ib ? strcmp($a, $b) : $ia <=> $ib;
+    });
 
     jsonOk([
         'seccion'     => $seccion,
         'actividades' => $actividades,
-        'paros'       => $paros,
+        'categorias'  => $categorias,
         'referencias' => $out,
     ]);
 } catch (Exception $e) {
