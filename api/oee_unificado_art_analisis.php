@@ -95,6 +95,9 @@ try {
         $rend = ($M + $PP + $PC) > 0 ? ($MOT + $PC) / ($M + $PP + $PC) * 100 : 0;
         $total = (int)$r['total'];
         $pzasH = $horasDed > 0 ? $total / $horasDed : 0;
+        // Rendimiento en piezas/hora (fórmula sobre M/3600): OK y NOK por hora.
+        $okH  = $horasDed > 0 ? round((float)$r['ok']  / $horasDed, 1) : 0;
+        $nokH = $horasDed > 0 ? round((float)$r['nok'] / $horasDed, 1) : 0;
         $ini = (string)$r['fecha_ini'];
         $fin = (string)$r['fecha_fin'];
         if ($desc === '') $desc = trim((string)$r['desc_prod']);
@@ -133,10 +136,17 @@ try {
             'pct_vs_plan'       => $pctVsPlan,
             'ok'                => (int)$r['ok'],
             'nok'               => (int)$r['nok'],
+            'ok_h'              => $okH,
+            'nok_h'             => $nokH,
         ];
     }
     // Orden cronológico (año, mes, fecha) como en el cuadro QlikView.
     usort($ofs, fn($a, $b) => strcmp($a['fecha_ini'], $b['fecha_ini']));
+
+    // Media de uds fabricadas/hora del conjunto: total unidades / total horas
+    // dedicadas (ponderada por horas, no media simple de ratios por OF).
+    $totHorasDed = $totMded / 3600;
+    $mediaUdsHora = $totHorasDed > 0 ? round($totUds / $totHorasDed, 1) : 0;
 
     jsonOk([
         'cod_producto'  => $cod,
@@ -145,6 +155,7 @@ try {
             'unidades'        => $totUds,
             'horas_dedicadas' => round($totMded / 3600, 1),
             'horas_perdidas'  => round($totMperd / 3600, 1),
+            'media_uds_hora'  => $mediaUdsHora,
         ],
         'ofs' => $ofs,
     ]);
