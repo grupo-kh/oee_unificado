@@ -116,7 +116,17 @@ class PlanExcelReader
     {
         if (!is_dir(self::CACHE_DIR)) @mkdir(self::CACHE_DIR, 0777, true);
         $local = self::CACHE_DIR . '/' . $fechaDMY . '.xlsm';
-        $candidates = glob(self::excelBase() . '\\*' . $fechaDMY . '.xlsm') ?: [];
+        // Separador portable: en Windows (XAMPP producción) era '\\'; en Linux
+        // debe ser '/'. DIRECTORY_SEPARATOR funciona en ambos entornos.
+        $candidates = glob(self::excelBase() . DIRECTORY_SEPARATOR . '*' . $fechaDMY . '.xlsm') ?: [];
+        // Excluir los ficheros temporales/lock de Excel ("~$nombre.xlsm"): son
+        // de pocos bytes y no son libros válidos. Si no se filtran, su mtime
+        // (más reciente, porque Excel los toca al abrir) hace que ganen en el
+        // orden y se copie un fichero corrupto.
+        $candidates = array_values(array_filter(
+            $candidates,
+            fn($f) => strpos(basename($f), '~$') !== 0
+        ));
         if (!$candidates) return file_exists($local) ? $local : null;
 
         usort($candidates, fn($a, $b) => filemtime($b) <=> filemtime($a));

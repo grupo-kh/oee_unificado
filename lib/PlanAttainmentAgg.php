@@ -246,7 +246,10 @@ class PlanAttainmentAgg
         if (self::$fileDatesCache !== null) return self::$fileDatesCache;
 
         $basePath = PlanExcelReader::excelBase();
-        $files = glob($basePath . '\\*.xlsm') ?: [];
+        // Separador portable Windows/Linux (antes era '\\', no válido en Linux).
+        $files = glob($basePath . DIRECTORY_SEPARATOR . '*.xlsm') ?: [];
+        // Excluir temporales/lock de Excel ("~$...").
+        $files = array_values(array_filter($files, fn($f) => strpos(basename($f), '~$') !== 0));
         // Deduplicar por fecha: si hay varios ficheros para el mismo día
         // (p. ej. "F13057... 27.04.2026.xlsm" y "Copia de ... 27.04.2026.xlsm")
         // queremos UNA sola entrada — ensureLocalCopy() decidirá cuál leer.

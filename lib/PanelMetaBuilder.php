@@ -188,9 +188,11 @@ class PanelMetaBuilder
     /** Lista las fechas (DateTime[]) de los .xlsm presentes, deduplicadas y DESC. */
     private static function listAvailableDatesDesc(): array
     {
-        $files = glob(PlanExcelReader::excelBase() . '\\*.xlsm') ?: [];
+        // Separador portable Windows/Linux (antes era '\\', no válido en Linux).
+        $files = glob(PlanExcelReader::excelBase() . DIRECTORY_SEPARATOR . '*.xlsm') ?: [];
         $byYmd = [];
         foreach ($files as $f) {
+            if (strpos(basename($f), '~$') === 0) continue; // temporales/lock de Excel
             if (preg_match('/(\d{2})\.(\d{2})\.(\d{4})\.xlsm$/', $f, $m)) {
                 $ymd = $m[3] . '-' . $m[2] . '-' . $m[1];
                 if (isset($byYmd[$ymd])) continue;
@@ -216,7 +218,8 @@ class PanelMetaBuilder
         }
         if (!$fileDate) return null;
         $dmy = $fileDate->format('d.m.Y');
-        $candidates = glob(PlanExcelReader::excelBase() . '\\*' . $dmy . '.xlsm') ?: [];
+        $candidates = glob(PlanExcelReader::excelBase() . DIRECTORY_SEPARATOR . '*' . $dmy . '.xlsm') ?: [];
+        $candidates = array_values(array_filter($candidates, fn($f) => strpos(basename($f), '~$') !== 0));
         if (!$candidates) return null;
         usort($candidates, fn($a, $b) => filemtime($b) <=> filemtime($a));
         $path = $candidates[0];
