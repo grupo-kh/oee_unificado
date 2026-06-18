@@ -728,7 +728,7 @@ const App={
     if(this._artChart){try{this._artChart.destroy();}catch(_){}}
     this._artChart=new Chart(cv,{data:{labels,datasets:[
         {type:'bar',label:'Cantidades fabricadas',data:vals,backgroundColor:cols,order:2,
-          datalabels:{anchor:'end',align:'top',color:'#3a2426',font:{size:13,weight:'bold'},formatter:(v,ctx)=>self.fU(v)+'\n'+self.fU(ofs[ctx.dataIndex].pzas_hora_real)+' u/h'}}
+          datalabels:{anchor:'end',align:'top',color:'#3a2426',font:{size:13,weight:'bold'},formatter:(v,ctx)=>self.fU(ofs[ctx.dataIndex].pzas_hora_real)+' u/h'}}
       ]},
       options:{responsive:true,maintainAspectRatio:false,
         interaction:{mode:'index',intersect:false},
