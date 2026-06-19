@@ -707,10 +707,10 @@ const App={
       </div>
       <div class="art-detalle"><table class="rdto-table"><thead><tr>
         <th>Año</th><th>Mes</th><th>OF</th><th>Máquina</th>
-        <th class="num">Rdto. teó. %</th><th class="num">Objetivo (u/h)</th><th class="num">Δ vs hist.</th>
-        <th class="num">Pzs. reales</th><th class="num">Pzs. debidas</th><th class="num">% real/debido</th>
-        <th class="num">Uds/h</th><th class="num">OK/h</th><th class="num">NOK/h</th>${hayNom?'<th class="num">Pzs/h nom.</th><th class="num">% nom.</th>':''}
-        <th class="num">H. dedic.</th><th class="num">H. perd.</th>
+        <th class="num">Rdto. %</th><th class="num">Δ vs hist.</th>
+        <th class="num">Uds/h real</th><th class="num">Objetivo (u/h)</th>
+        <th class="num">OK/h</th><th class="num">NOK/h</th>
+        <th class="num">Uds. fab.</th><th class="num">H. dedic.</th><th class="num">H. perd.</th>
         <th class="num">OK</th><th class="num">NOK</th></tr></thead><tbody>`;
     // Color gradual de uds/h relativo al máximo (sin rojo de alarma).
     const phMaxT=Math.max(...ofs.map(o=>o.pzas_hora_real||0),1);
@@ -718,22 +718,17 @@ const App={
     for(const o of ofs){
       const dlt=Math.round((o.rend_c-media)*10)/10;
       const dcol=dlt>=0?'#1f7a8c':'#c4703a';
-      // Piezas que se deberían haber hecho al rendimiento 100%, y % real/debido.
-      const debidas=o.rend_c>0?Math.round(o.unidades/(o.rend_c/100)):0;
-      const pctRD=debidas>0?Math.round(o.unidades/debidas*100):0;
       // Objetivo = uds/h nominal. La OF cumple si su pzs/h real ≥ nominal.
       const nom=o.pzas_hora_nominal;
       const okObj=nom!=null && o.pzas_hora_real>=nom;
       html+=`<tr>
         <td>${o.anio}</td><td>${o.mes}</td><td>${this.esc(o.cod_of)}</td><td>${this.esc(o.desc_maquina)}</td>
         <td class="num" style="font-weight:700;color:${nom!=null?(okObj?'#1d7a3a':'#c4703a'):'#3a2426'}">${o.rend_c}</td>
-        <td class="num" style="color:#10b981;font-weight:600">${nom!=null?this.fU(nom):'—'}</td>
         <td class="num" style="color:${dcol};font-weight:600">${dlt>=0?'+':''}${dlt}</td>
-        <td class="num">${this.fU(o.unidades)}</td><td class="num">${this.fU(debidas)}</td>
-        <td class="num" style="font-weight:600">${pctRD}%</td>
         <td class="num" style="color:${phCol(o.pzas_hora_real)};font-weight:700">${this.fU(o.pzas_hora_real)}</td>
+        <td class="num" style="color:#10b981;font-weight:600">${nom!=null?this.fU(nom):'—'}</td>
         <td class="num">${this.fU(o.ok_h)}</td><td class="num">${this.fU(o.nok_h)}</td>
-        ${hayNom?`<td class="num">${o.pzas_hora_nominal!=null?this.fU(o.pzas_hora_nominal):'—'}</td><td class="num">${o.pct_nominal!=null?o.pct_nominal+'%':'—'}</td>`:''}
+        <td class="num">${this.fU(o.unidades)}</td>
         <td class="num">${o.horas_dedicadas}</td><td class="num">${o.horas_perdidas}</td>
         <td class="num">${this.fU(o.ok)}</td><td class="num">${this.fU(o.nok)}</td></tr>`;
     }
