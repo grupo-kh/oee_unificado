@@ -15,6 +15,7 @@ PUNTO_MONTAJE="/mnt/backup-oee"
 SUBCARPETA="Backups/OEE_Unificado"       # subcarpeta dentro del recurso (se crea si no existe)
 CRED_FILE="/etc/oee-smb.cred"            # reutiliza las credenciales ya creadas para dkh
 HORARIO_CRON="0 2 * * 1"                 # lunes a las 02:00
+EMAIL_ALERTA="aarminana@grupokh.com"     # destino de avisos de fallo
 SCRIPT="/home/aistudio/oee_unificado/scripts/backup/backup_semanal.sh"
 
 DEST="${PUNTO_MONTAJE}/${SUBCARPETA}"
@@ -32,7 +33,7 @@ echo "  destino de backups: $DEST"
 
 echo "=== 2) Cron semanal ==="
 # Línea de cron que exporta el destino y ejecuta el script.
-CRON_LINE="${HORARIO_CRON} BACKUP_DEST='${DEST}' BACKUP_KEEP=8 ${SCRIPT} >/dev/null 2>&1"
+CRON_LINE="${HORARIO_CRON} BACKUP_DEST='${DEST}' BACKUP_KEEP=8 BACKUP_EMAIL='${EMAIL_ALERTA}' ${SCRIPT} >/dev/null 2>&1"
 # Instalar en el crontab del usuario (evitando duplicados).
 ( crontab -l 2>/dev/null | grep -v "$SCRIPT" ; echo "$CRON_LINE" ) | crontab -
 echo "  cron instalado:"
