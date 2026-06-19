@@ -707,7 +707,7 @@ const App={
       </div>
       <div class="art-detalle"><table class="rdto-table"><thead><tr>
         <th>Año</th><th>Mes</th><th>OF</th><th>Máquina</th>
-        <th class="num">Rdto. teó. %</th><th class="num">Objetivo %</th><th class="num">Δ vs hist.</th>
+        <th class="num">Rdto. teó. %</th><th class="num">Objetivo (u/h)</th><th class="num">Δ vs hist.</th>
         <th class="num">Pzs. reales</th><th class="num">Pzs. debidas</th><th class="num">% real/debido</th>
         <th class="num">Uds/h</th><th class="num">OK/h</th><th class="num">NOK/h</th>${hayNom?'<th class="num">Pzs/h nom.</th><th class="num">% nom.</th>':''}
         <th class="num">H. dedic.</th><th class="num">H. perd.</th>
@@ -721,12 +721,13 @@ const App={
       // Piezas que se deberían haber hecho al rendimiento 100%, y % real/debido.
       const debidas=o.rend_c>0?Math.round(o.unidades/(o.rend_c/100)):0;
       const pctRD=debidas>0?Math.round(o.unidades/debidas*100):0;
-      // Objetivo fijo 75%: verde si la OF lo alcanza, rojo si queda por debajo.
-      const okObj=o.rend_c>=75;
+      // Objetivo = uds/h nominal. La OF cumple si su pzs/h real ≥ nominal.
+      const nom=o.pzas_hora_nominal;
+      const okObj=nom!=null && o.pzas_hora_real>=nom;
       html+=`<tr>
         <td>${o.anio}</td><td>${o.mes}</td><td>${this.esc(o.cod_of)}</td><td>${this.esc(o.desc_maquina)}</td>
-        <td class="num" style="font-weight:700;color:${okObj?'#1d7a3a':'#c4703a'}">${o.rend_c}</td>
-        <td class="num" style="color:#10b981;font-weight:600">75</td>
+        <td class="num" style="font-weight:700;color:${nom!=null?(okObj?'#1d7a3a':'#c4703a'):'#3a2426'}">${o.rend_c}</td>
+        <td class="num" style="color:#10b981;font-weight:600">${nom!=null?this.fU(nom):'—'}</td>
         <td class="num" style="color:${dcol};font-weight:600">${dlt>=0?'+':''}${dlt}</td>
         <td class="num">${this.fU(o.unidades)}</td><td class="num">${this.fU(debidas)}</td>
         <td class="num" style="font-weight:600">${pctRD}%</td>
@@ -737,7 +738,7 @@ const App={
         <td class="num">${this.fU(o.ok)}</td><td class="num">${this.fU(o.nok)}</td></tr>`;
     }
     html+=`</tbody></table></div>
-      <div class="art-chart-title">Cantidades fabricadas por OF · color = uds fabricadas/hora · clic en una barra = detalle OEE de la OF</div>
+      <div class="art-chart-title">Cantidades fabricadas por OF · línea azul = uds/h real · línea verde = objetivo (uds/h nominal) · clic en una barra = detalle OEE de la OF</div>
       <div class="art-chart-scroll"><div class="chartbox tall" style="min-width:${Math.max(600,ofs.length*120)}px"><canvas class="art-cv"></canvas></div></div>`;
     body.innerHTML=html;
     // Etiqueta del eje X en 3 líneas: OF completa + rendimiento % + uds fabricadas.
@@ -754,27 +755,30 @@ const App={
     const self=this;
     // Piezas reales vs piezas que se deberían haber hecho (al rendimiento 100%).
     const debidas=ofs.map(o=>o.rend_c>0?Math.round(o.unidades/(o.rend_c/100)):0);
-    const rend=ofs.map(o=>o.rend_c||0);
-    const OBJ=75;                              // rendimiento objetivo fijo (meta de negocio)
-    const objetivo=ofs.map(()=>OBJ);           // línea horizontal del objetivo
+    // Rendimiento objetivo = productividad NOMINAL (uds/hora) de Logicclass para
+    // esa máquina+artículo. Línea de objetivo en u/h, comparada con pzs/h real.
+    const phReal=ofs.map(o=>o.pzas_hora_real||0);
+    const phNom=ofs.map(o=>o.pzas_hora_nominal); // puede ser null si no hay nominal
     if(this._artChart){try{this._artChart.destroy();}catch(_){}}
     this._artChart=new Chart(cv,{data:{labels,datasets:[
         {type:'bar',label:'Cantidades fabricadas',data:vals,backgroundColor:cols,order:3,yAxisID:'y',
           datalabels:{anchor:'end',align:'top',color:'#3a2426',font:{size:13,weight:'bold'},formatter:(v,ctx)=>self.fU(ofs[ctx.dataIndex].pzas_hora_real)+' u/h'}},
-        {type:'line',label:'Rendimiento %',data:rend,yAxisID:'y1',order:1,
+        {type:'line',label:'Uds/h real',data:phReal,yAxisID:'y1',order:1,
           borderColor:'#3a6aa3',backgroundColor:'#3a6aa3',borderWidth:2,tension:0,pointRadius:3,pointHoverRadius:5,
-          datalabels:{display:true,align:'top',color:'#2d4d7a',font:{size:10,weight:'bold'},formatter:v=>Math.round(v)+'%'}},
-        {type:'line',label:'Objetivo '+OBJ+'%',data:objetivo,yAxisID:'y1',order:2,
-          borderColor:'#10b981',borderWidth:2,borderDash:[6,4],pointRadius:0,datalabels:{display:false}}
+          datalabels:{display:true,align:'top',color:'#2d4d7a',font:{size:10,weight:'bold'},formatter:v=>self.fU(Math.round(v))}},
+        {type:'line',label:'Objetivo (uds/h nominal)',data:phNom,yAxisID:'y1',order:2,spanGaps:true,
+          borderColor:'#10b981',borderWidth:2,borderDash:[6,4],pointRadius:0,
+          datalabels:{display:false}}
       ]},
       options:{responsive:true,maintainAspectRatio:false,
         interaction:{mode:'index',intersect:false},
         plugins:{legend:{display:true,position:'bottom'},
           tooltip:{callbacks:{afterBody:items=>{const i=items[0].dataIndex;const o=ofs[i];
-            return ['▸ Uds fabricadas/hora: '+self.fU(o.pzas_hora_real)+' u/h',
-                    'Unidades fabricadas: '+self.fU(o.unidades),
-                    'Rendimiento: '+o.rend_c+'%  ·  Objetivo: '+OBJ+'%',
-                    'Piezas que se debían hacer (100%): '+self.fU(debidas[i])];}}}},
+            const nom=o.pzas_hora_nominal;
+            return ['▸ Uds/h real: '+self.fU(o.pzas_hora_real)+' u/h',
+                    'Objetivo (nominal): '+(nom!=null?self.fU(nom)+' u/h':'—'),
+                    '% sobre nominal: '+(o.pct_nominal!=null?o.pct_nominal+'%':'—'),
+                    'Unidades fabricadas: '+self.fU(o.unidades)];}}}},
         onClick:(e,els,chart)=>{
           let idx=els&&els.length?els[0].index:null;
           if(idx==null){
@@ -785,7 +789,7 @@ const App={
         },
         scales:{x:{ticks:{maxRotation:0,minRotation:0,autoSkip:false,font:{size:11,weight:'600'},color:'#3a2426'}},
                 y:{beginAtZero:true,grace:'18%',position:'left',title:{display:true,text:'unidades fabricadas'}},
-                y1:{beginAtZero:true,position:'right',grid:{drawOnChartArea:false},grace:'18%',title:{display:true,text:'rendimiento %'}}}}});
+                y1:{beginAtZero:true,position:'right',grid:{drawOnChartArea:false},grace:'18%',title:{display:true,text:'uds / hora'}}}}});
     // Refuerzo: listener nativo sobre el canvas. El onClick de Chart.js puede no
     // dispararse si el contenedor del modal tiene scroll; este lo cubre siempre.
     cv.style.cursor='pointer';
