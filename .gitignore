@@ -57,6 +57,7 @@ config/qr_secret.dat
 #    Contienen IPs, hostnames y rutas de red internas. NO deben publicarse.
 .notebook/
 docs/
+!docs/qlikview_carga_analisis_of.md
 input/
 SETUP_POSTGRES.md
 oee_unificado
