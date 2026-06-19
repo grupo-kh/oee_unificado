@@ -758,10 +758,10 @@ const App={
     this._artChart=new Chart(cv,{data:{labels,datasets:[
         {type:'bar',label:'Cantidades fabricadas',data:vals,backgroundColor:cols,order:3,yAxisID:'y',
           datalabels:{anchor:'end',align:'top',color:'#3a2426',font:{size:13,weight:'bold'},formatter:(v,ctx)=>self.fU(ofs[ctx.dataIndex].pzas_hora_real)+' u/h'}},
-        {type:'line',label:'Uds/h real',data:phReal,yAxisID:'y1',order:1,
+        {type:'line',label:'Uds/h real',data:phReal,yAxisID:'y',order:1,
           borderColor:'#3a6aa3',backgroundColor:'#3a6aa3',borderWidth:2,tension:0,pointRadius:3,pointHoverRadius:5,
           datalabels:{display:true,align:'top',color:'#2d4d7a',font:{size:10,weight:'bold'},formatter:v=>self.fU(Math.round(v))}},
-        {type:'line',label:'Objetivo (uds/h nominal)',data:phNom,yAxisID:'y1',order:2,spanGaps:true,
+        {type:'line',label:'Objetivo (uds/h nominal)',data:phNom,yAxisID:'y',order:2,spanGaps:true,
           borderColor:'#10b981',borderWidth:2,borderDash:[6,4],pointRadius:0,
           datalabels:{display:false}}
       ]},
@@ -783,8 +783,7 @@ const App={
           if(idx!=null&&ofs[idx]){const o=ofs[idx];self.openOfDetalle(o.cod_of,o.cod_maquina);}
         },
         scales:{x:{ticks:{maxRotation:0,minRotation:0,autoSkip:false,font:{size:11,weight:'600'},color:'#3a2426'}},
-                y:{beginAtZero:true,grace:'18%',position:'left',title:{display:true,text:'unidades fabricadas'}},
-                y1:{beginAtZero:true,position:'right',grid:{drawOnChartArea:false},grace:'18%',title:{display:true,text:'uds / hora'}}}}});
+                y:{beginAtZero:true,grace:'18%',position:'left',title:{display:true,text:'unidades / uds·h (real y objetivo superpuestos)'}}}}});
     // Refuerzo: listener nativo sobre el canvas. El onClick de Chart.js puede no
     // dispararse si el contenedor del modal tiene scroll; este lo cubre siempre.
     cv.style.cursor='pointer';
