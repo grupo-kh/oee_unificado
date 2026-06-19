@@ -1445,8 +1445,13 @@ const App={
       const d=await this.get('oee_unificado_maq_referencias.php',this.common({cod_maquina:cod}));
       const refs=d.referencias||[];
       if(!refs.length){this.body(ov).innerHTML='<div class="empty">Sin referencias fabricadas en el rango</div>';return;}
-      // Etiqueta con objetivo (uds/h nominal) por referencia.
-      const labels=refs.map(r=>r.desc+(r.nom_sage?(' · '+r.nom_sage):'')+' · Rdto '+(r.rend!=null?r.rend:0)+'%'+(r.objetivo!=null?(' · Obj '+self.fU(r.objetivo)+' u/h'):''));
+      // Etiqueta en dos líneas: 1) nombre + código de referencia, 2) Rdto y Obj
+      // con indicadores de color (🔵 rendimiento · 🟢 objetivo) para distinguirlos
+      // a simple vista del nombre/código.
+      const labels=refs.map(r=>[
+        r.desc+(r.nom_sage?(' · '+r.nom_sage):''),
+        '🔵 Rdto '+(r.rend!=null?r.rend:0)+'%'+(r.objetivo!=null?('   🟢 Obj '+self.fU(r.objetivo)+' u/h'):'')
+      ]);
       const h=Math.min(1600,Math.max(280,refs.length*30+150));
       this.body(ov).innerHTML=`<div class="breadcrumb">${refs.length} referencias · barras = piezas/hora (OK rojo corp. · NOK naranja) · línea verde = objetivo (uds/h nominal) · «Rdto» = % rendimiento. Haz clic en una referencia para ver sus OFs.</div>`
         +`<div class="chartbox" style="height:${h}px"><canvas class="cvr"></canvas></div>`
