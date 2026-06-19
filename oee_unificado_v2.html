@@ -539,9 +539,12 @@ const App={
         const hint=rdtoMaq?'Haz clic en una máquina para ver sus referencias fabricadas (se abre debajo).'
                   :rdtoRef?'Haz clic en una referencia para ver su análisis histórico de OFs (ventana).'
                           :`Haz clic en una ${esRef?'referencia':'máquina'} para analizarla (se abre debajo).`;
+        // Color relativo al mayor del conjunto: verde fuerte la máxima, y de ahí
+        // hacia abajo gradual sin llegar a rojo.
+        const vMax=Math.max(...items.map(i=>i.valor||0),1);
         machBody.innerHTML=this.barList(items,{
           name:i=>i.maquina,val:i=>i.valor,unit,max,
-          color:i=>unit==='%'?this.semColor(i.valor):'#3a6aa3',clickable
+          color:i=>unit==='%'?this.semColor(i.valor,vMax):'#3a6aa3',clickable
         })+(clickable?`<div class="hint">${hint}</div>`:'');
         if(clickable){
           [...machBody.querySelectorAll('.brow')].forEach((row,ix)=>{
@@ -1155,15 +1158,18 @@ const App={
   // alto = teal/azul, medio-alto = verde-azulado, medio = ámbar, bajo = naranja.
   // Semáforo gradual continuo: verde (valor bajo) → amarillo → rojo (valor alto).
   // Interpola por tramos en RGB para una transición suave según el % (0..100).
-  semColor(v){
-    v=Math.max(0,Math.min(100,Number(v)||0));
+  // Verde semafórico relativo al mayor del conjunto: la barra máxima en verde
+  // fuerte y de ahí hacia abajo, gradual, SIN llegar a rojo (verde apagado /
+  // gris-verdoso para las menores). vMax = valor mayor del conjunto.
+  semColor(v,vMax){
+    v=Math.max(0,Number(v)||0);
+    const max=Math.max(Number(vMax)||0,1);
+    const r=Math.max(0,Math.min(1,v/max));       // 1 = la mayor · 0 = la menor
     const lerp=(a,b,t)=>Math.round(a+(b-a)*t);
-    const hex=(r,g,b)=>'#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
-    // Paradas: 0=verde, 50=amarillo, 100=rojo.
-    const verde=[31,122,58], amar=[214,164,65], rojo=[176,42,42];
-    let c;
-    if(v<=50){const t=v/50;c=[lerp(verde[0],amar[0],t),lerp(verde[1],amar[1],t),lerp(verde[2],amar[2],t)];}
-    else{const t=(v-50)/50;c=[lerp(amar[0],rojo[0],t),lerp(amar[1],rojo[1],t),lerp(amar[2],rojo[2],t)];}
+    const hex=(R,G,B)=>'#'+[R,G,B].map(x=>x.toString(16).padStart(2,'0')).join('');
+    // Paradas: mayor = verde vivo · menor = gris-verdoso apagado (nunca rojo).
+    const verde=[31,122,58], apagado=[150,168,150];
+    const c=[lerp(apagado[0],verde[0],r),lerp(apagado[1],verde[1],r),lerp(apagado[2],verde[2],r)];
     return hex(c[0],c[1],c[2]);
   },
   barList(items,o){
