@@ -66,16 +66,21 @@ try {
     $udsHoraNom = []; // [cod_maquina][cod_articulo] = uds/hora nominal
     if (DB_LOGIC_HOST !== '') {
         try {
+            // Cualquier operación de producción (PRD%) con nominal > 0. El QlikView
+            // solo usaba PRD CNF/SLD/TRQ, pero eso dejaba sin objetivo a máquinas con
+            // otras operaciones (PRD CRT, CYS, TRS, ASSY…). Si un (centro,artículo)
+            // tiene varias PRD, se toma el mayor UnidadesHora.
             $sqlNom = "
                 SELECT LTRIM(RTRIM(CentroTrabajo)) AS ct,
                        LTRIM(RTRIM(codigoArticulo)) AS art,
-                       CAST(UnidadesHora AS DECIMAL(10,0)) AS uh
+                       MAX(CAST(UnidadesHora AS DECIMAL(10,0))) AS uh
                 FROM Oper_Formula
                 WHERE CentroTrabajo <> ' '
-                  AND (Operacion = 'PRD CNF' OR Operacion = 'PRD SLD' OR Operacion = 'PRD TRQ')
+                  AND Operacion LIKE 'PRD%'
                   AND UnidadesHora <> '0'
                   AND codigoempresa = 1
                   AND LTRIM(RTRIM(codigoArticulo)) = ?
+                GROUP BY LTRIM(RTRIM(CentroTrabajo)), LTRIM(RTRIM(codigoArticulo))
             ";
             foreach (fetchAll('logicclass', $sqlNom, [$cod]) as $n) {
                 $udsHoraNom[(string)$n['ct']][(string)$n['art']] = (float)$n['uh'];
