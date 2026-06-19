@@ -54,12 +54,46 @@ try {
         } catch (\Throwable $e) { /* SAGE no disponible */ }
     }
 
+    // Productividad nominal (uds/h objetivo) por referencia en esta máquina, desde
+    // Logicclass. Con fallback por tipo de máquina (gemelas comparten nominal).
+    $nomCt = [];   // [articulo] = uds/hora nominal en este centro
+    $nomTipo = []; // [articulo] = uds/hora nominal en máquinas del mismo tipo
+    if (DB_LOGIC_HOST !== '' && !empty($cods)) {
+        try {
+            // Tipo de este centro y de todos (para el fallback).
+            $tipoDe = []; $tipoCm = null;
+            foreach (fetchAll('mapex', "SELECT LTRIM(RTRIM(Cod_maquina)) c, Id_tipomaquina t FROM cfg_maquina WHERE Id_tipomaquina IS NOT NULL") as $t) {
+                $tipoDe[(string)$t['c']] = (int)$t['t'];
+            }
+            $tipoCm = $tipoDe[$cod] ?? null;
+            // Nominal de todos los artículos producidos, por centro.
+            foreach (array_chunk($cods, 500) as $chunk) {
+                $ph = implode(',', array_fill(0, count($chunk), '?'));
+                $sqlN = "SELECT LTRIM(RTRIM(CentroTrabajo)) ct, LTRIM(RTRIM(codigoArticulo)) art,
+                                MAX(CAST(UnidadesHora AS DECIMAL(10,0))) uh
+                         FROM Oper_Formula
+                         WHERE Operacion LIKE 'PRD%' AND UnidadesHora <> '0' AND codigoempresa = 1
+                           AND LTRIM(RTRIM(codigoArticulo)) IN ($ph)
+                         GROUP BY LTRIM(RTRIM(CentroTrabajo)), LTRIM(RTRIM(codigoArticulo))";
+                foreach (fetchAll('logicclass', $sqlN, $chunk) as $n) {
+                    $art = (string)$n['art']; $ct = (string)$n['ct']; $uh = (float)$n['uh'];
+                    if ($ct === $cod) $nomCt[$art] = $uh;
+                    $tp = $tipoDe[$ct] ?? null;
+                    if ($tp !== null && $tp === $tipoCm) {
+                        if (!isset($nomTipo[$art]) || $uh > $nomTipo[$art]) $nomTipo[$art] = $uh;
+                    }
+                }
+            }
+        } catch (\Throwable $e) { error_log('maq_referencias logicclass: ' . $e->getMessage()); }
+    }
+
     $refs = [];
     foreach ($rows as $r) {
         $cr = (string)$r['cod_ref']; if ($cr === '') continue;
         $horas = ((float)$r['mseg']) / 3600;
         $M = (float)$r['mseg']; $MOT = (float)$r['MOT']; $PP = (float)$r['PP']; $PC = (float)$r['PC'];
         $rend = ($M + $PP + $PC) > 0 ? ($MOT + $PC) / ($M + $PP + $PC) * 100 : 0;
+        $nom = $nomCt[$cr] ?? $nomTipo[$cr] ?? null;   // objetivo uds/h (centro o tipo)
         $refs[] = [
             'cod'        => $cr,
             'desc'       => trim((string)($r['desc_ref'] ?: $cr)),
@@ -71,6 +105,7 @@ try {
             'ok_h'       => $horas > 0 ? round($r['ok']  / $horas, 1) : 0,
             'nok_h'      => $horas > 0 ? round($r['nok'] / $horas, 1) : 0,
             'rend'       => round($rend, 1),
+            'objetivo'   => $nom !== null ? round($nom, 0) : null,
         ];
     }
     usort($refs, fn($a, $b) => $b['uds_total'] <=> $a['uds_total']);

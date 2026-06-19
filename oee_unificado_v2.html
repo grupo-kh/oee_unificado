@@ -1445,22 +1445,27 @@ const App={
       const d=await this.get('oee_unificado_maq_referencias.php',this.common({cod_maquina:cod}));
       const refs=d.referencias||[];
       if(!refs.length){this.body(ov).innerHTML='<div class="empty">Sin referencias fabricadas en el rango</div>';return;}
-      const labels=refs.map(r=>r.desc+(r.nom_sage?(' · '+r.nom_sage):'')+' · Rdto '+(r.rend!=null?r.rend:0)+'%');
+      // Etiqueta con objetivo (uds/h nominal) por referencia.
+      const labels=refs.map(r=>r.desc+(r.nom_sage?(' · '+r.nom_sage):'')+' · Rdto '+(r.rend!=null?r.rend:0)+'%'+(r.objetivo!=null?(' · Obj '+self.fU(r.objetivo)+' u/h'):''));
       const h=Math.min(1600,Math.max(280,refs.length*30+150));
-      this.body(ov).innerHTML=`<div class="breadcrumb">${refs.length} referencias · barras = piezas/hora (OK rojo corp. · NOK naranja) · «Rdto» = % rendimiento. Haz clic en una referencia para ver sus OFs, histórico y comparativa.</div>`
+      this.body(ov).innerHTML=`<div class="breadcrumb">${refs.length} referencias · barras = piezas/hora (OK rojo corp. · NOK naranja) · línea verde = objetivo (uds/h nominal) · «Rdto» = % rendimiento. Haz clic en una referencia para ver sus OFs.</div>`
         +`<div class="chartbox" style="height:${h}px"><canvas class="cvr"></canvas></div>`
         +`<div class="rdofs" style="margin-top:18px"></div>`;
       const wrap=this.body(ov), el=wrap.querySelector('.cvr'), detail=wrap.querySelector('.rdofs');
       this.chartDestroy(el);
-      new Chart(el,{type:'bar',data:{labels,datasets:[
-        {label:'OK/h',data:refs.map(r=>r.ok_h),backgroundColor:'#8c181a'},
-        {label:'NOK/h',data:refs.map(r=>r.nok_h),backgroundColor:'#e0902a'}
+      new Chart(el,{data:{labels,datasets:[
+        {type:'bar',label:'OK/h',data:refs.map(r=>r.ok_h),backgroundColor:'#8c181a'},
+        {type:'bar',label:'NOK/h',data:refs.map(r=>r.nok_h),backgroundColor:'#e0902a'},
+        // Objetivo (uds/h nominal): marcador por referencia en la misma escala de piezas/hora.
+        {type:'scatter',label:'Objetivo (uds/h)',data:refs.map((r,i)=>r.objetivo!=null?{x:r.objetivo,y:i}:null).filter(Boolean),
+          backgroundColor:'#10b981',borderColor:'#0b7a55',pointStyle:'rectRot',radius:7,borderWidth:2,
+          datalabels:{display:false}}
       ]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
         layout:{padding:{right:48}},
         plugins:{legend:{position:'bottom'},
-          datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]>0,anchor:'end',align:'right',
+          datalabels:{display:ctx=>ctx.dataset.type==='bar'&&ctx.dataset.data[ctx.dataIndex]>0,anchor:'end',align:'right',
             color:'#1f2937',font:{size:11,weight:'700'},formatter:v=>Math.round(v).toLocaleString('es-ES')},
-          tooltip:{callbacks:{afterBody:items=>{const r=refs[items[0].dataIndex];return 'Total: '+(r.uds_total).toLocaleString('es-ES')+' uds · '+r.horas+' h · Rendimiento '+(r.rend!=null?r.rend:0)+'%';}}}},
+          tooltip:{callbacks:{afterBody:items=>{const r=refs[items[0].dataIndex];return 'Total: '+(r.uds_total).toLocaleString('es-ES')+' uds · '+r.horas+' h · Rendimiento '+(r.rend!=null?r.rend:0)+'% · Objetivo '+(r.objetivo!=null?self.fU(r.objetivo)+' u/h':'—');}}}},
         onClick:(e,els)=>{if(els.length){const r=refs[els[0].index];
           // Solo comparativa de rendimiento por OF + popup de análisis histórico.
           detail.innerHTML='<div class="rd-mods"></div>';
