@@ -63,7 +63,8 @@ try {
     // Logicclass — réplica de la 3ª conexión del QlikView (Oper_Formula.UnidadesHora).
     // Tolerante a fallo: si Logicclass no está configurado o no es alcanzable,
     // se continúa solo con datos de MAPEX (udsHora quedará null).
-    $udsHoraNom = []; // [cod_maquina][cod_articulo] = uds/hora nominal
+    $udsHoraNom = [];     // [cod_maquina][cod_articulo] = uds/hora nominal (centro exacto)
+    $udsHoraNomTipo = [];  // [id_tipomaquina] = uds/hora nominal (fallback por tipo)
     if (DB_LOGIC_HOST !== '') {
         try {
             // Cualquier operación de producción (PRD%) con nominal > 0. El QlikView
@@ -85,6 +86,26 @@ try {
             foreach (fetchAll('logicclass', $sqlNom, [$cod]) as $n) {
                 $udsHoraNom[(string)$n['ct']][(string)$n['art']] = (float)$n['uh'];
             }
+            // Fallback por tipo de máquina: muchas máquinas son gemelas (mismo tipo,
+            // p.ej. BT 3.4 IZQDA/DCHA) y Logicclass solo define el nominal en una. Se
+            // mapea centro→tipo (MAPEX) y se guarda, por tipo, el nominal del artículo
+            // visto en cualquiera de sus centros, para usarlo cuando el centro exacto
+            // no lo tenga.
+            $tipoDe = []; // cod_maquina => id_tipomaquina
+            foreach (fetchAll('mapex', "SELECT LTRIM(RTRIM(Cod_maquina)) c, Id_tipomaquina t FROM cfg_maquina WHERE Id_tipomaquina IS NOT NULL") as $t) {
+                $tipoDe[(string)$t['c']] = (int)$t['t'];
+            }
+            foreach ($udsHoraNom as $ct => $arts) {
+                $tp = $tipoDe[$ct] ?? null;
+                if ($tp === null) continue;
+                foreach ($arts as $art => $uh) {
+                    // si varios centros del mismo tipo difieren, se queda el mayor
+                    if (!isset($udsHoraNomTipo[$tp][$art]) || $uh > $udsHoraNomTipo[$tp][$art]) {
+                        $udsHoraNomTipo[$tp][$art] = $uh;
+                    }
+                }
+            }
+            $GLOBALS['__tipoDe'] = $tipoDe; // para el lookup en el bucle de OFs
         } catch (\Throwable $e) {
             error_log('art_analisis logicclass: ' . $e->getMessage());
         }
@@ -107,8 +128,13 @@ try {
         $fin = (string)$r['fecha_fin'];
         if ($desc === '') $desc = trim((string)$r['desc_prod']);
         $cm = trim((string)$r['cod_maquina']);
-        // Productividad nominal de Logicclass para esta máquina+artículo (si existe).
+        // Nominal: 1º el del centro exacto; si no, fallback al de otra máquina del
+        // mismo tipo (gemelas comparten productividad).
         $nom = $udsHoraNom[$cm][$cod] ?? null;
+        if ($nom === null) {
+            $tpCm = $GLOBALS['__tipoDe'][$cm] ?? null;
+            if ($tpCm !== null) $nom = $udsHoraNomTipo[$tpCm][$cod] ?? null;
+        }
         $pctNom = ($nom && $nom > 0) ? round($pzasH / $nom * 100, 1) : null;
         // Piezas que se "deberían" haber hecho:
         //  - plan      = Unidades_planning (planificadas para la OF).
