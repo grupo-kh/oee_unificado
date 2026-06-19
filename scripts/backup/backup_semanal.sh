@@ -21,6 +21,9 @@ DEST_DIR="${BACKUP_DEST:-/mnt/backup-oee}"   # destino externo (montaje fs01 rw)
 RETENER="${BACKUP_KEEP:-8}"                   # nº de backups a conservar (8 semanas ≈ 2 meses)
 PG_DB="plan_attainment"
 LOG="${PROJ_DIR}/scripts/backup/backup.log"
+# Email de aviso ante fallo (se configura por entorno BACKUP_EMAIL en el cron).
+# Si está vacío, no se intenta enviar (solo queda registrado en el log).
+EMAIL_ALERTA="${BACKUP_EMAIL:-}"
 
 STAMP="$(date +%Y%m%d_%H%M%S)"
 WORK="$(mktemp -d /tmp/oee_backup.XXXXXX)"
@@ -28,7 +31,42 @@ NOMBRE="oee_unificado_backup_${STAMP}"
 ARCHIVO="${NOMBRE}.tar.gz"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
-fail() { log "ERROR: $*"; rm -rf "$WORK"; exit 1; }
+
+# Notifica por email un fallo del backup (si hay EMAIL_ALERTA y un MTA disponible).
+notificar_fallo() {
+    local motivo="$1"
+    [ -z "$EMAIL_ALERTA" ] && return 0
+    local host; host="$(hostname)"
+    local asunto="[FALLO] Backup OEE Unificado en ${host} - $(date '+%Y-%m-%d %H:%M')"
+    local cuerpo
+    cuerpo="El backup semanal de OEE Unificado ha FALLADO.
+
+  Servidor:  ${host}
+  Fecha:     $(date '+%Y-%m-%d %H:%M:%S')
+  Motivo:    ${motivo}
+  Destino:   ${DEST_DIR}
+
+Últimas líneas del log (${LOG}):
+$(tail -n 15 "$LOG" 2>/dev/null)
+
+Revisa el montaje del destino externo y el estado de PostgreSQL.
+"
+    # 1ª opción: comando 'mail'. 2ª: sendmail directo. Tolerante a fallo del propio aviso.
+    if command -v mail >/dev/null 2>&1; then
+        printf '%s' "$cuerpo" | mail -s "$asunto" "$EMAIL_ALERTA" 2>>"$LOG" \
+            && log "Aviso de fallo enviado a ${EMAIL_ALERTA}" \
+            || log "No se pudo enviar el aviso por 'mail'"
+    elif command -v sendmail >/dev/null 2>&1; then
+        { printf 'To: %s\nSubject: %s\n\n%s' "$EMAIL_ALERTA" "$asunto" "$cuerpo"; } \
+            | sendmail -t 2>>"$LOG" \
+            && log "Aviso de fallo enviado a ${EMAIL_ALERTA} (sendmail)" \
+            || log "No se pudo enviar el aviso por 'sendmail'"
+    else
+        log "Sin MTA (mail/sendmail) para enviar el aviso de fallo"
+    fi
+}
+
+fail() { log "ERROR: $*"; notificar_fallo "$*"; rm -rf "$WORK"; exit 1; }
 
 log "===== Inicio backup ${STAMP} ====="
 
