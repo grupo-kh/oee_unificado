@@ -56,7 +56,7 @@ config/qr_secret.dat
 # ─── Documentación interna y datos (respaldados en .claude/project-archive) ───
 #    Contienen IPs, hostnames y rutas de red internas. NO deben publicarse.
 .notebook/
-docs/
+docs/*
 !docs/qlikview_carga_analisis_of.md
 input/
 SETUP_POSTGRES.md
