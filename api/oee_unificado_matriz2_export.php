@@ -52,20 +52,15 @@ $fhasta = (string) getParam('fecha_hasta');
 // en su propia columna: el mismo motivo bajo dos act×cat distintos son dos columnas
 // distintas con claves distintas (evita el bug antiguo de repetir el valor por toda la
 // actividad). Regla dura: cada hoja lee únicamente celdas[$leaf['key']].
+// Columnas-hoja = SOLO motivos (sin columna resumen). El total de la categoría
+// es la suma de sus motivos (backend garantiza resumen == Σ motivos).
 $leaves = [];   // orden EXACTO de columnas, de izquierda a derecha
 foreach ($acts as $a) foreach ($cats as $c) {
-    $kCat = "$a||$c";
-    $hayCat = false;
-    foreach ($maqs as $m) if (($m['celdas'][$kCat] ?? 0) > 0) { $hayCat = true; break; }
-    if (!$hayCat) continue;
-    // Columna resumen de la categoría (siempre presente para el par con datos).
-    $leaves[] = ['tipo' => 'resumen', 'act' => $a, 'cat' => $c, 'paro' => null, 'key' => $kCat];
-    // Columnas de motivo presentes en este act×cat (orden de paros_por_categoria).
     foreach (($parosPorCat[$c] ?? []) as $p) {
         $kPar = "$a||$c||$p";
         $hayPar = false;
         foreach ($maqs as $m) if (($m['celdas'][$kPar] ?? 0) > 0) { $hayPar = true; break; }
-        if ($hayPar) $leaves[] = ['tipo' => 'motivo', 'act' => $a, 'cat' => $c, 'paro' => $p, 'key' => $kPar];
+        if ($hayPar) $leaves[] = ['act' => $a, 'cat' => $c, 'paro' => $p, 'key' => $kPar];
     }
 }
 
@@ -113,11 +108,11 @@ while ($idx < $nL) {
     while ($idx < $nL && $leaves[$idx]['act'] === $a) {
         $c = $leaves[$idx]['cat'];
         $iniCat = $ci;
-        // Recorrer todas las hojas de esta categoría (resumen + sus motivos).
+        // Recorrer todos los motivos de esta categoría (fila 6 = nombre del motivo).
         while ($idx < $nL && $leaves[$idx]['act'] === $a && $leaves[$idx]['cat'] === $c) {
             $leaf = $leaves[$idx];
             $col6 = Coordinate::stringFromColumnIndex($ci);
-            $ws->setCellValue($col6 . $rH3, $leaf['tipo'] === 'resumen' ? 'Resumen' : $leaf['paro']);
+            $ws->setCellValue($col6 . $rH3, $leaf['paro']);
             $ci++;
             $idx++;
         }
