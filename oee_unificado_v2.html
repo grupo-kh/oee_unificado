@@ -137,13 +137,6 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .mtx2-tbl tr.mtx2-maqrow td.mtx2-act{background:#2b1a1c;color:#fff}
 .mtx2-tbl tr.mtx2-reftr:hover td{background:#f4eeef}
 .mtx2-tbl tr.mtx2-reftr:hover td.mtx2-mot{background:#f7eeef}
-/* Filas de motivo bajo cada referencia: SIEMPRE visibles, fondo más claro para
-   distinguirlas de la referencia, sin necesidad de expandir las columnas. */
-.mtx2-tbl tr.mtx2-motrow td{background:#fdfbfb;color:#6a5658;font-size:11px}
-.mtx2-tbl tr.mtx2-motrow td.mtx2-ref-cell{background:#fbf7f7;font-weight:500;padding-left:20px;color:#5a4446}
-.mtx2-tbl tr.mtx2-motrow td.mtx2-ref-cell small{color:#a8989a;font-weight:400}
-.mtx2-tbl tr.mtx2-motrow td.mtx2-mottot{font-weight:600;color:#5a4446}
-.mtx2-tbl tr.mtx2-motrow:hover td{background:#f6f0f0}
 /* popup a pantalla completa (Top máquinas / Top motivos) */
 .fullpop{position:fixed;inset:0;background:#fff;z-index:1500;display:flex;flex-direction:column;overflow:hidden}
 .fullpop-head{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid #f0eeee}
@@ -1965,22 +1958,6 @@ const App={
       }
       return s;
     };
-    // Celdas-hoja de una fila de MOTIVO (visible de entrada, bajo su referencia):
-    // el valor del motivo cae SOLO en la columna RESUMEN de su categoría (siempre
-    // visible); el resto de columnas-hoja van vacías. Así el detalle se ve sin
-    // depender de expandir las columnas de motivo.
-    const filaCeldasMotivo=(grpMot,get)=>{
-      let s='';
-      for(const lf of leaves){
-        if(lf.tipo==='resumen'){
-          const v=(lf.grp===grpMot)?(get()||0):0;
-          s+=`<td class="num" style="${cellCol(v)}">${q(v)}</td>`;
-        }else{
-          s+=`<td class="num mtx2-mot" data-grp="${e(lf.grp)}"></td>`;
-        }
-      }
-      return s;
-    };
     let h='<div class="mtx2-scroll"><table class="mtx2-tbl"><thead>';
     // Fila 1 (Actividad). Colspan inicial = suma de hojas de sus categorías (resumen
     // + motivos), porque las columnas de motivo nacen EXPANDIDAS por defecto.
@@ -2016,23 +1993,12 @@ const App={
       h+=filaCeldas(k=>mq.celdas[k]||0);
       h+='</tr>';
       for(const ref of mq.referencias){
-        // Fila de referencia (los resúmenes por categoría siempre visibles; las
-        // columnas de motivo se expanden al clicar la categoría).
+        // Fila de referencia. El detalle por motivo se ve en COLUMNAS anidadas
+        // dentro de cada categoría (visibles de entrada), no en filas inferiores.
         h+=`<tr class="mtx2-reftr"><td class="mtx2-ref-cell" title="${e(ref.cod)}">${e(ref.desc)}<small>${e(ref.cod)}</small></td>`;
         h+=`<td class="num mtx2-tot"><b>${q(ref.total_horas)}</b></td>`;
         h+=filaCeldas(k=>ref.celdas[k]||0);
         h+='</tr>';
-        // Filas de MOTIVO bajo la referencia, SIEMPRE visibles (fondo más claro).
-        // Una por cada (act,cat,paro) con dato en esta referencia, en el orden de
-        // las hojas de motivo. El valor cae en la columna resumen de su categoría.
-        for(const lf of leaves){
-          if(lf.tipo!=='motivo')continue;
-          const v=ref.celdas[lf.keyParo]||0; if(!(v>0))continue;
-          h+=`<tr class="mtx2-motrow"><td class="mtx2-ref-cell mtx2-motcell" title="${e(lf.act)} · ${e(lf.cat)}">↳ ${e(lf.paro)}<small>${e(lf.cat)}</small></td>`;
-          h+=`<td class="num mtx2-tot mtx2-mottot">${q(v)}</td>`;
-          h+=filaCeldasMotivo(lf.grp,()=>v);
-          h+='</tr>';
-        }
       }
     }
     h+='</tbody></table></div>';
