@@ -99,28 +99,41 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .hist-datebar .hdb-turnos{display:flex;gap:10px;align-items:center;padding-bottom:6px}
 .hist-datebar .hdb-chk{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;color:#374151;text-transform:none;cursor:pointer}
 .hist-datebar .hdb-chk input{cursor:pointer}
-/* ── Matriz 2: una tabla · filas = referencia · columnas = actividad/categoría ── */
+/* ── Matriz 2: una tabla · filas = máquina/referencia · cabecera de 3 niveles ──
+   (Actividad → Categoría → Motivo). Las columnas de motivo se expanden/colapsan
+   por categoría; el resumen de categoría está siempre visible. ── */
 .mtx2-scroll{overflow:auto;max-height:78vh;border:1px solid #d9cccd;border-radius:8px}
 .mtx2-tbl{border-collapse:collapse;font-size:12px}
 .mtx2-tbl th,.mtx2-tbl td{border:1px solid #ece4e4;padding:5px 9px;white-space:nowrap}
-.mtx2-tbl thead th{position:sticky;top:0;z-index:3;background:#3a2426;color:#fff}
-.mtx2-tbl th.mtx2-acttop{text-align:center;background:#2b1a1c;font-weight:700;border-bottom:2px solid #8c181a}
-.mtx2-tbl th.mtx2-paroh{font-weight:600;font-size:11px;top:30px}
-.mtx2-tbl th.mtx2-acth{text-align:left;left:0;z-index:5}
+.mtx2-tbl thead th{position:sticky;z-index:3;background:#3a2426;color:#fff}
+/* Tres filas de cabecera pegadas arriba. Alto real de fila ≈ 30px (padding 5+5 +
+   borde + texto ~18). Fila 1 (Actividad) top:0; fila 2 (Categoría) top:30px;
+   fila 3 (Motivo) top:60px. La fila TOTAL queda tras las 3 → top:90px. */
+.mtx2-tbl th.mtx2-acttop{top:0;text-align:center;background:#2b1a1c;font-weight:700;border-bottom:2px solid #8c181a}
+.mtx2-tbl th.mtx2-cath{top:30px;text-align:center;font-weight:700;font-size:11px}
+.mtx2-tbl th.mtx2-cath.mtx2-clic{cursor:pointer}
+.mtx2-tbl th.mtx2-cath.mtx2-clic:hover{background:#4a3032}
+.mtx2-tg{display:inline-block;margin-left:4px;color:#f0b9ba;font-size:9px}
+.mtx2-tbl th.mtx2-resh{top:60px;font-weight:600;font-size:11px;background:#3a2426}
+.mtx2-tbl th.mtx2-moth{top:60px;font-weight:500;font-size:11px;background:#4a3032;color:#f3e7e7}
+.mtx2-tbl th.mtx2-acth{top:0;text-align:left;left:0;z-index:5;background:#3a2426}
+.mtx2-tbl th.mtx2-tot{top:0;left:auto;z-index:4;background:#3a2426}
 .mtx2-tbl td.mtx2-ref-cell{position:sticky;left:0;z-index:1;background:#faf8f8;font-weight:600;color:#3a2426;text-align:left;max-width:300px;overflow:hidden;text-overflow:ellipsis}
 .mtx2-tbl td.mtx2-ref-cell small{display:block;color:#8a6e70;font-weight:500;font-size:10px}
 .mtx2-tbl td.mtx2-act{font-weight:700;color:#3a2426;background:#f0eeee;position:sticky;left:0;text-align:left}
 .mtx2-tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
+/* Columnas de motivo: fondo levemente distinto para diferenciarlas del resumen. */
+.mtx2-tbl td.mtx2-mot{background:#fcf7f7}
+.mtx2-tbl tr.mtx2-totrow td.mtx2-mot,
+.mtx2-tbl tr.mtx2-maqrow td.mtx2-mot{background:inherit}
+/* Colapso de columna de motivo (cabecera + celdas). */
+.mtx2-tbl .col-hidden{display:none}
 .mtx2-tbl .mtx2-tot{background:#f0eeee;font-weight:700}
-.mtx2-tbl tr.mtx2-totrow td{background:#ece4e4;font-weight:700;position:sticky;top:52px;z-index:2}
+.mtx2-tbl tr.mtx2-totrow td{background:#ece4e4;font-weight:700;position:sticky;top:90px;z-index:2}
 .mtx2-tbl tr.mtx2-maqrow td{background:#3a2426;color:#fff;font-weight:700}
 .mtx2-tbl tr.mtx2-maqrow td.mtx2-act{background:#2b1a1c;color:#fff}
-.mtx2-tbl tr.mtx2-refrow{cursor:pointer}
-.mtx2-tbl tr.mtx2-refrow:hover td{background:#f4eeef}
-.mtx2-exp{display:inline-block;width:12px;color:#8c181a;font-size:9px}
-.mtx2-tbl td.mtx2-paro-cell{position:sticky;left:0;z-index:1;background:#fbf9f9;text-align:left;padding-left:22px;color:#5a4446;font-size:11px}
-.mtx2-tbl td.mtx2-paro-cell small{color:#a8989a;margin-left:6px}
-.mtx2-tbl tr.mtx2-pararow td{font-size:11px;color:#6a5658}
+.mtx2-tbl tr.mtx2-reftr:hover td{background:#f4eeef}
+.mtx2-tbl tr.mtx2-reftr:hover td.mtx2-mot{background:#f7eeef}
 /* popup a pantalla completa (Top máquinas / Top motivos) */
 .fullpop{position:fixed;inset:0;background:#fff;z-index:1500;display:flex;flex-direction:column;overflow:hidden}
 .fullpop-head{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid #f0eeee}
@@ -1843,14 +1856,45 @@ const App={
       const d=await this.get('oee_unificado_matriz2.php',this.common({seccion:State.seccion}));
       this._mtx2=d;
       const wire=()=>{
-        // Expandir/contraer el detalle por paro al clicar una referencia.
-        body.querySelectorAll('.mtx2-refrow').forEach(tr=>{tr.onclick=()=>{
-          const id=tr.dataset.tgt; const exp=tr.querySelector('.mtx2-exp');
-          const filas=body.querySelectorAll('tr.'+id);
-          const open=filas.length&&filas[0].style.display==='none';
-          filas.forEach(f=>f.style.display=open?'':'none');
-          if(exp)exp.textContent=open?'▼':'▶';
-        };});
+        const tabla=body.querySelector('.mtx2-tbl'); if(!tabla)return;
+        // Recalcula el colspan de cada categoría de una actividad (1 + nMot si está
+        // abierta) y el colspan de la cabecera de actividad (suma de sus categorías).
+        // No consulta display de celdas: se apoya en data-nmot y en data-open.
+        // Compara por IGUALDAD de data-act (no por prefijo del grp) para no confundir
+        // actividades cuyo nombre sea prefijo de otra, y por valor de dataset para no
+        // romper con espacios/acentos/comillas en los nombres.
+        const recalc=(act)=>{
+          let aTh=null;
+          tabla.querySelectorAll('.mtx2-acttop').forEach(t=>{if(t.dataset.act===act)aTh=t;});
+          if(!aTh)return; let total=0;
+          tabla.querySelectorAll('.mtx2-cath').forEach(cTh=>{
+            if(cTh.dataset.act!==act)return;
+            const nMot=parseInt(cTh.dataset.nmot||'0',10);
+            const abierto=cTh.dataset.open==='1';
+            const col=1+(abierto?nMot:0);
+            cTh.colSpan=col; total+=col;
+          });
+          aTh.colSpan=total;
+        };
+        // Alterna columnas de motivo de un grupo (cabecera fila 3 + celdas de TODAS
+        // las filas) y recalcula los colspans de la actividad afectada. Recorre las
+        // celdas .mtx2-mot comparando data-grp por valor (robusto ante caracteres
+        // especiales en el slug del grupo).
+        const toggleGrupo=(grp,catTh)=>{
+          const nMot=parseInt(catTh.dataset.nmot||'0',10); if(!nMot)return;
+          const abrir=catTh.dataset.open!=='1';
+          tabla.querySelectorAll('.mtx2-mot').forEach(td=>{
+            if(td.dataset.grp!==grp)return;
+            td.classList.toggle('col-hidden',!abrir);
+            td.style.display=abrir?'':'none';
+          });
+          catTh.dataset.open=abrir?'1':'0';
+          const tg=catTh.querySelector('.mtx2-tg'); if(tg)tg.textContent=abrir?'▼':'▶';
+          recalc(catTh.dataset.act);
+        };
+        tabla.querySelectorAll('.mtx2-cath.mtx2-clic').forEach(th=>{
+          th.onclick=()=>toggleGrupo(th.dataset.grp,th);
+        });
       };
       body.innerHTML=this.matriz2Tabla(d); wire();
       // Filtro: por referencia o por máquina, en vivo.
@@ -1863,64 +1907,90 @@ const App={
     }catch(e){body.innerHTML=`<div class="error">${e.message}</div>`;}
   },
   matriz2Tabla(d){
-    // Como la Matriz original: filas agrupadas Máquina → Referencia. Columnas =
-    // categoría de paro (Tipo Paro 1) agrupada por actividad (cabecera 2 niveles).
-    // Cada referencia es expandible: muestra el detalle por paro individual.
+    // Filas agrupadas Máquina → Referencia (sin filas-paro). Cabecera de 3 niveles:
+    // Actividad → Categoría → Motivo. Por cada (act,cat) con datos se generan una
+    // columna RESUMEN (siempre visible) más N columnas de MOTIVO (ocultas por
+    // defecto, con clase col-hidden) que se despliegan al clicar la categoría.
+    // El detalle de paro ahora son COLUMNAS, no filas.
     const acts=d.actividades||[], cats=d.categorias||[], maqs=d.maquinas||[];
     const parosPorCat=d.paros_por_categoria||{};
     if(!maqs.length)return '<div class="empty">Sin paros para el filtro seleccionado</div>';
     const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     const f2=v=>(v==null||v===0)?'':(Math.round(v*100)/100).toFixed(2);
     const cellCol=v=>v==null||v===0?'':v>8?'background:#e08a3c;color:#fff':v>4?'background:#d9a441':v>2?'background:#f0e2c0':v>0?'background:#f7f1e3':'';
-    // Columnas (actividad×categoría) con algún dato en el conjunto.
+    // Predicados de presencia (idénticos al criterio anterior, ampliado al triple).
     const has=(k)=>maqs.some(m=>m.celdas[k]>0);
-    const colKeys=[];
-    for(const a of acts)for(const c of cats){const k=a+'||'+c;if(has(k))colKeys.push({act:a,cat:c,key:k});}
-    const actCols={}; colKeys.forEach(c=>actCols[c.act]=(actCols[c.act]||0)+1);
-    const ncol=colKeys.length;
+    const hasParo=(a,c,p)=>maqs.some(m=>m.celdas[a+'||'+c+'||'+p]>0);
+    // Modelo de columnas: ÚNICA fuente de verdad para thead y tbody.
+    //   leaves  = lista plana ordenada de columnas-hoja (resumen y motivo).
+    //   actList = jerarquía Actividad → [Categoría → motivos] para los colspans.
+    const leaves=[]; const actList=[];
+    for(const a of acts){
+      const catsDeA=[];
+      for(const c of cats){
+        const kCat=a+'||'+c; if(!has(kCat))continue;
+        const motivos=(parosPorCat[c]||[]).filter(p=>hasParo(a,c,p));
+        const grp=a+'__'+c;
+        leaves.push({tipo:'resumen',act:a,cat:c,grp,keyCat:kCat});
+        for(const p of motivos)leaves.push({tipo:'motivo',act:a,cat:c,grp,paro:p,keyParo:a+'||'+c+'||'+p});
+        catsDeA.push({cat:c,grp,motivos,nMot:motivos.length});
+      }
+      if(catsDeA.length)actList.push({act:a,cats:catsDeA});
+    }
+    // Construye las celdas numéricas de una fila a partir de su objeto de celdas.
+    // celdaResumen / celdaMotivo: lectura directa de la clave correspondiente.
+    const filaCeldas=(get)=>{
+      let s='';
+      for(const lf of leaves){
+        if(lf.tipo==='resumen'){
+          const v=get(lf.keyCat)||0;
+          s+=`<td class="num" style="${cellCol(v)}">${f2(v)}</td>`;
+        }else{
+          const v=get(lf.keyParo)||0;
+          s+=`<td class="num mtx2-mot col-hidden" data-grp="${e(lf.grp)}" style="display:none;${cellCol(v)}">${f2(v)}</td>`;
+        }
+      }
+      return s;
+    };
     let h='<div class="mtx2-scroll"><table class="mtx2-tbl"><thead>';
-    h+='<tr><th class="mtx2-acth" rowspan="2">Máquina / Referencia</th>';
-    h+='<th class="mtx2-tot" rowspan="2">TOTAL (h)</th>';
-    for(const a of acts){ if(actCols[a]) h+=`<th class="mtx2-acttop" colspan="${actCols[a]}">${e(a)}</th>`; }
-    h+='</tr><tr>';
-    for(const c of colKeys) h+=`<th class="mtx2-paroh">${e(c.cat)}</th>`;
+    // Fila 1 (Actividad). Colspan inicial = nº categorías de la act (todo colapsado).
+    h+='<tr><th class="mtx2-acth" rowspan="3">Máquina / Referencia</th>';
+    h+='<th class="mtx2-tot" rowspan="3">TOTAL (h)</th>';
+    for(const a of actList)h+=`<th class="mtx2-acttop" data-act="${e(a.act)}" colspan="${a.cats.length}">${e(a.act)}</th>`;
+    h+='</tr>';
+    // Fila 2 (Categoría). Colspan inicial = 1 (solo resumen visible). Las clicables
+    // (con motivos) llevan indicador ▶ y data-nmot para recalcular colspans.
+    h+='<tr>';
+    for(const a of actList)for(const c of a.cats){
+      const clic=c.nMot>0;
+      h+=`<th class="mtx2-cath${clic?' mtx2-clic':''}" data-act="${e(a.act)}" data-grp="${e(c.grp)}" data-nmot="${c.nMot}" colspan="1">${e(c.cat)}${clic?' <span class="mtx2-tg">▶</span>':''}</th>`;
+    }
+    h+='</tr>';
+    // Fila 3 (Motivo). Una celda por hoja: resumen (siempre visible) y motivo (oculto).
+    h+='<tr>';
+    for(const lf of leaves){
+      if(lf.tipo==='resumen')h+=`<th class="mtx2-resh" data-grp="${e(lf.grp)}">Resumen</th>`;
+      else h+=`<th class="mtx2-moth mtx2-mot col-hidden" data-grp="${e(lf.grp)}" data-paro="${e(lf.paro)}" style="display:none">${e(lf.paro)}</th>`;
+    }
     h+='</tr></thead><tbody>';
-    // Fila TOTAL general (arriba). El total se calcula antes para poder pintarlo
-    // en la 2ª columna (junto a Máquina/Referencia).
-    const colTot={}; let gtot=0;
-    for(const c of colKeys){let t=0;for(const m of maqs)t+=m.celdas[c.key]||0;colTot[c.key]=t;gtot+=t;}
+    // Fila TOTAL general. El total (2ª columna) suma SOLO las hojas resumen.
+    let gtot=0; for(const lf of leaves)if(lf.tipo==='resumen'){let t=0;for(const m of maqs)t+=m.celdas[lf.keyCat]||0;gtot+=t;}
     h+='<tr class="mtx2-totrow"><td class="mtx2-act"><b>TOTAL</b></td>';
     h+=`<td class="num mtx2-tot"><b>${f2(gtot)}</b></td>`;
-    for(const c of colKeys)h+=`<td class="num"><b>${f2(colTot[c.key])}</b></td>`;
+    h+=filaCeldas(k=>{let t=0;for(const m of maqs)t+=m.celdas[k]||0;return t;});
     h+='</tr>';
-    let rid=0;
     for(const mq of maqs){
       // Fila de máquina (cabecera de grupo).
       h+=`<tr class="mtx2-maqrow"><td class="mtx2-act">🏭 ${e(mq.maquina)}</td>`;
       h+=`<td class="num mtx2-tot"><b>${f2(mq.total_horas)}</b></td>`;
-      for(const c of colKeys)h+=`<td class="num"><b>${f2(mq.celdas[c.key]||0)}</b></td>`;
+      h+=filaCeldas(k=>mq.celdas[k]||0);
       h+='</tr>';
       for(const ref of mq.referencias){
-        const id='m2r'+(rid++);
-        // Fila de referencia (clic = expandir/contraer detalle por paro).
-        h+=`<tr class="mtx2-refrow" data-tgt="${id}"><td class="mtx2-ref-cell" title="${e(ref.cod)}"><span class="mtx2-exp">▶</span> ${e(ref.desc)}<small>${e(ref.cod)}</small></td>`;
+        // Fila de referencia (ya NO es expandible: el detalle son columnas).
+        h+=`<tr class="mtx2-reftr"><td class="mtx2-ref-cell" title="${e(ref.cod)}">${e(ref.desc)}<small>${e(ref.cod)}</small></td>`;
         h+=`<td class="num mtx2-tot"><b>${f2(ref.total_horas)}</b></td>`;
-        for(const c of colKeys){const v=ref.celdas[c.key]||0;h+=`<td class="num" style="${cellCol(v)}">${f2(v)}</td>`;}
+        h+=filaCeldas(k=>ref.celdas[k]||0);
         h+='</tr>';
-        // Filas de detalle por paro (una por paro presente, ocultas por defecto).
-        const parosUsados=[];
-        for(const c of cats){for(const p of (parosPorCat[c]||[])){
-          if(acts.some(a=>ref.celdas[a+'||'+c+'||'+p]>0)) parosUsados.push({cat:c,paro:p});
-        }}
-        for(const pp of parosUsados){
-          h+=`<tr class="mtx2-pararow ${id}" style="display:none"><td class="mtx2-paro-cell">↳ ${e(pp.paro)} <small>${e(pp.cat)}</small></td>`;
-          // Total de la fila-paro: se calcula antes para pintarlo en la 2ª columna.
-          let tp=0;
-          for(const c of colKeys)tp+=ref.celdas[c.act+'||'+c.cat+'||'+pp.paro]||0;
-          h+=`<td class="num">${f2(tp)}</td>`;
-          for(const c of colKeys){const v=ref.celdas[c.act+'||'+c.cat+'||'+pp.paro]||0;h+=`<td class="num" style="${cellCol(v)}">${f2(v)}</td>`;}
-          h+='</tr>';
-        }
       }
     }
     h+='</tbody></table></div>';
