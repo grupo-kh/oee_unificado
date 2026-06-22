@@ -172,6 +172,27 @@ foreach ($maqs as $m) {
         $ws->setCellValue($cT . $r, round($ref['total_horas'], 2));
         $ws->getStyle("A$r")->getFont()->setBold(true);
         $r++;
+        // Filas de MOTIVO bajo la referencia (paridad con la UI): una por cada hoja
+        // de motivo con dato; el valor cae en la columna RESUMEN de su categoría.
+        // Fondo más claro para distinguirlas de la referencia.
+        foreach ($leaves as $leaf) {
+            if ($leaf['tipo'] !== 'motivo') continue;
+            $v = $ref['celdas'][$leaf['key']] ?? 0;
+            if (!($v > 0)) continue;
+            $ws->setCellValue("A$r", '        ↳ ' . $leaf['paro'] . ' · ' . $leaf['cat']);
+            // El motivo va en la columna resumen de su categoría ("ACT||CAT").
+            $kRes = $leaf['act'] . '||' . $leaf['cat'];
+            $ci = 2;
+            foreach ($leaves as $lf) {
+                $val = ($lf['tipo'] === 'resumen' && $lf['key'] === $kRes) ? $f2($v) : null;
+                $ws->setCellValue(Coordinate::stringFromColumnIndex($ci) . $r, $val);
+                $ci++;
+            }
+            $ws->setCellValue($cT . $r, round($v, 2));
+            $ws->getStyle("A$r:$cT$r")->getFont()->setSize(9)->getColor()->setRGB('6A5658');
+            $ws->getStyle("A$r:$cT$r")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FBF7F7');
+            $r++;
+        }
     }
 }
 

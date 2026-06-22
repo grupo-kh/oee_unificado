@@ -121,7 +121,10 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .mtx2-tbl td.mtx2-ref-cell{position:sticky;left:0;z-index:1;background:#faf8f8;font-weight:600;color:#3a2426;text-align:left;max-width:300px;overflow:hidden;text-overflow:ellipsis}
 .mtx2-tbl td.mtx2-ref-cell small{display:block;color:#8a6e70;font-weight:500;font-size:10px}
 .mtx2-tbl td.mtx2-act{font-weight:700;color:#3a2426;background:#f0eeee;position:sticky;left:0;text-align:left}
-.mtx2-tbl td.num{text-align:right;font-variant-numeric:tabular-nums}
+/* Cantidad: celda centrada en su columna, dígitos alineados a la derecha dentro
+   del bloque (span inline-block con ancho mínimo) para que las cifras cuadren. */
+.mtx2-tbl td.num{text-align:center;font-variant-numeric:tabular-nums}
+.mtx2-q{display:inline-block;text-align:right;min-width:3.4em}
 /* Columnas de motivo: fondo levemente distinto para diferenciarlas del resumen. */
 .mtx2-tbl td.mtx2-mot{background:#fcf7f7}
 .mtx2-tbl tr.mtx2-totrow td.mtx2-mot,
@@ -134,6 +137,13 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .mtx2-tbl tr.mtx2-maqrow td.mtx2-act{background:#2b1a1c;color:#fff}
 .mtx2-tbl tr.mtx2-reftr:hover td{background:#f4eeef}
 .mtx2-tbl tr.mtx2-reftr:hover td.mtx2-mot{background:#f7eeef}
+/* Filas de motivo bajo cada referencia: SIEMPRE visibles, fondo más claro para
+   distinguirlas de la referencia, sin necesidad de expandir las columnas. */
+.mtx2-tbl tr.mtx2-motrow td{background:#fdfbfb;color:#6a5658;font-size:11px}
+.mtx2-tbl tr.mtx2-motrow td.mtx2-ref-cell{background:#fbf7f7;font-weight:500;padding-left:20px;color:#5a4446}
+.mtx2-tbl tr.mtx2-motrow td.mtx2-ref-cell small{color:#a8989a;font-weight:400}
+.mtx2-tbl tr.mtx2-motrow td.mtx2-mottot{font-weight:600;color:#5a4446}
+.mtx2-tbl tr.mtx2-motrow:hover td{background:#f6f0f0}
 /* popup a pantalla completa (Top máquinas / Top motivos) */
 .fullpop{position:fixed;inset:0;background:#fff;z-index:1500;display:flex;flex-direction:column;overflow:hidden}
 .fullpop-head{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid #f0eeee}
@@ -1917,6 +1927,9 @@ const App={
     if(!maqs.length)return '<div class="empty">Sin paros para el filtro seleccionado</div>';
     const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     const f2=v=>(v==null||v===0)?'':(Math.round(v*100)/100).toFixed(2);
+    // Cantidad centrada en la columna pero con los dígitos alineados a la derecha:
+    // la celda centra (CSS) y el span interno alinea a la derecha entre cifras.
+    const q=v=>{const t=f2(v);return t===''?'':`<span class="mtx2-q">${t}</span>`;};
     const cellCol=v=>v==null||v===0?'':v>8?'background:#e08a3c;color:#fff':v>4?'background:#d9a441':v>2?'background:#f0e2c0':v>0?'background:#f7f1e3':'';
     // Predicados de presencia (idénticos al criterio anterior, ampliado al triple).
     const has=(k)=>maqs.some(m=>m.celdas[k]>0);
@@ -1944,10 +1957,26 @@ const App={
       for(const lf of leaves){
         if(lf.tipo==='resumen'){
           const v=get(lf.keyCat)||0;
-          s+=`<td class="num" style="${cellCol(v)}">${f2(v)}</td>`;
+          s+=`<td class="num" style="${cellCol(v)}">${q(v)}</td>`;
         }else{
           const v=get(lf.keyParo)||0;
-          s+=`<td class="num mtx2-mot col-hidden" data-grp="${e(lf.grp)}" style="display:none;${cellCol(v)}">${f2(v)}</td>`;
+          s+=`<td class="num mtx2-mot col-hidden" data-grp="${e(lf.grp)}" style="display:none;${cellCol(v)}">${q(v)}</td>`;
+        }
+      }
+      return s;
+    };
+    // Celdas-hoja de una fila de MOTIVO (visible de entrada, bajo su referencia):
+    // el valor del motivo cae SOLO en la columna RESUMEN de su categoría (siempre
+    // visible); el resto de columnas-hoja van vacías. Así el detalle se ve sin
+    // depender de expandir las columnas de motivo.
+    const filaCeldasMotivo=(grpMot,get)=>{
+      let s='';
+      for(const lf of leaves){
+        if(lf.tipo==='resumen'){
+          const v=(lf.grp===grpMot)?(get()||0):0;
+          s+=`<td class="num" style="${cellCol(v)}">${q(v)}</td>`;
+        }else{
+          s+=`<td class="num mtx2-mot col-hidden" data-grp="${e(lf.grp)}" style="display:none"></td>`;
         }
       }
       return s;
@@ -1976,21 +2005,33 @@ const App={
     // Fila TOTAL general. El total (2ª columna) suma SOLO las hojas resumen.
     let gtot=0; for(const lf of leaves)if(lf.tipo==='resumen'){let t=0;for(const m of maqs)t+=m.celdas[lf.keyCat]||0;gtot+=t;}
     h+='<tr class="mtx2-totrow"><td class="mtx2-act"><b>TOTAL</b></td>';
-    h+=`<td class="num mtx2-tot"><b>${f2(gtot)}</b></td>`;
+    h+=`<td class="num mtx2-tot"><b>${q(gtot)}</b></td>`;
     h+=filaCeldas(k=>{let t=0;for(const m of maqs)t+=m.celdas[k]||0;return t;});
     h+='</tr>';
     for(const mq of maqs){
       // Fila de máquina (cabecera de grupo).
       h+=`<tr class="mtx2-maqrow"><td class="mtx2-act">🏭 ${e(mq.maquina)}</td>`;
-      h+=`<td class="num mtx2-tot"><b>${f2(mq.total_horas)}</b></td>`;
+      h+=`<td class="num mtx2-tot"><b>${q(mq.total_horas)}</b></td>`;
       h+=filaCeldas(k=>mq.celdas[k]||0);
       h+='</tr>';
       for(const ref of mq.referencias){
-        // Fila de referencia (ya NO es expandible: el detalle son columnas).
+        // Fila de referencia (los resúmenes por categoría siempre visibles; las
+        // columnas de motivo se expanden al clicar la categoría).
         h+=`<tr class="mtx2-reftr"><td class="mtx2-ref-cell" title="${e(ref.cod)}">${e(ref.desc)}<small>${e(ref.cod)}</small></td>`;
-        h+=`<td class="num mtx2-tot"><b>${f2(ref.total_horas)}</b></td>`;
+        h+=`<td class="num mtx2-tot"><b>${q(ref.total_horas)}</b></td>`;
         h+=filaCeldas(k=>ref.celdas[k]||0);
         h+='</tr>';
+        // Filas de MOTIVO bajo la referencia, SIEMPRE visibles (fondo más claro).
+        // Una por cada (act,cat,paro) con dato en esta referencia, en el orden de
+        // las hojas de motivo. El valor cae en la columna resumen de su categoría.
+        for(const lf of leaves){
+          if(lf.tipo!=='motivo')continue;
+          const v=ref.celdas[lf.keyParo]||0; if(!(v>0))continue;
+          h+=`<tr class="mtx2-motrow"><td class="mtx2-ref-cell mtx2-motcell" title="${e(lf.act)} · ${e(lf.cat)}">↳ ${e(lf.paro)}<small>${e(lf.cat)}</small></td>`;
+          h+=`<td class="num mtx2-tot mtx2-mottot">${q(v)}</td>`;
+          h+=filaCeldasMotivo(lf.grp,()=>v);
+          h+='</tr>';
+        }
       }
     }
     h+='</tbody></table></div>';
