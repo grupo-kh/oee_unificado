@@ -71,9 +71,9 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .mtx thead th{position:sticky;top:0;background:#2d4d7a;color:#fff;font-weight:700;z-index:2;text-align:center;white-space:normal;min-width:74px;max-width:120px}
 .mtx th.mtx-first,.mtx td.mtx-first{position:sticky;left:0;text-align:left;background:#fff;z-index:1;min-width:250px;max-width:250px;overflow:hidden;text-overflow:ellipsis}
 .mtx thead th.mtx-first{z-index:3;min-width:250px}
-.mtx tr.mtx-maq td{background:#dce6f4;font-weight:700}
-.mtx tr.mtx-maq td.mtx-first{background:#dce6f4;color:#1e40af;cursor:pointer}
-.mtx tr.mtx-maq td.mtx-first:hover{background:#cbdcf0;text-decoration:underline}
+.mtx tr.mtx-maq td{background:#aecbef;font-weight:700;border-top:2px solid #5b88c4}
+.mtx tr.mtx-maq td.mtx-first{background:#aecbef;color:#15336e;cursor:pointer}
+.mtx tr.mtx-maq td.mtx-first:hover{background:#9bbdea;text-decoration:underline}
 .mtx td.mtx-ref{padding-left:24px;color:#1e40af;font-weight:500;cursor:pointer}
 .mtx td.mtx-ref:hover{background:#f6f3f4;text-decoration:underline}
 .mtx tr.mtx-tot td{background:#2d4d7a;color:#fff;font-weight:700}
@@ -81,6 +81,11 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .mtx tr.mtx-tot td.mtx-disp{color:#fff}
 .mtx td.mtx-fab{font-size:11px;color:#555;text-align:center;white-space:nowrap}
 .mtx td.mtx-real{text-align:right;font-weight:600;color:#3a2426}
+.mtx td.mtx-perd{text-align:right;font-weight:700;color:#c45a2c;background:#fdf3ee}
+/* En la fila TOTAL (azul oscuro) y en la fila de máquina (franja azul) la celda de
+   pérdida hereda el fondo de su fila, para no romper la banda con un hueco salmón. */
+.mtx tr.mtx-tot td.mtx-perd{background:#2d4d7a;color:#fff}
+.mtx tr.mtx-maq td.mtx-perd{background:#aecbef;color:#15336e}
 /* formato condicional: tonos salmón (override del fondo de fila con !important) */
 .mtx td.sal1{background:#fde2d8!important}
 .mtx td.sal2{background:#f9c3b0!important}
@@ -152,6 +157,11 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .btrack{flex:1;height:26px;background:#f0eeee;border-radius:5px;overflow:hidden;position:relative}
 .bfill{height:100%;border-radius:5px;min-width:2px;transition:width .3s}
 .bval{min-width:96px;text-align:right;font-size:13px;font-weight:700}
+/* Columnas extra opcionales (horas perdidas en métrica OEE) */
+.bextra{min-width:120px;max-width:120px;text-align:right;font-size:12.5px;font-weight:600;color:#3a2426;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brow.bhead{padding-top:0;padding-bottom:2px;cursor:default;background:none}
+.brow.bhead:hover{background:none}
+.brow.bhead .bextra{font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.02em}
 .hint{font-size:12px;color:#9ca3af;margin-top:12px;font-style:italic}
 .loading{text-align:center;padding:40px;color:#9ca3af}
 .spinner{display:inline-block;width:34px;height:34px;border:3px solid #f0eeee;border-top-color:#A31416;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:14px}
@@ -542,8 +552,14 @@ const App={
         // Color relativo al mayor del conjunto: verde fuerte la máxima, y de ahí
         // hacia abajo gradual sin llegar a rojo.
         const vMax=Math.max(...items.map(i=>i.valor||0),1);
+        // Solo en OEE por máquina: dos columnas con las horas perdidas (disp/rend).
+        const fH=v=>(v==null||v==='')?'':(Math.round(v*10)/10).toLocaleString('es-ES')+' h';
+        const extraCols=(State.metrica==='oee'&&!esRef)?[
+          {label:'H. perd. disponib.',val:i=>i.horas_perd_disp,fmt:fH},
+          {label:'H. perd. rendim.',  val:i=>i.horas_perd_rend,fmt:fH},
+        ]:null;
         machBody.innerHTML=this.barList(items,{
-          name:i=>i.maquina,val:i=>i.valor,unit,max,
+          name:i=>i.maquina,val:i=>i.valor,unit,max,extraCols,
           color:i=>unit==='%'?this.semColor(i.valor,vMax):'#3a6aa3',clickable
         })+(clickable?`<div class="hint">${hint}</div>`:'');
         if(clickable){
@@ -1171,15 +1187,28 @@ const App={
     return hex(c[0],c[1],c[2]);
   },
   barList(items,o){
-    return '<div class="bars">'+items.map(i=>{
+    // Columnas extra opcionales (o.extraCols): [{label, val(i), fmt?}]. Solo las
+    // usa la lista principal de máquinas en métrica OEE (horas perdidas). El resto
+    // de usos de barList no las pasan, así que su render no cambia.
+    const extra=Array.isArray(o.extraCols)?o.extraCols:[];
+    const hcols=extra.length
+      ? '<div class="brow bhead"><div class="bname"></div><div class="btrack"></div><div class="bval"></div>'
+        +extra.map(c=>`<div class="bextra" title="${c.label}">${c.label}</div>`).join('')+'</div>'
+      : '';
+    return '<div class="bars">'+hcols+items.map(i=>{
       const v=o.val(i),w=Math.max(0,Math.min(100,(v/o.max)*100));
       const disp=o.unit==='h'?(v.toFixed?v.toFixed(1):v)+' h'
                  :o.unit==='%'?v+' %'
                  :(v.toLocaleString?v.toLocaleString():v)+' '+(o.unit||'');
+      const ec=extra.map(c=>{
+        const cv=c.val(i);
+        const txt=c.fmt?c.fmt(cv):((cv==null)?'':cv);
+        return `<div class="bextra">${txt}</div>`;
+      }).join('');
       return `<div class="brow${o.clickable?' clickable':''}">
         <div class="bname" title="${o.name(i)}">${o.name(i)}</div>
         <div class="btrack"><div class="bfill" style="width:${w}%;background:${o.color(i)}"></div></div>
-        <div class="bval">${disp}</div></div>`;
+        <div class="bval">${disp}</div>${ec}</div>`;
     }).join('')+'</div>';
   },
 
@@ -1851,27 +1880,33 @@ const App={
     const ncol=colKeys.length;
     let h='<div class="mtx2-scroll"><table class="mtx2-tbl"><thead>';
     h+='<tr><th class="mtx2-acth" rowspan="2">Máquina / Referencia</th>';
+    h+='<th class="mtx2-tot" rowspan="2">TOTAL (h)</th>';
     for(const a of acts){ if(actCols[a]) h+=`<th class="mtx2-acttop" colspan="${actCols[a]}">${e(a)}</th>`; }
-    h+='<th class="mtx2-tot" rowspan="2">TOTAL (h)</th></tr><tr>';
+    h+='</tr><tr>';
     for(const c of colKeys) h+=`<th class="mtx2-paroh">${e(c.cat)}</th>`;
     h+='</tr></thead><tbody>';
-    // Fila TOTAL general (arriba).
+    // Fila TOTAL general (arriba). El total se calcula antes para poder pintarlo
+    // en la 2ª columna (junto a Máquina/Referencia).
+    const colTot={}; let gtot=0;
+    for(const c of colKeys){let t=0;for(const m of maqs)t+=m.celdas[c.key]||0;colTot[c.key]=t;gtot+=t;}
     h+='<tr class="mtx2-totrow"><td class="mtx2-act"><b>TOTAL</b></td>';
-    let gtot=0;
-    for(const c of colKeys){let t=0;for(const m of maqs)t+=m.celdas[c.key]||0;gtot+=t;h+=`<td class="num"><b>${f2(t)}</b></td>`;}
-    h+=`<td class="num"><b>${f2(gtot)}</b></td></tr>`;
+    h+=`<td class="num mtx2-tot"><b>${f2(gtot)}</b></td>`;
+    for(const c of colKeys)h+=`<td class="num"><b>${f2(colTot[c.key])}</b></td>`;
+    h+='</tr>';
     let rid=0;
     for(const mq of maqs){
       // Fila de máquina (cabecera de grupo).
       h+=`<tr class="mtx2-maqrow"><td class="mtx2-act">🏭 ${e(mq.maquina)}</td>`;
+      h+=`<td class="num mtx2-tot"><b>${f2(mq.total_horas)}</b></td>`;
       for(const c of colKeys)h+=`<td class="num"><b>${f2(mq.celdas[c.key]||0)}</b></td>`;
-      h+=`<td class="num mtx2-tot"><b>${f2(mq.total_horas)}</b></td></tr>`;
+      h+='</tr>';
       for(const ref of mq.referencias){
         const id='m2r'+(rid++);
         // Fila de referencia (clic = expandir/contraer detalle por paro).
         h+=`<tr class="mtx2-refrow" data-tgt="${id}"><td class="mtx2-ref-cell" title="${e(ref.cod)}"><span class="mtx2-exp">▶</span> ${e(ref.desc)}<small>${e(ref.cod)}</small></td>`;
+        h+=`<td class="num mtx2-tot"><b>${f2(ref.total_horas)}</b></td>`;
         for(const c of colKeys){const v=ref.celdas[c.key]||0;h+=`<td class="num" style="${cellCol(v)}">${f2(v)}</td>`;}
-        h+=`<td class="num mtx2-tot"><b>${f2(ref.total_horas)}</b></td></tr>`;
+        h+='</tr>';
         // Filas de detalle por paro (una por paro presente, ocultas por defecto).
         const parosUsados=[];
         for(const c of cats){for(const p of (parosPorCat[c]||[])){
@@ -1879,9 +1914,12 @@ const App={
         }}
         for(const pp of parosUsados){
           h+=`<tr class="mtx2-pararow ${id}" style="display:none"><td class="mtx2-paro-cell">↳ ${e(pp.paro)} <small>${e(pp.cat)}</small></td>`;
+          // Total de la fila-paro: se calcula antes para pintarlo en la 2ª columna.
           let tp=0;
-          for(const c of colKeys){const v=ref.celdas[c.act+'||'+c.cat+'||'+pp.paro]||0;tp+=v;h+=`<td class="num" style="${cellCol(v)}">${f2(v)}</td>`;}
-          h+=`<td class="num">${f2(tp)}</td></tr>`;
+          for(const c of colKeys)tp+=ref.celdas[c.act+'||'+c.cat+'||'+pp.paro]||0;
+          h+=`<td class="num">${f2(tp)}</td>`;
+          for(const c of colKeys){const v=ref.celdas[c.act+'||'+c.cat+'||'+pp.paro]||0;h+=`<td class="num" style="${cellCol(v)}">${f2(v)}</td>`;}
+          h+='</tr>';
         }
       }
     }
@@ -1908,11 +1946,12 @@ const App={
         `<td class="mtx-fab">${e(o.ini)}</td><td class="mtx-fab">${e(o.fin)}</td>`+
         `<td class="mtx-real">${n0(o.utot)}</td><td class="mtx-real">${n0(o.uteo)}</td>`+
         `<td class="mtx-real">${n0(o.phreal)}</td><td class="mtx-real">${n1(o.phteo)}</td>`+
-        `<td class="mtx-real">${f2(o.real)}</td>`;
+        `<td class="mtx-real">${f2(o.real)}</td>`+
+        `<td class="mtx-perd">${f2(o.perd)}</td>`;
     };
     let h='<div class="mtx-wrap"><table class="mtx"><thead><tr>';
     h+='<th class="mtx-first">Máquina / Referencia</th>';
-    h+='<th>Nom. SAGE</th><th>TOTAL (h)</th><th>Disp. %</th><th>Rend. %</th><th>Cal. %</th><th>OEE %</th><th>Preparación (h)</th><th>Inicio fab.</th><th>Fin fab.</th><th>Uds. Total fab.</th><th>Uds. Teo fab.</th><th>Pzs/h real</th><th>Rdto. Teo</th><th>Fab. real (h)</th>';
+    h+='<th>Nom. SAGE</th><th>TOTAL (h)</th><th>Disp. %</th><th>Rend. %</th><th>Cal. %</th><th>OEE %</th><th>Preparación (h)</th><th>Inicio fab.</th><th>Fin fab.</th><th>Uds. Total fab.</th><th>Uds. Teo fab.</th><th>Pzs/h real</th><th>Rdto. Teo</th><th>Fab. real (h)</th><th>Pérdida de Horas por Rendimiento</th>';
     mots.forEach(m=>h+=`<th>${esc(m)}</th>`);
     h+='</tr></thead><tbody>';
     // Fila TOTAL por motivo (horizontal, ARRIBA).
@@ -1922,12 +1961,12 @@ const App={
     maqs.forEach(mq=>{
       const disp=mq.disponibilidad==null?'':mq.disponibilidad;
       h+=`<tr class="mtx-maq"><td class="mtx-first" data-cod="${esc(mq.cod_maquina)}" data-name="${esc(mq.maquina)}" data-disp="${disp}" title="Clic para ver el histograma de toda la máquina">${esc(mq.maquina)}</td>`;
-      h+=cells({tot:mq.total,dd:mq.disponibilidad,rr:mq.rendimiento,cc:mq.calidad,oo:mq.oee},false);
+      h+=cells({tot:mq.total,dd:mq.disponibilidad,rr:mq.rendimiento,cc:mq.calidad,oo:mq.oee,perd:mq.perd_rend},false);
       mots.forEach(m=>h+=`<td>${f2(mq.por_motivo[m])}</td>`);
       h+='</tr>';
       (mq.referencias||[]).forEach(r=>{
         h+=`<tr><td class="mtx-first mtx-ref" data-cod="${esc(mq.cod_maquina)}" data-ref="${esc(r.referencia)}" data-maq="${esc(mq.maquina)}" title="Clic para ver el histograma de esta referencia">${esc(r.referencia)}</td>`;
-        h+=cells({sage:r.nomenclatura,tot:r.total,dd:r.disponibilidad,rr:r.rendimiento,cc:r.calidad,oo:r.oee,prep:r.fab_prep,utot:r.uds_total,uteo:r.uds_teo,phreal:r.ph_real,phteo:r.ph_teo,ini:r.fab_inicio,fin:r.fab_fin,real:r.fab_real},true);
+        h+=cells({sage:r.nomenclatura,tot:r.total,dd:r.disponibilidad,rr:r.rendimiento,cc:r.calidad,oo:r.oee,prep:r.fab_prep,utot:r.uds_total,uteo:r.uds_teo,phreal:r.ph_real,phteo:r.ph_teo,ini:r.fab_inicio,fin:r.fab_fin,real:r.fab_real,perd:r.perd_rend},true);
         mots.forEach(m=>{const v=r.por_motivo[m];h+=`<td class="${salMot(v)}">${f2(v)}</td>`;});
         h+='</tr>';
       });

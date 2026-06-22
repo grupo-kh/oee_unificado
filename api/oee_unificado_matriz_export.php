@@ -102,6 +102,7 @@ try {
 
     $drcByName  = [];   // Desc_maquina => ['disp','rend','cal']
     $codByName  = [];   // Desc_maquina => Cod_maquina
+    $perdRendByName = [];  // Desc_maquina => horas perdidas por rendimiento (M − MOT)
     $codMaqs    = [];   // Cod_maquina en ámbito
     $seccionLabel = $seccion !== '' ? $seccion : 'Todas';
     foreach ($oeeRows as $r) {
@@ -112,6 +113,8 @@ try {
             (float)$r['M'], (float)$r['MOT'], (float)$r['MOKT'],
             (float)$r['PP'], (float)$r['PC'], (float)$r['PNP']
         );
+        // Pérdida de horas por rendimiento: M − M_OKNOK_TEO (mismo criterio que el drill).
+        $perdRendByName[$name] = round(max(0, (float)$r['M'] - (float)$r['MOT']) / 3600, 2);
         $codByName[$name]  = (string)$r['cod_maquina'];
         $codMaqs[] = (string)$r['cod_maquina'];
     }
@@ -120,6 +123,7 @@ try {
     // ───── 2) % D/R/C + unidades fabricadas por máquina + referencia ─────
     $drcRef   = [];   // [cod_maquina][cod_producto] => ['disp','rend','cal','oee']
     $unitsRef = [];   // [cod_maquina][cod_producto] => ['u_total','u_teo','dif']
+    $perdRendRef = []; // [cod_maquina][cod_producto] => horas perdidas por rendimiento (M − MOT)
     if (!empty($codMaqs)) {
         $phM = implode(',', array_fill(0, count($codMaqs), '?'));
         $sqlOeeRef = "
@@ -141,6 +145,7 @@ try {
                 (float)$r['M'], (float)$r['MOT'], (float)$r['MOKT'],
                 (float)$r['PP'], (float)$r['PC'], (float)$r['PNP']
             );
+            $perdRendRef[$cm][$cr] = round(max(0, (float)$r['M'] - (float)$r['MOT']) / 3600, 2);
             $uTot = (int)$r['u_total']; $uTeo = (int)$r['u_teo'];
             $unitsRef[$cm][$cr] = [
                 'u_total' => $uTot,
@@ -310,7 +315,7 @@ try {
     // Helper: datos por referencia listos para JSON/XLSX.
     // Orden de las referencias de cada máquina: por FECHA DE INICIO de fabricación
     // ascendente (orden cronológico de fabricación); las sin fecha, al final.
-    $refsDe = function(string $maq) use ($refTotal, $refLabel, $matrix, $drcRef, $unitsRef, $rendTeo, $fab, $sageNom, $codByName) {
+    $refsDe = function(string $maq) use ($refTotal, $refLabel, $matrix, $drcRef, $unitsRef, $rendTeo, $fab, $sageNom, $codByName, $perdRendRef) {
         $cm = $codByName[$maq] ?? '';
         $out = [];
         foreach (array_keys($refTotal[$maq] ?? []) as $k) {
@@ -335,6 +340,7 @@ try {
                 'fab_fin'         => $fb['fin'] ?? '',
                 'fab_prep'        => $fb['prep_h'] ?? null,
                 'fab_real'        => $fb['real_h'] ?? null,
+                'perd_rend'       => ($k !== '__NOREF__') ? ($perdRendRef[$cm][$k] ?? null) : null, // Pérdida horas por rendimiento (M − MOT)
                 'por_motivo'      => array_map(fn($v) => round($v, 2), $matrix[$maq][$k] ?? []),
                 '_sort'           => $fb['raw'] ?? '9999-12-31 23:59:59',
             ];
@@ -357,6 +363,7 @@ try {
                 'calidad'        => $drc['cal']  ?? null,
                 'oee'            => $drc['oee']  ?? null,
                 'total'          => round(array_sum($maqTotal[$maq] ?? []), 2),
+                'perd_rend'      => $perdRendByName[$maq] ?? null, // Pérdida horas por rendimiento (M − MOT)
                 'por_motivo'     => array_map(fn($v) => round($v, 2), $maqTotal[$maq] ?? []),
                 'referencias'    => $refsDe($maq),
             ];
@@ -377,7 +384,8 @@ try {
     // ───── Construir el XLSX ─────
     // Columnas: 1 Máquina/Ref · 2 Nom.SAGE · 3 TOTAL(h) · 4 Disp · 5 Rend · 6 Cal · 7 OEE
     //           · 8 Preparación(h) · 9 Inicio fab · 10 Fin fab · 11 Uds.Total · 12 Uds.Teo
-    //           · 13 Pzs/h real · 14 Pzs/h teo · 15 Fab. real(h) · 16.. motivos
+    //           · 13 Pzs/h real · 14 Pzs/h teo · 15 Fab. real(h)
+    //           · 16 Pérdida de Horas por Rendimiento · 17.. motivos
     $book = new Spreadsheet();
     $book->getProperties()->setCreator('KH Plan Attainment')->setTitle('OEE Unificado · Matriz')
         ->setDescription("Matriz motivos × máquina/referencia $fdesde a $fhasta");
@@ -386,7 +394,7 @@ try {
 
     $colName = 1; $colSage = 2; $colTotal = 3; $colDisp = 4; $colRend = 5; $colCal = 6; $colOee = 7;
     $colPrep = 8; $colIni = 9; $colFin = 10; $colUTot = 11; $colUTeo = 12;
-    $colPhReal = 13; $colPhTeo = 14; $colReal = 15; $colMot0 = 16;
+    $colPhReal = 13; $colPhTeo = 14; $colReal = 15; $colPerdRend = 16; $colMot0 = 17;
     $nMot = count($motivos);
     $lastCol = $colMot0 + $nMot - 1; if ($lastCol < $colFin) $lastCol = $colFin;
     $lastColLt = Coordinate::stringFromColumnIndex($lastCol);
@@ -420,6 +428,7 @@ try {
     $ws->setCellValue([$colPhReal, $hRow], 'Pzs/h real');
     $ws->setCellValue([$colPhTeo, $hRow], 'Rdto. Teo');
     $ws->setCellValue([$colReal, $hRow], 'Fab. real (h)');
+    $ws->setCellValue([$colPerdRend, $hRow], 'Pérdida de Horas por Rendimiento');
     foreach ($motivos as $i => $mot) $ws->setCellValue([$colMot0 + $i, $hRow], $mot);
     $hdrRange = "A$hRow:{$lastColLt}$hRow";
     $ws->getStyle($hdrRange)->getFont()->setBold(true)->setColor(new Color('FFFFFFFF'));
@@ -469,8 +478,12 @@ try {
             $ws->setCellValue([$colCal,  $maqRow], $drcByName[$maq]['cal']);
             $ws->setCellValue([$colOee,  $maqRow], $drcByName[$maq]['oee']);
         }
+        if (($perdRendByName[$maq] ?? null) !== null) {
+            $ws->setCellValue([$colPerdRend, $maqRow], $perdRendByName[$maq]);
+        }
         $ws->getStyle("A$maqRow:{$lastColLt}$maqRow")->getFont()->setBold(true);
-        $ws->getStyle("A$maqRow:{$lastColLt}$maqRow")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('DCE6F4');
+        // Azul más marcado para distinguir la fila TOTAL de la máquina de sus referencias.
+        $ws->getStyle("A$maqRow:{$lastColLt}$maqRow")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('AECBEF');
         // (El formato condicional salmón en % NO se aplica a las filas de máquina,
         //  solo al detalle por referencia.)
         $row++;
@@ -492,6 +505,7 @@ try {
             if ($rf['ph_real'] !== null)   $ws->setCellValue([$colPhReal, $row], $rf['ph_real']);
             if ($rf['ph_teo'] !== null)    $ws->setCellValue([$colPhTeo, $row], $rf['ph_teo']);
             if ($rf['fab_real'] !== null) $ws->setCellValue([$colReal, $row], $rf['fab_real']);
+            if (($rf['perd_rend'] ?? null) !== null) $ws->setCellValue([$colPerdRend, $row], $rf['perd_rend']);
             // Salmón en % < 75 de la referencia.
             foreach ([[$colDisp,'disponibilidad'],[$colRend,'rendimiento'],[$colCal,'calidad'],[$colOee,'oee']] as $pc) {
                 if ($rf[$pc[1]] !== null && $rf[$pc[1]] < 75) $fillCell($pc[0], $row, $SAL1);
@@ -522,7 +536,7 @@ try {
         }
         $ws->getStyle("{$dispLt}$totRow:{$pctFinLt}$lastRow")->getNumberFormat()->setFormatCode('0.0"%"');
         $ws->getStyle("{$dispLt}$totRow:{$pctFinLt}$lastRow")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-        foreach ([$colPrep, $colReal] as $cc) {   // horas: prep y fab. real (no adyacentes)
+        foreach ([$colPrep, $colReal, $colPerdRend] as $cc) {   // horas: prep, fab. real y pérdida por rendimiento (no adyacentes)
             $lt = Coordinate::stringFromColumnIndex($cc);
             $ws->getStyle("{$lt}$totRow:{$lt}$lastRow")->getNumberFormat()->setFormatCode('#,##0.00');
             $ws->getStyle("{$lt}$totRow:{$lt}$lastRow")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
@@ -544,8 +558,9 @@ try {
     $ws->getColumnDimension(Coordinate::stringFromColumnIndex($colPrep))->setWidth(13);
     foreach ([$colUTot,$colUTeo,$colPhReal,$colPhTeo] as $c) $ws->getColumnDimension(Coordinate::stringFromColumnIndex($c))->setWidth(11);
     $ws->getColumnDimension(Coordinate::stringFromColumnIndex($colReal))->setWidth(13);
+    $ws->getColumnDimension(Coordinate::stringFromColumnIndex($colPerdRend))->setWidth(16);
     for ($c = $colMot0; $c <= $lastCol; $c++) $ws->getColumnDimension(Coordinate::stringFromColumnIndex($c))->setWidth(12);
-    // Inmoviliza bloque izquierdo (15 cols) + cabecera + fila TOTAL.
+    // Inmoviliza bloque izquierdo (16 cols, incluye Pérdida por rendimiento) + cabecera + fila TOTAL.
     $ws->freezePane(Coordinate::stringFromColumnIndex($colMot0) . ($totRow + 1));
 
     // ───── Descargar ─────

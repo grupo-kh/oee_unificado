@@ -110,10 +110,19 @@ try {
             (float)$r['M'], (float)$r['M_Teo'], (float)$r['M_OKNOK_TEO'],
             (float)$r['M_OK_TEO'], (float)$r['PPERF'], (float)$r['PCALIDAD'], (float)$r['PNP']
         );
+        // Horas perdidas (segundos → horas). Reutilizan los mismos componentes que
+        // ya entrega F_his_ct, sin consultas adicionales:
+        //   · Disponibilidad: PNP (paros no productivos) — base de D = M/(M+PNP).
+        //   · Rendimiento: M − M_OKNOK_TEO — tiempo de máquina que no se convirtió
+        //     en producción teórica (misma fórmula que _motivosRendimiento).
+        $horasPerdDisp = round((float)$r['PNP'] / 3600, 2);
+        $horasPerdRend = round(max(0, (float)$r['M'] - (float)$r['M_OKNOK_TEO']) / 3600, 2);
         $maquinas[] = [
-            'cod_maquina' => $r['cod_maquina'],
-            'maquina'     => $r['maquina'] ?: $r['cod_maquina'],
-            'valor'       => $drc[$metrica],
+            'cod_maquina'     => $r['cod_maquina'],
+            'maquina'         => $r['maquina'] ?: $r['cod_maquina'],
+            'valor'           => $drc[$metrica],
+            'horas_perd_disp' => $horasPerdDisp,
+            'horas_perd_rend' => $horasPerdRend,
         ];
     }
     // Sort ASC (peores primero)
