@@ -110,10 +110,14 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
    borde + texto ~18). Fila 1 (Actividad) top:0; fila 2 (Categoría) top:30px;
    fila 3 (Motivo) top:60px. La fila TOTAL queda tras las 3 → top:90px. */
 .mtx2-tbl th.mtx2-acttop{top:0;text-align:center;background:#2b1a1c;font-weight:700;border-bottom:2px solid #8c181a}
-.mtx2-tbl th.mtx2-cath{top:30px;text-align:center;font-weight:700;font-size:11px}
-.mtx2-tbl th.mtx2-moth{top:60px;font-weight:500;font-size:11px;background:#4a3032;color:#f3e7e7}
+.mtx2-tbl th.mtx2-cath{top:30px;text-align:center;font-weight:700;font-size:11px;background:#5a3a3c}
+/* Encabezado de motivo: fondo definido y texto blanco para legibilidad clara. */
+.mtx2-tbl th.mtx2-moth{top:60px;font-weight:600;font-size:11px;background:#6a4244;color:#fff;border-bottom:2px solid #8c181a}
 .mtx2-tbl th.mtx2-acth{top:0;text-align:left;left:0;z-index:5;background:#3a2426}
 .mtx2-tbl th.mtx2-tot{top:0;left:auto;z-index:4;background:#3a2426}
+/* Línea divisoria entre categorías: borde izquierdo marcado en la 1ª columna de
+   cada categoría (cabeceras y celdas de datos). */
+.mtx2-tbl .mtx2-catstart{border-left:2px solid #8c181a}
 .mtx2-tbl td.mtx2-ref-cell{position:sticky;left:0;z-index:1;background:#faf8f8;font-weight:600;color:#3a2426;text-align:left;max-width:300px;overflow:hidden;text-overflow:ellipsis}
 .mtx2-tbl td.mtx2-ref-cell small{display:block;color:#8a6e70;font-weight:500;font-size:10px}
 .mtx2-tbl td.mtx2-act{font-weight:700;color:#3a2426;background:#f0eeee;position:sticky;left:0;text-align:left}
@@ -1890,17 +1894,22 @@ const App={
         const motivos=(parosPorCat[c]||[]).filter(p=>hasParo(a,c,p));
         if(!motivos.length)continue;   // sin motivos no hay columnas que mostrar
         const grp=a+'__'+c;
-        for(const p of motivos)leaves.push({act:a,cat:c,grp,paro:p,keyParo:a+'||'+c+'||'+p});
+        // catIni marca la 1ª hoja de la categoría → borde divisorio entre categorías.
+        motivos.forEach((p,i)=>leaves.push({act:a,cat:c,grp,paro:p,keyParo:a+'||'+c+'||'+p,catIni:i===0}));
         catsDeA.push({cat:c,grp,motivos,nMot:motivos.length});
       }
       if(catsDeA.length)actList.push({act:a,cats:catsDeA});
     }
     // Celdas numéricas de una fila: una por cada motivo (lectura directa de su clave).
-    const filaCeldas=(get)=>{
+    // heat=true aplica el gradiente de calor (solo en filas de referencia, con texto
+    // oscuro). En máquina/TOTAL (texto blanco) NO se aplica: el fondo claro del
+    // gradiente dejaría el texto blanco ilegible. catIni → borde divisorio de categoría.
+    const filaCeldas=(get,heat)=>{
       let s='';
       for(const lf of leaves){
         const v=get(lf.keyParo)||0;
-        s+=`<td class="num mtx2-mot" data-grp="${e(lf.grp)}" style="${cellCol(v)}">${q(v)}</td>`;
+        const cls='num mtx2-mot'+(lf.catIni?' mtx2-catstart':'');
+        s+=`<td class="${cls}" data-grp="${e(lf.grp)}" style="${heat?cellCol(v):''}">${q(v)}</td>`;
       }
       return s;
     };
@@ -1910,34 +1919,35 @@ const App={
     h+='<th class="mtx2-tot" rowspan="3">TOTAL (h)</th>';
     for(const a of actList){const cs=a.cats.reduce((t,c)=>t+c.nMot,0);h+=`<th class="mtx2-acttop" data-act="${e(a.act)}" colspan="${cs}">${e(a.act)}</th>`;}
     h+='</tr>';
-    // Fila 2 (Categoría). Colspan = nMot (solo columnas de motivo, siempre visibles).
+    // Fila 2 (Categoría). Colspan = nMot. Cada categoría empieza con borde divisorio.
     h+='<tr>';
     for(const a of actList)for(const c of a.cats){
-      h+=`<th class="mtx2-cath" data-act="${e(a.act)}" data-grp="${e(c.grp)}" colspan="${c.nMot}">${e(c.cat)}</th>`;
+      h+=`<th class="mtx2-cath mtx2-catstart" data-act="${e(a.act)}" data-grp="${e(c.grp)}" colspan="${c.nMot}">${e(c.cat)}</th>`;
     }
     h+='</tr>';
-    // Fila 3 (Motivo). Una celda por motivo (sin columna resumen).
+    // Fila 3 (Motivo). Una celda por motivo (sin columna resumen). La 1ª de cada
+    // categoría lleva mtx2-catstart para el borde divisorio.
     h+='<tr>';
-    for(const lf of leaves)h+=`<th class="mtx2-moth mtx2-mot" data-grp="${e(lf.grp)}" data-paro="${e(lf.paro)}">${e(lf.paro)}</th>`;
+    for(const lf of leaves)h+=`<th class="mtx2-moth mtx2-mot${lf.catIni?' mtx2-catstart':''}" data-grp="${e(lf.grp)}" data-paro="${e(lf.paro)}">${e(lf.paro)}</th>`;
     h+='</tr></thead><tbody>';
     // Fila TOTAL general. El total (2ª columna) suma todos los motivos.
     let gtot=0; for(const lf of leaves){for(const m of maqs)gtot+=m.celdas[lf.keyParo]||0;}
     h+='<tr class="mtx2-totrow"><td class="mtx2-act"><b>TOTAL</b></td>';
     h+=`<td class="num mtx2-tot"><b>${q(gtot)}</b></td>`;
-    h+=filaCeldas(k=>{let t=0;for(const m of maqs)t+=m.celdas[k]||0;return t;});
+    h+=filaCeldas(k=>{let t=0;for(const m of maqs)t+=m.celdas[k]||0;return t;},false);
     h+='</tr>';
     for(const mq of maqs){
-      // Fila de máquina (cabecera de grupo).
+      // Fila de máquina (cabecera de grupo). Sin gradiente de calor (texto blanco).
       h+=`<tr class="mtx2-maqrow"><td class="mtx2-act">🏭 ${e(mq.maquina)}</td>`;
       h+=`<td class="num mtx2-tot"><b>${q(mq.total_horas)}</b></td>`;
-      h+=filaCeldas(k=>mq.celdas[k]||0);
+      h+=filaCeldas(k=>mq.celdas[k]||0,false);
       h+='</tr>';
       for(const ref of mq.referencias){
         // Fila de referencia. El detalle por motivo se ve en COLUMNAS anidadas
         // dentro de cada categoría (visibles de entrada), no en filas inferiores.
         h+=`<tr class="mtx2-reftr"><td class="mtx2-ref-cell" title="${e(ref.cod)}">${e(ref.desc)}<small>${e(ref.cod)}</small></td>`;
         h+=`<td class="num mtx2-tot"><b>${q(ref.total_horas)}</b></td>`;
-        h+=filaCeldas(k=>ref.celdas[k]||0);
+        h+=filaCeldas(k=>ref.celdas[k]||0,true);
         h+='</tr>';
       }
     }

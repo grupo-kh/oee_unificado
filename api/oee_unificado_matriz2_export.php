@@ -173,8 +173,21 @@ foreach ($maqs as $m) {
 // Ancho columnas + bordes.
 $ws->getColumnDimension('A')->setWidth(46);
 for ($i = 2; $i <= $colTot; $i++) $ws->getColumnDimension(Coordinate::stringFromColumnIndex($i))->setWidth(13);
-$ws->getStyle('A' . $rH1 . ':' . $cT . ($r - 1))
+$ultima = $r - 1;
+$ws->getStyle('A' . $rH1 . ':' . $cT . $ultima)
    ->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+
+// Línea divisoria entre categorías: borde izquierdo grueso granate en la 1ª columna
+// de cada categoría (desde la cabecera hasta la última fila de datos).
+$colCat = 2;   // empieza tras la columna A
+for ($k = 0; $k < $nLeaf; $k++) {
+    $esIniCat = ($k === 0) || ($leaves[$k]['act'] !== $leaves[$k - 1]['act']) || ($leaves[$k]['cat'] !== $leaves[$k - 1]['cat']);
+    if ($esIniCat && $k > 0) {
+        $col = Coordinate::stringFromColumnIndex($k + 2);   // +2: A + base 1
+        $ws->getStyle($col . $rH1 . ':' . $col . $ultima)
+           ->getBorders()->getLeft()->setBorderStyle(Border::BORDER_MEDIUM)->getColor()->setRGB('8C181A');
+    }
+}
 $ws->freezePane('B' . ($rH3 + 1));
 
 $nombre = 'Matriz2_' . ($seccion ?: 'Todas') . "_{$fdesde}_a_{$fhasta}.xlsx";
