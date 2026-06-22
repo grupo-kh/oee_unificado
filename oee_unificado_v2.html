@@ -1960,7 +1960,7 @@ const App={
           s+=`<td class="num" style="${cellCol(v)}">${q(v)}</td>`;
         }else{
           const v=get(lf.keyParo)||0;
-          s+=`<td class="num mtx2-mot col-hidden" data-grp="${e(lf.grp)}" style="display:none;${cellCol(v)}">${q(v)}</td>`;
+          s+=`<td class="num mtx2-mot" data-grp="${e(lf.grp)}" style="${cellCol(v)}">${q(v)}</td>`;
         }
       }
       return s;
@@ -1976,30 +1976,31 @@ const App={
           const v=(lf.grp===grpMot)?(get()||0):0;
           s+=`<td class="num" style="${cellCol(v)}">${q(v)}</td>`;
         }else{
-          s+=`<td class="num mtx2-mot col-hidden" data-grp="${e(lf.grp)}" style="display:none"></td>`;
+          s+=`<td class="num mtx2-mot" data-grp="${e(lf.grp)}"></td>`;
         }
       }
       return s;
     };
     let h='<div class="mtx2-scroll"><table class="mtx2-tbl"><thead>';
-    // Fila 1 (Actividad). Colspan inicial = nº categorías de la act (todo colapsado).
+    // Fila 1 (Actividad). Colspan inicial = suma de hojas de sus categorías (resumen
+    // + motivos), porque las columnas de motivo nacen EXPANDIDAS por defecto.
     h+='<tr><th class="mtx2-acth" rowspan="3">Máquina / Referencia</th>';
     h+='<th class="mtx2-tot" rowspan="3">TOTAL (h)</th>';
-    for(const a of actList)h+=`<th class="mtx2-acttop" data-act="${e(a.act)}" colspan="${a.cats.length}">${e(a.act)}</th>`;
+    for(const a of actList){const cs=a.cats.reduce((t,c)=>t+1+c.nMot,0);h+=`<th class="mtx2-acttop" data-act="${e(a.act)}" colspan="${cs}">${e(a.act)}</th>`;}
     h+='</tr>';
-    // Fila 2 (Categoría). Colspan inicial = 1 (solo resumen visible). Las clicables
-    // (con motivos) llevan indicador ▶ y data-nmot para recalcular colspans.
+    // Fila 2 (Categoría). Colspan inicial = 1 + nMot (motivos EXPANDIDOS por defecto).
+    // Las clicables (con motivos) nacen abiertas: data-open="1" e indicador ▼.
     h+='<tr>';
     for(const a of actList)for(const c of a.cats){
       const clic=c.nMot>0;
-      h+=`<th class="mtx2-cath${clic?' mtx2-clic':''}" data-act="${e(a.act)}" data-grp="${e(c.grp)}" data-nmot="${c.nMot}" colspan="1">${e(c.cat)}${clic?' <span class="mtx2-tg">▶</span>':''}</th>`;
+      h+=`<th class="mtx2-cath${clic?' mtx2-clic':''}" data-act="${e(a.act)}" data-grp="${e(c.grp)}" data-nmot="${c.nMot}" data-open="${clic?'1':'0'}" colspan="${1+c.nMot}">${e(c.cat)}${clic?' <span class="mtx2-tg">▼</span>':''}</th>`;
     }
     h+='</tr>';
-    // Fila 3 (Motivo). Una celda por hoja: resumen (siempre visible) y motivo (oculto).
+    // Fila 3 (Motivo). Una celda por hoja: resumen + motivos (visibles de entrada).
     h+='<tr>';
     for(const lf of leaves){
       if(lf.tipo==='resumen')h+=`<th class="mtx2-resh" data-grp="${e(lf.grp)}">Resumen</th>`;
-      else h+=`<th class="mtx2-moth mtx2-mot col-hidden" data-grp="${e(lf.grp)}" data-paro="${e(lf.paro)}" style="display:none">${e(lf.paro)}</th>`;
+      else h+=`<th class="mtx2-moth mtx2-mot" data-grp="${e(lf.grp)}" data-paro="${e(lf.paro)}">${e(lf.paro)}</th>`;
     }
     h+='</tr></thead><tbody>';
     // Fila TOTAL general. El total (2ª columna) suma SOLO las hojas resumen.
