@@ -97,6 +97,12 @@ function matriz2Data(): array
     $actSet = [];        // actividades presentes
     $catSet = [];        // categorías presentes
     $parosPorCat = [];   // categoria => [paro => true] (para las filas de paro)
+    // Pesos (horas totales) por nivel, para ordenar las columnas de MÁS a MENOS
+    // horas (la de más peso siempre a la izquierda). Se acumulan globalmente sobre
+    // todas las máquinas/referencias del filtro, en paralelo a las celdas.
+    $pesoAct = [];       // actividad        => horas
+    $pesoCat = [];       // categoría        => horas (global, suma de todas las actividades)
+    $pesoMot = [];       // "categoría||paro" => horas (motivo dentro de su categoría)
     foreach ($rows as $r) {
         $maq = (string) $r['maquina'];
         if ($seccion !== '' && in_array($seccion, ['VARILLAS','TROQUELADOS'], true)
@@ -130,6 +136,10 @@ function matriz2Data(): array
         $actSet[$act]  = true;
         $catSet[$cate] = true;
         $parosPorCat[$cate][$par] = true;
+        // Acumular peso por nivel (mismo $h que las celdas).
+        $pesoAct[$act]               = ($pesoAct[$act] ?? 0) + $h;
+        $pesoCat[$cate]              = ($pesoCat[$cate] ?? 0) + $h;
+        $pesoMot[$cate . '||' . $par] = ($pesoMot[$cate . '||' . $par] ?? 0) + $h;
     }
 
     // Salida: máquinas (orden por más horas) con sus referencias (idem).
@@ -150,27 +160,33 @@ function matriz2Data(): array
     }
     usort($out, fn($a, $b) => $b['total_horas'] <=> $a['total_horas']);
 
-    // Ordenar actividades por un orden lógico conocido y el resto alfabético.
-    $ordenAct = ['PREPARACION','PRODUCCION','AJUSTES EN PRODUCCION','MANTENIMIENTO',
-                 'MEJORAS DE PROCESO','PROTOTIPOS AJUSTE','PROTOTIPOS PRODUCCIÓN','TEST','CERRADA'];
+    // Orden de columnas POR PESO (horas de paro), de más a menos: la columna con
+    // más peso siempre queda a la izquierda. Aplica a los tres niveles de la
+    // cabecera (Actividad → Categoría → Motivo). Desempate alfabético para que el
+    // orden sea estable y reproducible cuando dos pesos coinciden.
     $actividades = array_keys($actSet);
-    usort($actividades, function ($a, $b) use ($ordenAct) {
-        $ia = array_search($a, $ordenAct); $ib = array_search($b, $ordenAct);
-        $ia = $ia === false ? 999 : $ia; $ib = $ib === false ? 999 : $ib;
-        return $ia === $ib ? strcmp($a, $b) : $ia <=> $ib;
+    usort($actividades, function ($a, $b) use ($pesoAct) {
+        $pa = $pesoAct[$a] ?? 0; $pb = $pesoAct[$b] ?? 0;
+        return $pa === $pb ? strcmp($a, $b) : $pb <=> $pa;
     });
-    // Categorías de paro (Tipo Paro 1) en orden lógico conocido.
-    $ordenCat = ['Interrupciones','Esperas','Ajustes y Programacion','Cambio MP/Utillajes',
-                 'Calidad','Mantenimiento','Mejoras','Otros'];
+    // Categorías de paro (Tipo Paro 1) por peso global (suma sobre todas las
+    // actividades). El orden de categorías es el mismo dentro de cada actividad.
     $categorias = array_keys($catSet);
-    usort($categorias, function ($a, $b) use ($ordenCat) {
-        $ia = array_search($a, $ordenCat); $ib = array_search($b, $ordenCat);
-        $ia = $ia === false ? 999 : $ia; $ib = $ib === false ? 999 : $ib;
-        return $ia === $ib ? strcmp($a, $b) : $ia <=> $ib;
+    usort($categorias, function ($a, $b) use ($pesoCat) {
+        $pa = $pesoCat[$a] ?? 0; $pb = $pesoCat[$b] ?? 0;
+        return $pa === $pb ? strcmp($a, $b) : $pb <=> $pa;
     });
-    // Paros individuales por categoría (para el nivel de detalle, ordenados).
+    // Motivos individuales dentro de cada categoría, también por peso (más a la
+    // izquierda el de más horas). El peso del motivo se mide dentro de su categoría.
     $parosPorCategoria = [];
-    foreach ($parosPorCat as $c => $set) { $p = array_keys($set); sort($p); $parosPorCategoria[$c] = $p; }
+    foreach ($parosPorCat as $c => $set) {
+        $p = array_keys($set);
+        usort($p, function ($a, $b) use ($pesoMot, $c) {
+            $pa = $pesoMot[$c . '||' . $a] ?? 0; $pb = $pesoMot[$c . '||' . $b] ?? 0;
+            return $pa === $pb ? strcmp($a, $b) : $pb <=> $pa;
+        });
+        $parosPorCategoria[$c] = $p;
+    }
 
     return [
         'seccion'             => $seccion,
