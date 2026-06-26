@@ -73,8 +73,13 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .evm-list{flex:0 0 260px;overflow:auto;border-right:1px solid #e5dada;padding-right:10px}
 .evm-mot{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13px;border:1px solid transparent}
 .evm-mot:hover{background:#f6f3f4}
-.evm-mot.active{background:#8c181a;color:#fff;font-weight:700}
-.evm-mot small{opacity:.8;font-variant-numeric:tabular-nums}
+.evm-mot.active{color:#fff;font-weight:700}
+.evm-mot.active .evm-dot{outline:2px solid rgba(255,255,255,.7)}
+.evm-mot small{opacity:.85;font-variant-numeric:tabular-nums}
+.evm-mot span{display:inline-flex;align-items:center;gap:7px}
+.evm-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;display:inline-block}
+.evm-trend{padding:6px 12px;border:1px solid #d9cccd;background:#fff;border-radius:7px;font-size:13px;cursor:pointer;font-weight:600;color:#3a2426}
+.evm-trend.active{background:#8c181a;color:#fff;border-color:#6e1315}
 .evm-chart{flex:1 1 auto;min-width:0}
 .evm-gran{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .evm-gran button{padding:6px 12px;border:1px solid #d9cccd;background:#fff;border-radius:7px;font-size:13px;cursor:pointer;font-weight:600;color:#3a2426}
@@ -447,6 +452,9 @@ tbody tr:hover{background:#f9fafb}
 const API='api/'; // ruta relativa: funciona con la carpeta actual y tras renombrarla
 const COL={oee:'#3a6aa3',disponibilidad:'#2d4d7a',rendimiento:'#c45a2c',calidad:'#8c181a'};
 const PALETTE=['#3a6aa3','#c45a2c','#8c181a','#7c3aed','#0891b2','#b45309','#be185d','#4d7c0f','#9a3412','#1e40af','#0f766e','#a16207'];
+// Paleta del comparador de motivos (evolución): granate corporativo primero,
+// luego colores legibles y bien diferenciados para superponer varias líneas.
+const EVM_PALETA=['#8c181a','#3a6aa3','#c45a2c','#4d7c0f','#7c3aed','#0891b2','#be185d','#a16207','#1e40af','#9a3412'];
 
 if(window.ChartDataLabels){
   Chart.register(ChartDataLabels);
@@ -2006,14 +2014,19 @@ const App={
           <button data-g="day" class="active">Día</button>
           <button data-g="week">Semana</button>
           <button data-g="month">Mes</button>
+          <button class="evm-trend" style="margin-left:6px">📈 Tendencia</button>
           <button class="evmClose" style="background:#f3f4f6;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280;margin-left:10px">✕ Cerrar</button>
         </div>
       </div>
       <div class="fullpop-body"><div class="evm-wrap"><div class="evm-list">${this.loadingHtml()}</div><div class="evm-chart"></div></div></div>`;
     document.body.appendChild(ov);
     ov.querySelector('.evmClose').onclick=()=>ov.remove();
-    this._evolMot={ov, gran:'day', motivoSel:null, d:null, desde:desde0, hasta:hasta0};
-    // Botones de granularidad: recargan con la nueva escala conservando el motivo.
+    // motivoSel: Set de motivos seleccionados (comparativa). trend: línea de tendencia on/off.
+    this._evolMot={ov, gran:'day', motivoSel:new Set(), trend:false, d:null, desde:desde0, hasta:hasta0};
+    // Toggle de tendencia: re-renderiza con/sin rectas de regresión.
+    const bt=ov.querySelector('.evm-trend');
+    bt.onclick=()=>{ this._evolMot.trend=!this._evolMot.trend; bt.classList.toggle('active',this._evolMot.trend); this.evolMotRender(); };
+    // Botones de granularidad: recargan con la nueva escala conservando la selección.
     ov.querySelectorAll('.evm-gran button[data-g]').forEach(b=>{
       b.onclick=()=>{
         ov.querySelectorAll('.evm-gran button[data-g]').forEach(x=>x.classList.remove('active'));
@@ -2084,76 +2097,132 @@ const App={
           fecha_desde:this._evolMot.desde, fecha_hasta:this._evolMot.hasta}));
       this._evolMot.d=d;
       if(!d.motivos.length){list.innerHTML='<div class="empty">Sin paros para el filtro seleccionado</div>';return;}
-      // Conservar el motivo seleccionado si sigue existiendo; si no, el de más peso.
-      const sel=this._evolMot.motivoSel;
-      this._evolMot.motivoSel=(sel&&d.motivos.some(m=>m.motivo===sel))?sel:d.motivos[0].motivo;
+      // Conservar los motivos seleccionados que sigan existiendo; si no queda
+      // ninguno (1ª carga o cambio de rango sin coincidencias), el de más peso.
+      const nombres=new Set(d.motivos.map(m=>m.motivo));
+      const sel=new Set([...this._evolMot.motivoSel].filter(m=>nombres.has(m)));
+      if(!sel.size)sel.add(d.motivos[0].motivo);
+      this._evolMot.motivoSel=sel;
+      // Mapa estable motivo→color. Persiste entre cargas (cambios de rango/granularidad):
+      // a un motivo ya visto NO se le reasigna color; los nuevos toman el siguiente de
+      // la paleta. Así cada motivo conserva su color en lista, líneas y tendencia.
+      const cmap=this._evolMot.colorDe||(this._evolMot.colorDe={});
+      let usados=Object.keys(cmap).length;
+      d.motivos.forEach(m=>{ if(!cmap[m.motivo]){ cmap[m.motivo]=EVM_PALETA[usados%EVM_PALETA.length]; usados++; } });
       this.evolMotRender();
     }catch(e){list.innerHTML=`<div class="error">${e.message}</div>`;}
   },
+  // Regresión lineal por mínimos cuadrados de una serie de valores (x=0..n-1).
+  // Devuelve un array con los valores de la recta a+b·x (mismos puntos que la serie).
+  evmTendencia(vals){
+    const n=vals.length; if(n<2)return vals.slice();
+    let sx=0,sy=0,sxy=0,sxx=0;
+    for(let i=0;i<n;i++){ sx+=i; sy+=vals[i]; sxy+=i*vals[i]; sxx+=i*i; }
+    const den=n*sxx-sx*sx;
+    if(den===0)return vals.map(()=>sy/n);
+    const b=(n*sxy-sx*sy)/den, a=(sy-b*sx)/n;
+    return vals.map((_,i)=>Math.max(0,a+b*i));   // horas no negativas
+  },
   evolMotRender(){
-    const {ov,d,motivoSel}=this._evolMot;
+    const {ov,d,motivoSel,trend,colorDe}=this._evolMot;
     const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     const list=ov.querySelector('.evm-list'); const chartBox=ov.querySelector('.evm-chart');
-    // Lista de motivos (peso desc). El activo resaltado.
-    list.innerHTML=d.motivos.map(m=>
-      `<div class="evm-mot${m.motivo===motivoSel?' active':''}" data-motivo="${e(m.motivo)}">
-         <span>${e(m.motivo)}</span><small>${m.total_horas.toFixed(2)} h</small></div>`).join('');
+    const MAX_SEL=5;   // límite de motivos simultáneos (legibilidad de la comparativa)
+    // Lista de motivos (peso desc) como toggle aditivo. El cuadradito de color liga
+    // cada item con su línea. Los seleccionados van resaltados.
+    list.innerHTML=d.motivos.map(m=>{
+      const on=motivoSel.has(m.motivo), col=colorDe[m.motivo]||'#8c181a';
+      return `<div class="evm-mot${on?' active':''}" data-motivo="${e(m.motivo)}" style="${on?`background:${col};border-color:${col}`:''}">
+         <span><span class="evm-dot" style="background:${col}"></span>${e(m.motivo)}</span><small>${m.total_horas.toFixed(2)} h</small></div>`;
+    }).join('');
     list.querySelectorAll('.evm-mot').forEach(row=>{
-      row.onclick=()=>{ this._evolMot.motivoSel=row.dataset.motivo; this.evolMotRender(); };
+      row.onclick=()=>{
+        const mv=row.dataset.motivo, set=this._evolMot.motivoSel;
+        if(set.has(mv)){ if(set.size>1)set.delete(mv); }      // nunca dejar 0
+        else { if(set.size>=MAX_SEL)return; set.add(mv); }     // tope de comparativa
+        this.evolMotRender();
+      };
     });
-    // Serie del motivo seleccionado.
-    const mot=d.motivos.find(m=>m.motivo===motivoSel);
-    if(!mot){chartBox.innerHTML='<div class="hint">Selecciona un motivo</div>';return;}
+    // Orden estable de las series seleccionadas (sigue el orden de peso de d.motivos).
+    const sel=d.motivos.filter(m=>motivoSel.has(m.motivo));
     const cats=d.buckets.map(b=>b.label);
-    const vals=mot.serie.map(p=>p.horas);
     const keys=d.buckets.map(b=>b.key);
     chartBox.innerHTML='<div class="evm-apx"></div>';
-    const muchos=cats.length>31;   // regla de etiquetas: ocultas si hay demasiados puntos
+    const unaSerie=sel.length===1, muchos=cats.length>31;
+    // Series de motivo + (opcional) su recta de tendencia, con color estable.
+    const series=[], colors=[], dashes=[], widths=[];
+    sel.forEach(m=>{
+      const col=colorDe[m.motivo]||'#8c181a', vals=m.serie.map(p=>p.horas);
+      series.push({name:m.motivo,data:vals}); colors.push(col); dashes.push(0); widths.push(3);
+      if(trend){
+        series.push({name:'Tendencia · '+m.motivo,data:this.evmTendencia(vals)});
+        colors.push(col); dashes.push(6); widths.push(2);
+      }
+    });
+    // Índices de las series de motivo real (para etiquetas y para excluir tendencia del clic).
+    const idxMotivo=[]; series.forEach((s,i)=>{ if(!s.name.startsWith('Tendencia · '))idxMotivo.push(i); });
     this.apex(chartBox.querySelector('.evm-apx'),{
       chart:{type:'line',height:Math.max(420,ov.querySelector('.fullpop-body').clientHeight-40),
         toolbar:{show:true,tools:{download:true,zoom:true,pan:true,reset:true}},animations:{enabled:false},
         events:{
-          // Clic en un punto → popup de reparto por máquina de ese bucket.
-          // En type:'line' dataPointSelection es errático; markerClick exige acertar
-          // el marcador exacto. Se escuchan los tres caminos (markerClick, el evento
-          // de selección y click sobre el área, que devuelve el punto más cercano)
-          // con un guard anti-doble-disparo común.
-          markerClick:(ev,ctx,cfg)=>this.evolMotPunto(keys,cfg&&cfg.dataPointIndex),
-          dataPointSelection:(ev,ctx,cfg)=>this.evolMotPunto(keys,cfg&&cfg.dataPointIndex),
-          click:(ev,ctx,cfg)=>this.evolMotPunto(keys,cfg&&cfg.dataPointIndex)
+          // Clic en un punto → reparto por máquina del MOTIVO de la línea clicada.
+          // Se desambigua por seriesIndex resolviendo el nombre de la serie; las
+          // líneas de tendencia no abren reparto. Tres caminos por la rareza de
+          // dataPointSelection en type:'line', con guard anti-doble-disparo común.
+          markerClick:(ev,ctx,cfg)=>this.evolMotPunto(keys,cfg),
+          dataPointSelection:(ev,ctx,cfg)=>this.evolMotPunto(keys,cfg),
+          click:(ev,ctx,cfg)=>this.evolMotPunto(keys,cfg)
         }},
-      series:[{name:mot.motivo,data:vals}],
-      colors:['#8c181a'],
-      stroke:{width:3,curve:'straight'},
+      series, colors,
+      stroke:{width:widths,curve:'straight',dashArray:dashes},
       markers:{size:muchos?4:6,strokeWidth:2,hover:{size:9,sizeOffset:3}},
-      dataLabels:{enabled:!muchos,formatter:v=>v>0?v.toFixed(1):'',background:{enabled:true,opacity:.9},style:{fontSize:'10px'}},
+      // Etiquetas de valor solo con UN motivo, pocos buckets y sin tendencia. Para
+      // evitar la combinación trampa de ApexCharts (enabled:false + enabledOnSeries),
+      // solo se fija enabledOnSeries cuando las etiquetas están realmente activas.
+      dataLabels:Object.assign(
+        {enabled:unaSerie&&!muchos&&!trend,formatter:v=>v>0?v.toFixed(1):'',background:{enabled:true,opacity:.9},style:{fontSize:'10px'}},
+        (unaSerie&&!muchos&&!trend)?{enabledOnSeries:idxMotivo}:{}),
       xaxis:{categories:cats,labels:{rotate:-45,rotateAlways:cats.length>12,style:{fontSize:'11px'}}},
       yaxis:{min:0,title:{text:'Horas de paro'},labels:{formatter:v=>(Math.round(v*10)/10)}},
       tooltip:{y:{formatter:v=>v.toFixed(2)+' h'}},
-      legend:{show:false},
+      legend:{show:true,position:'top',horizontalAlign:'left',showForSingleSeries:true,
+        onItemClick:{toggleDataSeries:true},onItemHover:{highlightDataSeries:true}},
       noData:{text:'Sin datos'}
     });
   },
-  // Maneja el clic en un punto del gráfico. Guard anti-doble-disparo: ApexCharts
-  // puede emitir markerClick y dataPointSelection en el mismo clic; ignoramos el
-  // segundo si llega para el mismo punto en una ventana corta.
-  evolMotPunto(keys,dataPointIndex){
-    // -1 = clic fuera de un punto (lo emite el evento 'click'); ignorar.
-    if(dataPointIndex==null||dataPointIndex<0||keys[dataPointIndex]==null)return;
-    const key=keys[dataPointIndex], ahora=Date.now();
-    if(this._evolMotUltimo&&this._evolMotUltimo.key===key&&(ahora-this._evolMotUltimo.t)<400)return;
-    this._evolMotUltimo={key,t:ahora};
-    this.evolMotMaquinas(key);
+  // Maneja el clic en un punto del gráfico. Resuelve el MOTIVO por seriesIndex
+  // (nombre de la serie clicada) para abrir el reparto del motivo correcto cuando
+  // hay varias líneas. Guard anti-doble-disparo: ApexCharts puede emitir varios
+  // eventos en el mismo clic; ignoramos repeticiones del mismo motivo+punto.
+  evolMotPunto(keys,cfg){
+    const dpi=cfg&&cfg.dataPointIndex, si=cfg&&cfg.seriesIndex;
+    // -1 = clic fuera de un punto (lo emite 'click'); ignorar.
+    if(dpi==null||dpi<0||keys[dpi]==null)return;
+    // Resolver el nombre de la serie clicada; las de tendencia no abren reparto.
+    let motivo=null;
+    try{ const s=cfg.w&&cfg.w.config&&cfg.w.config.series; if(si!=null&&s&&s[si])motivo=s[si].name; }catch(_){}
+    if(typeof motivo==='string'&&motivo.startsWith('Tendencia · '))return;
+    // Validar que el motivo resuelto sigue seleccionado. Si no (p.ej. seriesIndex
+    // corrido tras ocultar una serie por la leyenda) o no hubo seriesIndex, se cae
+    // al fallback seguro: solo abrir si hay un único motivo (sin ambigüedad).
+    if(motivo==null||!this._evolMot.motivoSel.has(motivo)){
+      const sel=[...this._evolMot.motivoSel]; if(sel.length===1)motivo=sel[0]; else return;
+    }
+    const key=keys[dpi], ahora=Date.now();
+    if(this._evolMotUltimo&&this._evolMotUltimo.key===key&&this._evolMotUltimo.motivo===motivo&&(ahora-this._evolMotUltimo.t)<400)return;
+    this._evolMotUltimo={key,motivo,t:ahora};
+    this.evolMotMaquinas(motivo,key);
   },
-  async evolMotMaquinas(bucketKey){
-    // Popup (fullpop encima) con el reparto por máquina del motivo en ese bucket.
-    const {motivoSel,gran,desde,hasta}=this._evolMot;
+  async evolMotMaquinas(motivo,bucketKey){
+    // Popup (fullpop encima) con el reparto por máquina del MOTIVO clicado en ese
+    // bucket (motivo recibido explícito: con varias líneas, es el de la serie clicada).
+    const {gran,desde,hasta}=this._evolMot;
     const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     const ov=document.createElement('div'); ov.className='fullpop';
     ov.innerHTML=`
       <div class="fullpop-head">
         <div class="evm-title"><img src="assets/img/logo-kh.png" alt="KH" class="evm-logo">
-          <h2>🏭 Reparto por máquina · ${e(motivoSel)}<small>${e(bucketKey)} · ${gran==='day'?'día':gran==='week'?'semana':'mes'} · horas de paro</small></h2>
+          <h2>🏭 Reparto por máquina · ${e(motivo)}<small>${e(bucketKey)} · ${gran==='day'?'día':gran==='week'?'semana':'mes'} · horas de paro</small></h2>
         </div>
         <button class="evmmClose" style="background:#f3f4f6;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280">✕ Cerrar</button>
       </div>
@@ -2164,18 +2233,18 @@ const App={
     try{
       // Mismo rango propio del formulario (para que el reparto cuadre con el punto).
       const d=await this.get('oee_unificado_motivo_periodo_maquinas.php',
-        this.common({seccion:State.seccion, granularidad:gran, motivo:motivoSel, bucket:bucketKey,
+        this.common({seccion:State.seccion, granularidad:gran, motivo, bucket:bucketKey,
           fecha_desde:desde, fecha_hasta:hasta}));
       if(!d.maquinas.length){body.innerHTML='<div class="empty">Sin paros de este motivo en este periodo</div>';return;}
       const max=Math.max(...d.maquinas.map(m=>m.horas));
-      body.innerHTML=`<div class="breadcrumb">Reparto de <b>${e(motivoSel)}</b> en <b>${e(d.rango.desde)}</b> a <b>${e(d.rango.hasta)}</b> · total <b>${d.total_horas.toFixed(2)} h</b> · ${d.maquinas.length} máquinas. <small style="color:#6b7280">Clic en una máquina = desglose por día y hora.</small></div>`
+      body.innerHTML=`<div class="breadcrumb">Reparto de <b>${e(motivo)}</b> en <b>${e(d.rango.desde)}</b> a <b>${e(d.rango.hasta)}</b> · total <b>${d.total_horas.toFixed(2)} h</b> · ${d.maquinas.length} máquinas. <small style="color:#6b7280">Clic en una máquina = desglose por día y hora.</small></div>`
         +this.barList(d.maquinas,{name:m=>m.maquina,val:m=>m.horas,unit:'h',max,
           extraCols:[{label:'%',val:m=>m.pct+'%'}],color:()=>'#8c181a',clickable:true});
       // Clic en una máquina → desglose temporal (día → hora) de ese motivo en esa
       // máquina, acotado al rango del bucket (d.rango). Reutiliza openMotivoTemporal.
       [...body.querySelectorAll('.brow:not(.bhead)')].forEach((row,ix)=>{
         const mq=d.maquinas[ix]; if(!mq)return;
-        row.onclick=()=>this.openMotivoTemporal(motivoSel,mq.cod_maquina,null,{desde:d.rango.desde,hasta:d.rango.hasta});
+        row.onclick=()=>this.openMotivoTemporal(motivo,mq.cod_maquina,null,{desde:d.rango.desde,hasta:d.rango.hasta});
       });
     }catch(e2){body.innerHTML=`<div class="error">${e2.message}</div>`;}
   },
