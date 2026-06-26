@@ -2163,22 +2163,34 @@ const App={
     const idxMotivo=[]; series.forEach((s,i)=>{ if(!s.name.startsWith('Tendencia · '))idxMotivo.push(i); });
     // Sombreado de columnas no laborables (solo en granularidad día, donde
     // 1 columna = 1 día). Se agrupan días consecutivos del mismo tipo en una banda.
-    // ApexCharts (eje categoría) ubica la banda por el NOMBRE de la categoría (x/x2
-    // = label), de centro a centro: para abarcar el ancho de las columnas se toma
-    // como inicio el día anterior al grupo (o el propio si es el borde) y como fin
-    // el día siguiente. Finde y festivo con tonos distintos.
+    // Geometría verificada de ApexCharts (eje categoría): una banda x=cats[k],
+    // x2=cats[k+1] cubre de CENTRO(k) a CENTRO(k+1), es decir un ancho de columna
+    // pero desplazado medio paso a la derecha. Para cubrir EXACTAMENTE las columnas
+    // del grupo [i..j], la banda va de cats[i] a cats[j+1] y se corrige con
+    // offsetX = -½ paso (medio ancho de columna) para centrarla en los días reales.
+    // Color corporativo translúcido (granate KH); el festivo se marca más intenso.
     const anots=[];
-    if(this._evolMot.gran==='day'){
+    if(this._evolMot.gran==='day' && cats.length>1){
       const tipos=d.buckets.map(b=>b.tipo);
-      const colorTipo={finde:'#5a6b7d',festivo:'#8c181a'};   // gris azulado / granate
+      const COL='#8c181a';                         // granate corporativo para ambos
+      const opac={finde:0.10, festivo:0.22};       // festivo más marcado que el finde
+      // Medio paso entre columnas (px). El eje útil ≈ ancho del contenedor menos el
+      // espacio del eje Y; con n categorías el paso = útil/(n-1). offsetX=-½ paso
+      // centra la banda [cats[i]..cats[j+1]] sobre las columnas reales [i..j].
+      const anchoUtil=Math.max(0,(chartBox.clientWidth||900)-70);
+      const medioPaso=anchoUtil/((cats.length-1)*2);
       let i=0;
       while(i<tipos.length){
         const t=tipos[i];
         if(t==='finde'||t==='festivo'){
           let j=i; while(j+1<tipos.length&&tipos[j+1]===t)j++;   // racha del mismo tipo
-          const xa=cats[Math.max(0,i-1)], xb=cats[Math.min(cats.length-1,j+1)];
-          anots.push({x:xa,x2:xb,fillColor:colorTipo[t],opacity:0.18,
-            borderColor:colorTipo[t],strokeDashArray:0,label:{text:''}});
+          const hayDer=j+1<=cats.length-1;
+          const xa=cats[i], xb=cats[hayDer?j+1:j];
+          // Sin día a la derecha (grupo al final del eje): la banda va de cats[i] a
+          // cats[j] (1 columna menos de ancho) y se desplaza +½ paso para cubrir el
+          // último día; con día a la derecha se desplaza -½ paso para centrar.
+          anots.push({x:xa,x2:xb,fillColor:COL,opacity:opac[t],borderColor:'transparent',
+            offsetX:hayDer?-medioPaso:medioPaso,label:{text:''}});
           i=j+1;
         }else i++;
       }
