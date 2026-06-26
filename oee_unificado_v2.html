@@ -80,6 +80,10 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 /* Selector de fechas propio del formulario (independiente del rango global) */
 .evm-fechas{display:flex;gap:6px;align-items:center;font-size:12px;color:#6b7280;font-weight:600}
 .evm-fechas input[type=date]{padding:6px 9px;border:1px solid #cbd5d3;border-radius:7px;font-size:13px;color:#334;font-weight:600}
+/* Filtros rápidos de rango (presets) */
+.evm-presets{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.evm-presets button{padding:5px 10px;border:1px solid #d9cccd;background:#fbf7f7;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;color:#6b4a4c}
+.evm-presets button:hover{background:#f3e9ea;border-color:#c9b6b8}
 /* tabla matriz (popup): cabecera y 1ª columna fijas, scroll horizontal */
 .mtx-wrap{overflow:auto;max-height:calc(100vh - 210px);border:1px solid #e5e7eb;border-radius:8px}
 .mtx{border-collapse:collapse;font-size:12px;white-space:nowrap}
@@ -895,9 +899,12 @@ const App={
     document.removeEventListener('keydown',this._motEsc);},
   // Modal nivel 3: distribución temporal de un motivo de paro (días → horas) en
   // el rango del popup. Usa oee_unificado_maq_motivo_temporal (por_dia/por_hora_dia).
-  async openMotivoTemporal(motivo,codMaq,codOf){
+  async openMotivoTemporal(motivo,codMaq,codOf,rango){
     this.motTmpClose();
-    const desde=this._art?this._art.desde:fDesde.value, hasta=this._art?this._art.hasta:fHasta.value;
+    // Rango: si se pasa explícito (p.ej. desde el formulario de evolución), prima;
+    // si no, cae al rango del artículo y, por último, a las fechas globales.
+    const desde=rango?rango.desde:(this._art?this._art.desde:fDesde.value),
+          hasta=rango?rango.hasta:(this._art?this._art.hasta:fHasta.value);
     const ov=document.createElement('div');
     ov.id='motTmpModal'; ov.className='art-overlay art-overlay-3';
     ov.innerHTML=`<div class="art-dialog of-dialog">
@@ -1985,6 +1992,12 @@ const App={
           hasta
             <input type="date" class="evm-hasta" value="${hasta0}">
           </span>
+          <span class="evm-presets">
+            <button data-p="semana_ant">Semana anterior</button>
+            <button data-p="mes_curso">Mes en curso</button>
+            <button data-p="mes_ant">Mes anterior</button>
+            <button data-p="3meses">3 meses</button>
+          </span>
           <span style="font-size:12px;color:#6b7280;font-weight:600;margin-left:6px">Granularidad:</span>
           <button data-g="day" class="active">Día</button>
           <button data-g="week">Semana</button>
@@ -2017,7 +2030,44 @@ const App={
       this.evolMotLoad();
     };
     iDesde.onchange=onFecha; iHasta.onchange=onFecha;
+    // Filtros rápidos: fijan el rango y recargan. Sincronizan los inputs de fecha.
+    ov.querySelectorAll('.evm-presets button[data-p]').forEach(b=>{
+      b.onclick=()=>{
+        const r=this.evmCalcPreset(b.dataset.p);
+        iDesde.value=r.desde; iHasta.value=r.hasta;
+        this._evolMot.desde=r.desde; this._evolMot.hasta=r.hasta;
+        this.evolMotLoad();
+      };
+    });
     this.evolMotLoad();
+  },
+  // Calcula el rango {desde,hasta} (YYYY-MM-DD) de un filtro rápido, sobre la fecha
+  // REAL del cliente (new Date), no sobre el rango global del dashboard.
+  evmCalcPreset(tipo){
+    const z=n=>String(n).padStart(2,'0');
+    const iso=d=>`${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`;
+    const hoy=new Date(); hoy.setHours(0,0,0,0);
+    if(tipo==='semana_ant'){
+      // Lunes a domingo de la semana anterior. getDay(): 0=Dom..6=Sáb.
+      const dow=(hoy.getDay()+6)%7;                 // 0=Lun..6=Dom de ESTA semana
+      const lunEsta=new Date(hoy); lunEsta.setDate(hoy.getDate()-dow);
+      const lunAnt=new Date(lunEsta); lunAnt.setDate(lunEsta.getDate()-7);
+      const domAnt=new Date(lunAnt); domAnt.setDate(lunAnt.getDate()+6);
+      return {desde:iso(lunAnt),hasta:iso(domAnt)};
+    }
+    if(tipo==='mes_curso'){
+      // Día 1 del mes en curso hasta hoy.
+      return {desde:iso(new Date(hoy.getFullYear(),hoy.getMonth(),1)),hasta:iso(hoy)};
+    }
+    if(tipo==='mes_ant'){
+      // Primer a último día del mes anterior. Día 0 del mes actual = último del previo.
+      const ini=new Date(hoy.getFullYear(),hoy.getMonth()-1,1);
+      const fin=new Date(hoy.getFullYear(),hoy.getMonth(),0);
+      return {desde:iso(ini),hasta:iso(fin)};
+    }
+    // 3 meses: desde hace 3 meses (mismo día) hasta hoy.
+    const ini=new Date(hoy.getFullYear(),hoy.getMonth()-3,hoy.getDate());
+    return {desde:iso(ini),hasta:iso(hoy)};
   },
   async evolMotLoad(){
     const ov=this._evolMot.ov;
@@ -2095,9 +2145,15 @@ const App={
           fecha_desde:desde, fecha_hasta:hasta}));
       if(!d.maquinas.length){body.innerHTML='<div class="empty">Sin paros de este motivo en este periodo</div>';return;}
       const max=Math.max(...d.maquinas.map(m=>m.horas));
-      body.innerHTML=`<div class="breadcrumb">Reparto de <b>${e(motivoSel)}</b> en <b>${e(d.rango.desde)}</b> a <b>${e(d.rango.hasta)}</b> · total <b>${d.total_horas.toFixed(2)} h</b> · ${d.maquinas.length} máquinas.</div>`
+      body.innerHTML=`<div class="breadcrumb">Reparto de <b>${e(motivoSel)}</b> en <b>${e(d.rango.desde)}</b> a <b>${e(d.rango.hasta)}</b> · total <b>${d.total_horas.toFixed(2)} h</b> · ${d.maquinas.length} máquinas. <small style="color:#6b7280">Clic en una máquina = desglose por día y hora.</small></div>`
         +this.barList(d.maquinas,{name:m=>m.maquina,val:m=>m.horas,unit:'h',max,
-          extraCols:[{label:'%',val:m=>m.pct+'%'}],color:()=>'#0f766e',clickable:false});
+          extraCols:[{label:'%',val:m=>m.pct+'%'}],color:()=>'#0f766e',clickable:true});
+      // Clic en una máquina → desglose temporal (día → hora) de ese motivo en esa
+      // máquina, acotado al rango del bucket (d.rango). Reutiliza openMotivoTemporal.
+      [...body.querySelectorAll('.brow:not(.bhead)')].forEach((row,ix)=>{
+        const mq=d.maquinas[ix]; if(!mq)return;
+        row.onclick=()=>this.openMotivoTemporal(motivoSel,mq.cod_maquina,null,{desde:d.rango.desde,hasta:d.rango.hasta});
+      });
     }catch(e2){body.innerHTML=`<div class="error">${e2.message}</div>`;}
   },
   matrizTabla(d){
