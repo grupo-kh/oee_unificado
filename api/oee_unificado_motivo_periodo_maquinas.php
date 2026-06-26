@@ -10,7 +10,7 @@ require_once __DIR__ . '/../lib/PlanAttainmentAgg.php';
  * (1 día / 7 días / 1 mes desde `bucket`) y el intervalo global [fecha_desde,
  * fecha_hasta], para no contar días fuera del intervalo en buckets de borde.
  *
- * Filtros idénticos a Matriz 2 (excluye paro 11 y actividad 1) + el motivo dado.
+ * Filtros como la disponibilidad de oee_unificado_v2 (solo excluye paro 11) + el motivo dado.
  *
  * GET: fecha_desde, fecha_hasta (req), seccion, turnos (CSV),
  *      motivo (req, Desc_paro), bucket (req, YYYY-MM-DD inicio del bucket),
@@ -42,10 +42,12 @@ function motivoPeriodoMaquinasData(): array
     $desde = max($bucket, $fdesde);
     $hasta = min($fin->format('Y-m-d'), $fhasta);
 
+    // Filtros como la disponibilidad de oee_unificado_v2: solo excluye paro 11
+    // (NO la actividad CERRADA), para que el total del reparto cuadre con el valor
+    // del punto clicado (motivos como PARO PLANIFICADO daban 0 con el filtro extra).
     $where  = [
         "CAST(hp.Dia_productivo AS DATE) BETWEEN ? AND ?",
         "cp.Cod_paro <> 11",
-        "cp.Id_actividad <> 1",
         "hpp.Fecha_fin IS NOT NULL",
         "cp.Desc_paro = ?",
     ];
