@@ -608,7 +608,8 @@ const App={
         ]:null;
         machBody.innerHTML=this.barList(items,{
           name:i=>i.maquina,val:i=>i.valor,unit,max,extraCols,
-          color:i=>unit==='%'?this.semColor(i.valor,vMax):'#3a6aa3',clickable
+          // Métricas en %: color por umbral (rojo/naranja/verde). Otras unidades: azul.
+          color:i=>unit==='%'?this.colorUmbral(i.valor):'#3a6aa3',clickable
         })+(clickable?`<div class="hint">${hint}</div>`:'');
         if(clickable){
           [...machBody.querySelectorAll('.brow')].forEach((row,ix)=>{
@@ -1239,6 +1240,15 @@ const App={
     const verde=[31,122,58], apagado=[150,168,150];
     const c=[lerp(apagado[0],verde[0],r),lerp(apagado[1],verde[1],r),lerp(apagado[2],verde[2],r)];
     return hex(c[0],c[1],c[2]);
+  },
+  // Formato condicional por UMBRAL del valor (%) de las gráficas de métrica
+  // (Disponibilidad/Rendimiento/Calidad/OEE) en la pantalla principal:
+  //   0–60 → rojo · 60,1–70 → naranja · 70,1–100 → verde.
+  colorUmbral(v){
+    v=Number(v)||0;
+    if(v<=60)return '#c0392b';   // rojo
+    if(v<=70)return '#e0902a';   // naranja
+    return '#1f7a3a';            // verde
   },
   barList(items,o){
     // Columnas extra opcionales (o.extraCols): [{label, val(i), fmt?}]. Solo las
