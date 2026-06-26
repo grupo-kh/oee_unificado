@@ -2161,6 +2161,28 @@ const App={
     });
     // Índices de las series de motivo real (para etiquetas y para excluir tendencia del clic).
     const idxMotivo=[]; series.forEach((s,i)=>{ if(!s.name.startsWith('Tendencia · '))idxMotivo.push(i); });
+    // Sombreado suave de columnas no laborables (solo en granularidad día, donde
+    // 1 columna = 1 día). Se agrupan días consecutivos del mismo tipo en una banda
+    // que va del centro del 1er día al centro del día siguiente al último del grupo
+    // (cubre el ancho de las columnas). Finde y festivo con tonos distintos.
+    const anots=[];
+    if(this._evolMot.gran==='day'){
+      const tipos=d.buckets.map(b=>b.tipo);
+      const colorTipo={finde:'#64748b',festivo:'#8c181a'};   // gris azulado / granate
+      let i=0;
+      while(i<tipos.length){
+        const t=tipos[i];
+        if(t==='finde'||t==='festivo'){
+          let j=i; while(j+1<tipos.length&&tipos[j+1]===t)j++;   // racha del mismo tipo
+          // Banda sobre el eje de categorías. ApexCharts admite índices numéricos
+          // (con .5) para abarcar el ancho exacto de las columnas: de medio paso
+          // antes del primer día a medio paso después del último del grupo.
+          anots.push({x:Math.max(0,i-0.5),x2:Math.min(cats.length-1,j+0.5),
+            fillColor:colorTipo[t],opacity:0.10,borderColor:'transparent',label:{text:''}});
+          i=j+1;
+        }else i++;
+      }
+    }
     this.apex(chartBox.querySelector('.evm-apx'),{
       chart:{type:'line',height:Math.max(420,ov.querySelector('.fullpop-body').clientHeight-40),
         toolbar:{show:true,tools:{download:true,zoom:true,pan:true,reset:true}},animations:{enabled:false},
@@ -2174,6 +2196,7 @@ const App={
           click:(ev,ctx,cfg)=>this.evolMotPunto(keys,cfg)
         }},
       series, colors,
+      annotations:{xaxis:anots},
       stroke:{width:widths,curve:'straight',dashArray:dashes},
       markers:{size:muchos?4:6,strokeWidth:2,hover:{size:9,sizeOffset:3}},
       // Etiquetas de valor solo con UN motivo, pocos buckets y sin tendencia. Para

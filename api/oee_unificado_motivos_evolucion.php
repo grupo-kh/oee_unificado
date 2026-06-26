@@ -116,13 +116,42 @@ function motivosEvolucionData(): array
 }
 
 /**
- * Genera la lista continua de buckets [{key:YYYY-MM-DD, label}] desde $fdesde a
+ * Festivos de la Comunidad Valenciana dentro del rango (mismo criterio que
+ * oee_unificado_evolucion.php): nacionales fijos + autonómicos CV (fijos y móviles
+ * dependientes de la Pascua). Devuelve un set [YYYY-MM-DD => true] para consulta O(1).
+ */
+function motivosEvolucionFestivosCV(string $desde, string $hasta): array
+{
+    $set = [];
+    $aIni = (int) substr($desde, 0, 4);
+    $aFin = (int) substr($hasta, 0, 4);
+    for ($y = $aIni; $y <= $aFin; $y++) {
+        foreach (['01-01','01-06','05-01','08-15','10-12','11-01','12-06','12-08','12-25'] as $md) $set["$y-$md"] = true;
+        foreach (['03-19','10-09'] as $md) $set["$y-$md"] = true;
+        if (function_exists('easter_date')) {
+            $easterTs = easter_date($y);
+            $set[date('Y-m-d', strtotime('-3 days', $easterTs))] = true; // Jueves Santo
+            $set[date('Y-m-d', strtotime('-2 days', $easterTs))] = true; // Viernes Santo
+            $set[date('Y-m-d', strtotime('+1 day',  $easterTs))] = true; // Lunes de Pascua (CV)
+            $set[date('Y-m-d', strtotime('+8 days', $easterTs))] = true; // San Vicente Ferrer (CV)
+        }
+    }
+    return $set;
+}
+
+/**
+ * Genera la lista continua de buckets [{key:YYYY-MM-DD, label, tipo}] desde $fdesde a
  * $fhasta con el paso de la granularidad. El primer bucket de semana/mes se ancla
  * al inicio del periodo que contiene $fdesde (lunes / día 1), igual que el bucket SQL.
+ *
+ * `tipo` (solo en granularidad DÍA, donde 1 bucket = 1 día): 'festivo' | 'finde' |
+ * 'normal'. En semana/mes no aplica (un bucket mezcla días laborables y no), va 'normal'.
  */
 function motivosEvolucionBuckets(string $fdesde, string $fhasta, string $gran): array
 {
     $meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    // Festivos solo se necesitan en granularidad día.
+    $festivos = ($gran === 'day') ? motivosEvolucionFestivosCV($fdesde, $fhasta) : [];
     $ini = new DateTime($fdesde);
     if ($gran === 'week') {
         // Anclar al lunes de la semana de fdesde (N: 1=Lun..7=Dom).
@@ -135,14 +164,17 @@ function motivosEvolucionBuckets(string $fdesde, string $fhasta, string $gran): 
     $cur = clone $ini;
     while ($cur <= $fin) {
         $key = $cur->format('Y-m-d');
+        $tipo = 'normal';
         if ($gran === 'day') {
             $label = $cur->format('d/m');
+            if (isset($festivos[$key]))           $tipo = 'festivo';
+            elseif ((int)$cur->format('N') >= 6)  $tipo = 'finde';   // 6=Sáb, 7=Dom
         } elseif ($gran === 'week') {
             $label = 'S' . $cur->format('W') . ' (' . $cur->format('d/m') . ')';
         } else {
             $label = $meses[(int)$cur->format('n') - 1] . ' ' . $cur->format('Y');
         }
-        $out[] = ['key' => $key, 'label' => $label];
+        $out[] = ['key' => $key, 'label' => $label, 'tipo' => $tipo];
         $cur->modify($gran === 'day' ? '+1 day' : ($gran === 'week' ? '+7 days' : '+1 month'));
     }
     return $out;
