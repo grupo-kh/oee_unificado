@@ -38,7 +38,9 @@ function motivoMaquinasEvolucionData(): array
     if ($fdesde > $fhasta) throw new Exception('fecha_desde no puede ser posterior a fecha_hasta');
     if (!in_array($gran, ['day','week','month'], true)) throw new Exception('granularidad inválida (day|week|month)');
     if ($seccion !== '' && !in_array($seccion, ['VARILLAS','TROQUELADOS'], true)) throw new Exception('seccion inválida');
-    if ($motivo === '') throw new Exception('motivo requerido');
+    // motivo vacío = TODOS los motivos (sumatorio por máquina). Si llega un motivo,
+    // se filtra por ese Desc_paro concreto.
+    $todos = ($motivo === '');
     $turnos = array_values(array_filter(getListParam('turnos'), fn($t) => in_array($t, ['M','T','N'], true)));
 
     // Bucket SQL según granularidad (idéntico a la vista por motivos), sobre Dia_productivo.
@@ -57,9 +59,12 @@ function motivoMaquinasEvolucionData(): array
         "CAST(hp.Dia_productivo AS DATE) BETWEEN ? AND ?",
         "cp.Cod_paro <> 11",
         "hpp.Fecha_fin IS NOT NULL",
-        "cp.Desc_paro = ?",
     ];
-    $params = [$fdesde, $fhasta, $motivo];
+    $params = [$fdesde, $fhasta];
+    if (!$todos) {                              // motivo concreto: filtrar por Desc_paro
+        $where[]  = "cp.Desc_paro = ?";
+        $params[] = $motivo;
+    }
     if (!empty($turnos)) {
         $ph = implode(',', array_fill(0, count($turnos), '?'));
         $where[] = "ct.Cod_turno IN ($ph)";

@@ -32,12 +32,16 @@ require_once __DIR__ . '/../includes/helpers.php';
  */
 function _maqMotFragmentos(string $por, string $cod, string $motivo, array $turnos): array {
     $joins = '';
+    // motivo vacío = TODOS los motivos (sumatorio): no se filtra por Desc_paro.
     $filtros = [
         "cp.Cod_paro <> 11",
         "hpp.Fecha_fin IS NOT NULL",
-        "cp.Desc_paro = ?",
     ];
-    $params = [$motivo];
+    $params = [];
+    if ($motivo !== '') {
+        $filtros[] = "cp.Desc_paro = ?";
+        $params[]  = $motivo;
+    }
 
     if ($por === 'referencia') {
         $joins = "
@@ -233,7 +237,7 @@ try {
 
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fdesde)) jsonError('fecha_desde inválida');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fhasta)) jsonError('fecha_hasta inválida');
-    if ($motivo === '') jsonError('motivo requerido');
+    // motivo vacío = TODOS los motivos (sumatorio del total de paros de la entidad).
     if ($cod    === '') jsonError(($por === 'referencia' ? 'cod_referencia' : 'cod_maquina') . ' requerido');
 
     $turnos = array_values(array_filter(getListParam('turnos'), fn($t) => in_array($t, ['M','T','N'], true)));

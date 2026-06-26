@@ -921,11 +921,14 @@ const App={
     // si no, cae al rango del artículo y, por último, a las fechas globales.
     const desde=rango?rango.desde:(this._art?this._art.desde:fDesde.value),
           hasta=rango?rango.hasta:(this._art?this._art.hasta:fHasta.value);
+    // motivo vacío = todos los motivos (sumatorio): título y badge adaptados.
+    const esTodos=(motivo==null||motivo==='');
+    const tituloMot=esTodos?'∑ Todos los motivos':this.esc(motivo);
     const ov=document.createElement('div');
     ov.id='motTmpModal'; ov.className='art-overlay art-overlay-3';
     ov.innerHTML=`<div class="art-dialog of-dialog">
-        <div class="art-dlg-head"><img src="assets/img/logo-kh.png" alt="KH" class="art-dlg-logo"><span class="badge-gen" style="background:#8c181a">MOTIVO</span>
-          <span class="art-dlg-title">${this.esc(motivo)}<small> · ${this.esc(codMaq)} · ${this.fFecha(desde)} a ${this.fFecha(hasta)}</small></span>
+        <div class="art-dlg-head"><img src="assets/img/logo-kh.png" alt="KH" class="art-dlg-logo"><span class="badge-gen" style="background:#8c181a">${esTodos?'TOTAL':'MOTIVO'}</span>
+          <span class="art-dlg-title">${tituloMot}<small> · ${this.esc(codMaq)} · ${this.fFecha(desde)} a ${this.fFecha(hasta)}</small></span>
           <button class="art-dlg-x" title="Cerrar">✕</button></div>
         <div class="art-dlg-body" id="motTmpBody">${this.loadingHtml()}</div>
       </div>`;
@@ -2127,8 +2130,13 @@ const App={
         selm.style.display='';
         const cat=await this.get('oee_unificado_motivos_evolucion.php',this.common(filtros));
         if(!cat.motivos.length){selm.innerHTML='';list.innerHTML='<div class="empty">Sin paros para el filtro seleccionado</div>';chart.innerHTML='';return;}
-        if(!st.motivoMaq||!cat.motivos.some(m=>m.motivo===st.motivoMaq)) st.motivoMaq=cat.motivos[0].motivo;
-        selm.innerHTML=cat.motivos.map(m=>`<option value="${this.esc(m.motivo)}"${m.motivo===st.motivoMaq?' selected':''}>${this.esc(m.motivo)} · ${m.total_horas.toFixed(1)} h</option>`).join('');
+        // motivoMaq: '' (centinela) = TODOS los motivos (sumatorio por máquina). Si el
+        // motivo elegido ya no existe en el rango, se cae a '' (todos) por defecto.
+        const totalCat=cat.motivos.reduce((a,m)=>a+(m.total_horas||0),0);
+        if(st.motivoMaq==null||(st.motivoMaq!==''&&!cat.motivos.some(m=>m.motivo===st.motivoMaq))) st.motivoMaq='';
+        const optTodos=`<option value=""${st.motivoMaq===''?' selected':''}>∑ Todos los motivos · ${totalCat.toFixed(1)} h</option>`;
+        selm.innerHTML=optTodos+cat.motivos.map(m=>`<option value="${this.esc(m.motivo)}"${m.motivo===st.motivoMaq?' selected':''}>${this.esc(m.motivo)} · ${m.total_horas.toFixed(1)} h</option>`).join('');
+        // motivo='' → el endpoint suma todos los motivos por máquina.
         const d=await this.get('oee_unificado_motivo_maquinas_evolucion.php',
           this.common(Object.assign({motivo:st.motivoMaq},filtros)));
         // Normalizar a forma común: items con clave/nombre/cod/total_horas/serie.
