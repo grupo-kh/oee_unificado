@@ -29,7 +29,8 @@ function motivoPeriodoMaquinasData(): array
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $bucket)) throw new Exception('bucket inválido');
     if (!in_array($gran, ['day','week','month'], true)) throw new Exception('granularidad inválida');
     if ($seccion !== '' && !in_array($seccion, ['VARILLAS','TROQUELADOS'], true)) throw new Exception('seccion inválida');
-    if ($motivo === '') throw new Exception('motivo requerido');
+    // motivo vacío = TODOS los motivos (reparto por máquina del total del bucket).
+    $todos = ($motivo === '');
     $turnos = array_values(array_filter(getListParam('turnos'), fn($t) => in_array($t, ['M','T','N'], true)));
 
     // Ancho del bucket → fin (inclusive). El reparto se acota a la intersección
@@ -49,9 +50,12 @@ function motivoPeriodoMaquinasData(): array
         "CAST(hp.Dia_productivo AS DATE) BETWEEN ? AND ?",
         "cp.Cod_paro <> 11",
         "hpp.Fecha_fin IS NOT NULL",
-        "cp.Desc_paro = ?",
     ];
-    $params = [$desde, $hasta, $motivo];
+    $params = [$desde, $hasta];
+    if (!$todos) {                              // motivo concreto: filtrar por Desc_paro
+        $where[]  = "cp.Desc_paro = ?";
+        $params[] = $motivo;
+    }
     if (!empty($turnos)) {
         $ph = implode(',', array_fill(0, count($turnos), '?'));
         $where[] = "ct.Cod_turno IN ($ph)";

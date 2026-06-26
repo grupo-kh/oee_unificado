@@ -2146,7 +2146,16 @@ const App={
       }else{
         selm.style.display='none';
         const d=await this.get('oee_unificado_motivos_evolucion.php',this.common(filtros));
-        st.d={buckets:d.buckets, items:(d.motivos||[]).map(m=>({clave:m.motivo,cod:null,nombre:m.motivo,total_horas:m.total_horas,serie:m.serie}))};
+        const items=(d.motivos||[]).map(m=>({clave:m.motivo,cod:null,nombre:m.motivo,total_horas:m.total_horas,serie:m.serie}));
+        // Item sintético '∑ Todos los motivos': línea suma de todos los motivos por
+        // bucket (calculada en cliente, sin llamada extra). Clave centinela que no
+        // colisiona con ningún Desc_paro real.
+        if(items.length){
+          const serie=d.buckets.map((b,i)=>({key:b.key,horas:Math.round(items.reduce((a,m)=>a+(m.serie[i]?m.serie[i].horas:0),0)*100)/100}));
+          const total=Math.round(items.reduce((a,m)=>a+(m.total_horas||0),0)*100)/100;
+          items.unshift({clave:'__TODOS__',cod:null,nombre:'∑ Todos los motivos',total_horas:total,serie,esTodos:true});
+        }
+        st.d={buckets:d.buckets, items};
         st.tituloTotal='Total motivos';
       }
       const d=st.d;
@@ -2179,10 +2188,11 @@ const App={
     const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     const list=ov.querySelector('.evm-list'); const chartBox=ov.querySelector('.evm-chart');
     const MAX_SEL=5;   // límite de series simultáneas (legibilidad de la comparativa)
-    // Cabecera: total de TODOS los items del rango (motivos o máquinas según la vista)
-    // y la suma de sus horas de paro. Es el "total" del periodo filtrado.
-    const totalGeneral=d.items.reduce((a,m)=>a+(m.total_horas||0),0);
-    const cab=`<div class="evm-list-cab">${this._evolMot.tituloTotal} · <b>${d.items.length}</b><span>${totalGeneral.toFixed(2)} h de paro</span></div>`;
+    // Cabecera: total de los items REALES del rango (excluye el item sintético
+    // '∑ Todos') y la suma de sus horas. Es el "total" del periodo filtrado.
+    const reales=d.items.filter(m=>!m.esTodos);
+    const totalGeneral=reales.reduce((a,m)=>a+(m.total_horas||0),0);
+    const cab=`<div class="evm-list-cab">${this._evolMot.tituloTotal} · <b>${reales.length}</b><span>${totalGeneral.toFixed(2)} h de paro</span></div>`;
     // Lista (peso desc) como toggle aditivo. El punto de color liga cada item con
     // su línea. Los seleccionados van resaltados.
     list.innerHTML=cab+d.items.map(m=>{
@@ -2308,6 +2318,9 @@ const App={
       // Reparto por MOTIVO de esa máquina en ese bucket (popup). Al clicar un motivo,
       // debajo se muestran sus paros por horas. Simétrico a la vista por motivos.
       this.evolMotMaquinaMotivos(it.cod, it.nombre, key);
+    }else if(it.esTodos){
+      // '∑ Todos los motivos': reparto por máquina de TODOS los motivos en ese bucket.
+      this.evolMotMaquinas('', key);
     }else{
       // Vista por motivos: reparto por máquina del motivo en ese bucket.
       this.evolMotMaquinas(it.clave,key);
@@ -2326,14 +2339,15 @@ const App={
   },
   async evolMotMaquinas(motivo,bucketKey){
     // Popup (fullpop encima) con el reparto por máquina del MOTIVO clicado en ese
-    // bucket (motivo recibido explícito: con varias líneas, es el de la serie clicada).
+    // bucket. motivo='' = todos los motivos (reparto por máquina del total).
     const {gran,desde,hasta}=this._evolMot;
     const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const motTit=(motivo==null||motivo==='')?'∑ Todos los motivos':e(motivo);
     const ov=document.createElement('div'); ov.className='fullpop';
     ov.innerHTML=`
       <div class="fullpop-head">
         <div class="evm-title"><img src="assets/img/logo-kh.png" alt="KH" class="evm-logo">
-          <h2>🏭 Reparto por máquina · ${e(motivo)}<small>${e(bucketKey)} · ${gran==='day'?'día':gran==='week'?'semana':'mes'} · horas de paro</small></h2>
+          <h2>🏭 Reparto por máquina · ${motTit}<small>${e(bucketKey)} · ${gran==='day'?'día':gran==='week'?'semana':'mes'} · horas de paro</small></h2>
         </div>
         <button class="evmmClose" style="background:#f3f4f6;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280">✕ Cerrar</button>
       </div>
@@ -2348,14 +2362,20 @@ const App={
           fecha_desde:desde, fecha_hasta:hasta}));
       if(!d.maquinas.length){body.innerHTML='<div class="empty">Sin paros de este motivo en este periodo</div>';return;}
       const max=Math.max(...d.maquinas.map(m=>m.horas));
-      body.innerHTML=`<div class="breadcrumb">Reparto de <b>${e(motivo)}</b> en <b>${e(d.rango.desde)}</b> a <b>${e(d.rango.hasta)}</b> · total <b>${d.total_horas.toFixed(2)} h</b> · ${d.maquinas.length} máquinas. <small style="color:#6b7280">Clic en una máquina = desglose por día y hora.</small></div>`
+      body.innerHTML=`<div class="breadcrumb">Reparto de <b>${motTit}</b> en <b>${e(d.rango.desde)}</b> a <b>${e(d.rango.hasta)}</b> · total <b>${d.total_horas.toFixed(2)} h</b> · ${d.maquinas.length} máquinas. <small style="color:#6b7280">Clic en una máquina = paros por horas (debajo).</small></div>`
         +this.barList(d.maquinas,{name:m=>m.maquina,val:m=>m.horas,unit:'h',max,
-          extraCols:[{label:'%',val:m=>m.pct+'%'}],color:()=>'#8c181a',clickable:true});
-      // Clic en una máquina → desglose temporal (día → hora) de ese motivo en esa
-      // máquina, acotado al rango del bucket (d.rango). Reutiliza openMotivoTemporal.
+          extraCols:[{label:'%',val:m=>m.pct+'%'}],color:()=>'#8c181a',clickable:true})
+        +'<div class="evmm-horas" style="margin-top:14px"></div>';
+      // Clic en una máquina → DEBAJO, el reparto por horas de ese motivo en esa
+      // máquina/periodo (inline, no modal). motivo='' = todos los motivos.
+      const wrapH=body.querySelector('.evmm-horas');
       [...body.querySelectorAll('.brow:not(.bhead)')].forEach((row,ix)=>{
         const mq=d.maquinas[ix]; if(!mq)return;
-        row.onclick=()=>this.openMotivoTemporal(motivo,mq.cod_maquina,null,{desde:d.rango.desde,hasta:d.rango.hasta});
+        row.onclick=()=>{
+          [...body.querySelectorAll('.brow:not(.bhead)')].forEach(r=>r.classList.remove('evm-sel'));
+          row.classList.add('evm-sel');
+          this.evolMotMaqMotivoHoras(wrapH, mq.cod_maquina, motivo, d.rango, mq.maquina);
+        };
       });
     }catch(e2){body.innerHTML=`<div class="error">${e2.message}</div>`;}
   },
@@ -2400,11 +2420,13 @@ const App={
       });
     }catch(e2){body.innerHTML=`<div class="error">${e2.message}</div>`;}
   },
-  async evolMotMaqMotivoHoras(wrap, codMaq, motivo, rango){
+  async evolMotMaqMotivoHoras(wrap, codMaq, motivo, rango, nombreMaq){
     // Reparto por horas (0–23) de un motivo en una máquina dentro del rango del bucket.
-    // Agrega todas las horas de los días del rango por franja horaria.
+    // motivo='' = todos los motivos. nombreMaq se antepone al título si se pasa.
     const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-    wrap.innerHTML=`<div class="art-of-subt">Paros por horas · ${e(motivo)} <small style="font-weight:500;color:#8a6e70">· ${e(rango.desde)} a ${e(rango.hasta)}</small></div>${this.loadingHtml()}`;
+    const etq=(motivo==null||motivo==='')?'∑ Todos los motivos':e(motivo);
+    const pref=nombreMaq?e(nombreMaq)+' · ':'';
+    wrap.innerHTML=`<div class="art-of-subt">Paros por horas · ${pref}${etq} <small style="font-weight:500;color:#8a6e70">· ${e(rango.desde)} a ${e(rango.hasta)}</small></div>${this.loadingHtml()}`;
     try{
       const turnos=this.turnos();
       // Sumar el reparto horario de cada día del rango (mode=por_hora_dia por día).
@@ -2422,8 +2444,8 @@ const App={
         (r.horas||[]).forEach(h=>{ acc[h.hora]=(acc[h.hora]||0)+(+h.horas||0); });
       }
       const hay=acc.some(v=>v>0);
-      if(!hay){wrap.innerHTML=`<div class="art-of-subt">Paros por horas · ${e(motivo)}</div><div class="hint">Sin detalle horario para este motivo en el periodo.</div>`;return;}
-      wrap.innerHTML=`<div class="art-of-subt">Paros por horas · ${e(motivo)} <small style="font-weight:500;color:#8a6e70">· ${e(rango.desde)} a ${e(rango.hasta)}</small></div><div class="chartbox" style="height:280px"><canvas class="evm-hcv"></canvas></div>`;
+      if(!hay){wrap.innerHTML=`<div class="art-of-subt">Paros por horas · ${pref}${etq}</div><div class="hint">Sin detalle horario en el periodo.</div>`;return;}
+      wrap.innerHTML=`<div class="art-of-subt">Paros por horas · ${pref}${etq} <small style="font-weight:500;color:#8a6e70">· ${e(rango.desde)} a ${e(rango.hasta)}</small></div><div class="chartbox" style="height:280px"><canvas class="evm-hcv"></canvas></div>`;
       const cv=wrap.querySelector('.evm-hcv');
       if(this._evmHChart){try{this._evmHChart.destroy();}catch(_){}}
       this._evmHChart=new Chart(cv,{type:'bar',data:{labels:acc.map((_,h)=>String(h).padStart(2,'0')+'h'),
