@@ -71,6 +71,8 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .evm-logo{height:26px;width:auto;flex-shrink:0}
 .evm-wrap{display:flex;gap:14px;height:100%;min-height:0}
 .evm-list{flex:0 0 260px;overflow:auto;border-right:1px solid #e5dada;padding-right:10px}
+.evm-list-cab{display:flex;flex-direction:column;gap:1px;padding:6px 10px 9px;margin-bottom:6px;border-bottom:1px solid #ecdede;font-size:13px;color:#3a2426;font-weight:700}
+.evm-list-cab span{font-size:12px;color:#8a6e70;font-weight:600}
 .evm-mot{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13px;border:1px solid transparent}
 .evm-mot:hover{background:#f6f3f4}
 .evm-mot.active{color:#fff;font-weight:700}
@@ -2128,9 +2130,13 @@ const App={
     const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     const list=ov.querySelector('.evm-list'); const chartBox=ov.querySelector('.evm-chart');
     const MAX_SEL=5;   // límite de motivos simultáneos (legibilidad de la comparativa)
+    // Cabecera con el total de TODOS los motivos del rango (suma de horas de paro) y
+    // el número de motivos distintos. Es el "total de motivos" del periodo filtrado.
+    const totalGeneral=d.motivos.reduce((a,m)=>a+(m.total_horas||0),0);
+    const cab=`<div class="evm-list-cab">Total motivos · <b>${d.motivos.length}</b><span>${totalGeneral.toFixed(2)} h de paro</span></div>`;
     // Lista de motivos (peso desc) como toggle aditivo. El cuadradito de color liga
     // cada item con su línea. Los seleccionados van resaltados.
-    list.innerHTML=d.motivos.map(m=>{
+    list.innerHTML=cab+d.motivos.map(m=>{
       const on=motivoSel.has(m.motivo), col=colorDe[m.motivo]||'#8c181a';
       return `<div class="evm-mot${on?' active':''}" data-motivo="${e(m.motivo)}" style="${on?`background:${col};border-color:${col}`:''}">
          <span><span class="evm-dot" style="background:${col}"></span>${e(m.motivo)}</span><small>${m.total_horas.toFixed(2)} h</small></div>`;
@@ -2211,12 +2217,12 @@ const App={
       annotations:{xaxis:anots},
       stroke:{width:widths,curve:'straight',dashArray:dashes},
       markers:{size:muchos?4:6,strokeWidth:2,hover:{size:9,sizeOffset:3}},
-      // Etiquetas de valor solo con UN motivo, pocos buckets y sin tendencia. Para
-      // evitar la combinación trampa de ApexCharts (enabled:false + enabledOnSeries),
-      // solo se fija enabledOnSeries cuando las etiquetas están realmente activas.
-      dataLabels:Object.assign(
-        {enabled:unaSerie&&!muchos&&!trend,formatter:v=>v>0?v.toFixed(1):'',background:{enabled:true,opacity:.9},style:{fontSize:'10px'}},
-        (unaSerie&&!muchos&&!trend)?{enabledOnSeries:idxMotivo}:{}),
+      // Etiquetas de valor SIEMPRE visibles en cada punto, en todas las series reales
+      // (nunca en las de tendencia) y en todas las escalas. Tamaño algo menor cuando
+      // hay muchos puntos para reducir el solape.
+      dataLabels:{enabled:true,enabledOnSeries:idxMotivo,
+        formatter:v=>v>0?v.toFixed(1):'',background:{enabled:true,opacity:.9},
+        style:{fontSize:muchos?'8px':'10px'}},
       xaxis:{categories:cats,labels:{rotate:-45,rotateAlways:cats.length>12,style:{fontSize:'11px'}}},
       yaxis:{min:0,title:{text:'Horas de paro'},labels:{formatter:v=>(Math.round(v*10)/10)}},
       tooltip:{y:{formatter:v=>v.toFixed(2)+' h'}},
