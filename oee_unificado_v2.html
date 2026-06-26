@@ -64,6 +64,19 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .btn-topmot:hover{background:#e3d9f7}
 .btn-matriz{background:#2d4d7a;color:#fff;border-color:#24406a}
 .btn-matriz:hover{background:#24406a}
+.btn-evolmot{background:#0f766e;color:#fff;border-color:#0c5d57}
+.btn-evolmot:hover{background:#0c5d57}
+/* Evolución de motivos: layout lista + gráfico */
+.evm-wrap{display:flex;gap:14px;height:100%;min-height:0}
+.evm-list{flex:0 0 260px;overflow:auto;border-right:1px solid #e5dada;padding-right:10px}
+.evm-mot{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13px;border:1px solid transparent}
+.evm-mot:hover{background:#f1f5f4}
+.evm-mot.active{background:#0f766e;color:#fff;font-weight:700}
+.evm-mot small{opacity:.8;font-variant-numeric:tabular-nums}
+.evm-chart{flex:1 1 auto;min-width:0}
+.evm-gran{display:flex;gap:6px;align-items:center}
+.evm-gran button{padding:6px 12px;border:1px solid #cbd5d3;background:#fff;border-radius:7px;font-size:13px;cursor:pointer;font-weight:600;color:#334}
+.evm-gran button.active{background:#0f766e;color:#fff;border-color:#0c5d57}
 /* tabla matriz (popup): cabecera y 1ª columna fijas, scroll horizontal */
 .mtx-wrap{overflow:auto;max-height:calc(100vh - 210px);border:1px solid #e5e7eb;border-radius:8px}
 .mtx{border-collapse:collapse;font-size:12px;white-space:nowrap}
@@ -393,6 +406,7 @@ tbody tr:hover{background:#f9fafb}
       <button class="btn btn-topmot" onclick="App.topModule('motivos')">🔧 Top motivos</button>
       <button class="btn btn-matriz" onclick="App.openMatriz()">🧮 Matriz</button>
       <button class="btn btn-matriz" onclick="App.openMatriz2()">🧮 Matriz 2</button>
+      <button class="btn btn-evolmot" onclick="App.openEvolMotivos()">📈 Evolución motivos</button>
       <button class="btn btn-pri" onclick="App.exportExcel()">⬇️ Excel</button>
     </div>
   </div>
@@ -1953,6 +1967,49 @@ const App={
     }
     h+='</tbody></table></div>';
     return h;
+  },
+  async openEvolMotivos(){
+    const ov=document.createElement('div'); ov.className='fullpop';
+    ov.innerHTML=`
+      <div class="fullpop-head">
+        <h2>📈 Evolución de motivos · Disponibilidad<small>${State.seccion} · ${fDesde.value} a ${fHasta.value} · horas de paro</small></h2>
+        <div class="evm-gran">
+          <span style="font-size:12px;color:#6b7280;font-weight:600">Granularidad:</span>
+          <button data-g="day" class="active">Día</button>
+          <button data-g="week">Semana</button>
+          <button data-g="month">Mes</button>
+          <button class="evmClose" style="background:#f3f4f6;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280;margin-left:10px">✕ Cerrar</button>
+        </div>
+      </div>
+      <div class="fullpop-body"><div class="evm-wrap"><div class="evm-list">${this.loadingHtml()}</div><div class="evm-chart"></div></div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('.evmClose').onclick=()=>ov.remove();
+    this._evolMot={ov, gran:'day', motivoSel:null, d:null};
+    // Botones de granularidad: recargan con la nueva escala conservando el motivo.
+    ov.querySelectorAll('.evm-gran button[data-g]').forEach(b=>{
+      b.onclick=()=>{
+        ov.querySelectorAll('.evm-gran button[data-g]').forEach(x=>x.classList.remove('active'));
+        b.classList.add('active');
+        this._evolMot.gran=b.dataset.g;
+        this.evolMotLoad();
+      };
+    });
+    this.evolMotLoad();
+  },
+  async evolMotLoad(){
+    const ov=this._evolMot.ov;
+    const list=ov.querySelector('.evm-list'); const chart=ov.querySelector('.evm-chart');
+    list.innerHTML=this.loadingHtml(); chart.innerHTML='';
+    try{
+      const d=await this.get('oee_unificado_motivos_evolucion.php',
+        this.common({seccion:State.seccion, granularidad:this._evolMot.gran}));
+      this._evolMot.d=d;
+      if(!d.motivos.length){list.innerHTML='<div class="empty">Sin paros para el filtro seleccionado</div>';return;}
+      // Conservar el motivo seleccionado si sigue existiendo; si no, el de más peso.
+      const sel=this._evolMot.motivoSel;
+      this._evolMot.motivoSel=(sel&&d.motivos.some(m=>m.motivo===sel))?sel:d.motivos[0].motivo;
+      this.evolMotRender();
+    }catch(e){list.innerHTML=`<div class="error">${e.message}</div>`;}
   },
   matrizTabla(d){
     const mots=d.motivos||[]; const maqs=d.maquinas||[];
