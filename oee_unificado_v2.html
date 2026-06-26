@@ -64,19 +64,21 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .btn-topmot:hover{background:#e3d9f7}
 .btn-matriz{background:#2d4d7a;color:#fff;border-color:#24406a}
 .btn-matriz:hover{background:#24406a}
-.btn-evolmot{background:#0f766e;color:#fff;border-color:#0c5d57}
-.btn-evolmot:hover{background:#0c5d57}
+.btn-evolmot{background:#8c181a;color:#fff;border-color:#6e1315}
+.btn-evolmot:hover{background:#6e1315}
 /* Evolución de motivos: layout lista + gráfico */
+.evm-title{display:flex;align-items:center;gap:10px}
+.evm-logo{height:26px;width:auto;flex-shrink:0}
 .evm-wrap{display:flex;gap:14px;height:100%;min-height:0}
 .evm-list{flex:0 0 260px;overflow:auto;border-right:1px solid #e5dada;padding-right:10px}
 .evm-mot{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13px;border:1px solid transparent}
-.evm-mot:hover{background:#f1f5f4}
-.evm-mot.active{background:#0f766e;color:#fff;font-weight:700}
+.evm-mot:hover{background:#f6f3f4}
+.evm-mot.active{background:#8c181a;color:#fff;font-weight:700}
 .evm-mot small{opacity:.8;font-variant-numeric:tabular-nums}
 .evm-chart{flex:1 1 auto;min-width:0}
 .evm-gran{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.evm-gran button{padding:6px 12px;border:1px solid #cbd5d3;background:#fff;border-radius:7px;font-size:13px;cursor:pointer;font-weight:600;color:#334}
-.evm-gran button.active{background:#0f766e;color:#fff;border-color:#0c5d57}
+.evm-gran button{padding:6px 12px;border:1px solid #d9cccd;background:#fff;border-radius:7px;font-size:13px;cursor:pointer;font-weight:600;color:#3a2426}
+.evm-gran button.active{background:#8c181a;color:#fff;border-color:#6e1315}
 /* Selector de fechas propio del formulario (independiente del rango global) */
 .evm-fechas{display:flex;gap:6px;align-items:center;font-size:12px;color:#6b7280;font-weight:600}
 .evm-fechas input[type=date]{padding:6px 9px;border:1px solid #cbd5d3;border-radius:7px;font-size:13px;color:#334;font-weight:600}
@@ -1985,7 +1987,9 @@ const App={
     const ov=document.createElement('div'); ov.className='fullpop';
     ov.innerHTML=`
       <div class="fullpop-head">
-        <h2>📈 Evolución de motivos · Disponibilidad<small>${State.seccion} · horas de paro</small></h2>
+        <div class="evm-title"><img src="assets/img/logo-kh.png" alt="KH" class="evm-logo">
+          <h2>📈 Evolución de motivos · Disponibilidad<small>${State.seccion} · horas de paro</small></h2>
+        </div>
         <div class="evm-gran">
           <span class="evm-fechas">Desde
             <input type="date" class="evm-desde" value="${desde0}">
@@ -2110,12 +2114,18 @@ const App={
         toolbar:{show:true,tools:{download:true,zoom:true,pan:true,reset:true}},animations:{enabled:false},
         events:{
           // Clic en un punto → popup de reparto por máquina de ese bucket.
-          dataPointSelection:(ev,ctx,{dataPointIndex})=>{ if(dataPointIndex!=null&&keys[dataPointIndex]!=null) this.evolMotMaquinas(keys[dataPointIndex]); }
+          // En type:'line' dataPointSelection es errático; markerClick exige acertar
+          // el marcador exacto. Se escuchan los tres caminos (markerClick, el evento
+          // de selección y click sobre el área, que devuelve el punto más cercano)
+          // con un guard anti-doble-disparo común.
+          markerClick:(ev,ctx,cfg)=>this.evolMotPunto(keys,cfg&&cfg.dataPointIndex),
+          dataPointSelection:(ev,ctx,cfg)=>this.evolMotPunto(keys,cfg&&cfg.dataPointIndex),
+          click:(ev,ctx,cfg)=>this.evolMotPunto(keys,cfg&&cfg.dataPointIndex)
         }},
       series:[{name:mot.motivo,data:vals}],
-      colors:[PALETTE[0]],
+      colors:['#8c181a'],
       stroke:{width:3,curve:'straight'},
-      markers:{size:muchos?3:5,hover:{sizeOffset:3}},
+      markers:{size:muchos?4:6,strokeWidth:2,hover:{size:9,sizeOffset:3}},
       dataLabels:{enabled:!muchos,formatter:v=>v>0?v.toFixed(1):'',background:{enabled:true,opacity:.9},style:{fontSize:'10px'}},
       xaxis:{categories:cats,labels:{rotate:-45,rotateAlways:cats.length>12,style:{fontSize:'11px'}}},
       yaxis:{min:0,title:{text:'Horas de paro'},labels:{formatter:v=>(Math.round(v*10)/10)}},
@@ -2124,6 +2134,17 @@ const App={
       noData:{text:'Sin datos'}
     });
   },
+  // Maneja el clic en un punto del gráfico. Guard anti-doble-disparo: ApexCharts
+  // puede emitir markerClick y dataPointSelection en el mismo clic; ignoramos el
+  // segundo si llega para el mismo punto en una ventana corta.
+  evolMotPunto(keys,dataPointIndex){
+    // -1 = clic fuera de un punto (lo emite el evento 'click'); ignorar.
+    if(dataPointIndex==null||dataPointIndex<0||keys[dataPointIndex]==null)return;
+    const key=keys[dataPointIndex], ahora=Date.now();
+    if(this._evolMotUltimo&&this._evolMotUltimo.key===key&&(ahora-this._evolMotUltimo.t)<400)return;
+    this._evolMotUltimo={key,t:ahora};
+    this.evolMotMaquinas(key);
+  },
   async evolMotMaquinas(bucketKey){
     // Popup (fullpop encima) con el reparto por máquina del motivo en ese bucket.
     const {motivoSel,gran,desde,hasta}=this._evolMot;
@@ -2131,7 +2152,9 @@ const App={
     const ov=document.createElement('div'); ov.className='fullpop';
     ov.innerHTML=`
       <div class="fullpop-head">
-        <h2>🏭 Reparto por máquina · ${e(motivoSel)}<small>${e(bucketKey)} · ${gran==='day'?'día':gran==='week'?'semana':'mes'} · horas de paro</small></h2>
+        <div class="evm-title"><img src="assets/img/logo-kh.png" alt="KH" class="evm-logo">
+          <h2>🏭 Reparto por máquina · ${e(motivoSel)}<small>${e(bucketKey)} · ${gran==='day'?'día':gran==='week'?'semana':'mes'} · horas de paro</small></h2>
+        </div>
         <button class="evmmClose" style="background:#f3f4f6;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280">✕ Cerrar</button>
       </div>
       <div class="fullpop-body"><div class="evmm-body">${this.loadingHtml()}</div></div>`;
@@ -2147,7 +2170,7 @@ const App={
       const max=Math.max(...d.maquinas.map(m=>m.horas));
       body.innerHTML=`<div class="breadcrumb">Reparto de <b>${e(motivoSel)}</b> en <b>${e(d.rango.desde)}</b> a <b>${e(d.rango.hasta)}</b> · total <b>${d.total_horas.toFixed(2)} h</b> · ${d.maquinas.length} máquinas. <small style="color:#6b7280">Clic en una máquina = desglose por día y hora.</small></div>`
         +this.barList(d.maquinas,{name:m=>m.maquina,val:m=>m.horas,unit:'h',max,
-          extraCols:[{label:'%',val:m=>m.pct+'%'}],color:()=>'#0f766e',clickable:true});
+          extraCols:[{label:'%',val:m=>m.pct+'%'}],color:()=>'#8c181a',clickable:true});
       // Clic en una máquina → desglose temporal (día → hora) de ese motivo en esa
       // máquina, acotado al rango del bucket (d.rango). Reutiliza openMotivoTemporal.
       [...body.querySelectorAll('.brow:not(.bhead)')].forEach((row,ix)=>{
