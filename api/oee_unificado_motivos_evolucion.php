@@ -40,10 +40,13 @@ function motivosEvolucionData(): array
         $bucketSQL = "DATEADD(MONTH, DATEDIFF(MONTH, 0, hp.Dia_productivo), 0)";
     }
 
+    // Filtros idénticos a la DISPONIBILIDAD de oee_unificado_v2 (oee_unificado_motivo_drill.php):
+    // solo se excluye el paro 11 (CERRADA). NO se excluye la actividad CERRADA (Id=1),
+    // porque la disponibilidad sí cuenta esos paros (PARO PLANIFICADO, MICRO PARO…) y las
+    // horas deben cuadrar con la pantalla principal para una misma máquina/rango.
     $where  = [
         "CAST(hp.Dia_productivo AS DATE) BETWEEN ? AND ?",
         "cp.Cod_paro <> 11",
-        "cp.Id_actividad <> 1",
         "hpp.Fecha_fin IS NOT NULL",
     ];
     $params = [$fdesde, $fhasta];
