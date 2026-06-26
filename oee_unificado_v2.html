@@ -2011,6 +2011,69 @@ const App={
       this.evolMotRender();
     }catch(e){list.innerHTML=`<div class="error">${e.message}</div>`;}
   },
+  evolMotRender(){
+    const {ov,d,motivoSel}=this._evolMot;
+    const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const list=ov.querySelector('.evm-list'); const chartBox=ov.querySelector('.evm-chart');
+    // Lista de motivos (peso desc). El activo resaltado.
+    list.innerHTML=d.motivos.map(m=>
+      `<div class="evm-mot${m.motivo===motivoSel?' active':''}" data-motivo="${e(m.motivo)}">
+         <span>${e(m.motivo)}</span><small>${m.total_horas.toFixed(2)} h</small></div>`).join('');
+    list.querySelectorAll('.evm-mot').forEach(row=>{
+      row.onclick=()=>{ this._evolMot.motivoSel=row.dataset.motivo; this.evolMotRender(); };
+    });
+    // Serie del motivo seleccionado.
+    const mot=d.motivos.find(m=>m.motivo===motivoSel);
+    if(!mot){chartBox.innerHTML='<div class="hint">Selecciona un motivo</div>';return;}
+    const cats=d.buckets.map(b=>b.label);
+    const vals=mot.serie.map(p=>p.horas);
+    const keys=d.buckets.map(b=>b.key);
+    chartBox.innerHTML='<div class="evm-apx"></div>';
+    const muchos=cats.length>31;   // regla de etiquetas: ocultas si hay demasiados puntos
+    this.apex(chartBox.querySelector('.evm-apx'),{
+      chart:{type:'line',height:Math.max(420,ov.querySelector('.fullpop-body').clientHeight-40),
+        toolbar:{show:true,tools:{download:true,zoom:true,pan:true,reset:true}},animations:{enabled:false},
+        events:{
+          // Clic en un marcador → popup de reparto por máquina de ese bucket.
+          markerClick:(ev,ctx,{dataPointIndex})=>{ if(dataPointIndex!=null&&keys[dataPointIndex]!=null) this.evolMotMaquinas(keys[dataPointIndex]); },
+          dataPointSelection:(ev,ctx,{dataPointIndex})=>{ if(dataPointIndex!=null&&keys[dataPointIndex]!=null) this.evolMotMaquinas(keys[dataPointIndex]); }
+        }},
+      series:[{name:mot.motivo,data:vals}],
+      colors:[PALETTE[0]],
+      stroke:{width:3,curve:'straight'},
+      markers:{size:muchos?3:5,hover:{sizeOffset:3}},
+      dataLabels:{enabled:!muchos,formatter:v=>v>0?v.toFixed(1):'',background:{enabled:true,opacity:.9},style:{fontSize:'10px'}},
+      xaxis:{categories:cats,labels:{rotate:-45,rotateAlways:cats.length>12,style:{fontSize:'11px'}}},
+      yaxis:{min:0,title:{text:'Horas de paro'},labels:{formatter:v=>(Math.round(v*10)/10)}},
+      tooltip:{y:{formatter:v=>v.toFixed(2)+' h'}},
+      legend:{show:false},
+      noData:{text:'Sin datos'}
+    });
+  },
+  async evolMotMaquinas(bucketKey){
+    // Popup (fullpop encima) con el reparto por máquina del motivo en ese bucket.
+    const {motivoSel,gran}=this._evolMot;
+    const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const ov=document.createElement('div'); ov.className='fullpop';
+    ov.innerHTML=`
+      <div class="fullpop-head">
+        <h2>🏭 Reparto por máquina · ${e(motivoSel)}<small>${e(bucketKey)} · ${gran==='day'?'día':gran==='week'?'semana':'mes'} · horas de paro</small></h2>
+        <button class="evmmClose" style="background:#f3f4f6;border:none;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:#6b7280">✕ Cerrar</button>
+      </div>
+      <div class="fullpop-body"><div class="evmm-body">${this.loadingHtml()}</div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('.evmmClose').onclick=()=>ov.remove();
+    const body=ov.querySelector('.evmm-body');
+    try{
+      const d=await this.get('oee_unificado_motivo_periodo_maquinas.php',
+        this.common({seccion:State.seccion, granularidad:gran, motivo:motivoSel, bucket:bucketKey}));
+      if(!d.maquinas.length){body.innerHTML='<div class="empty">Sin paros de este motivo en este periodo</div>';return;}
+      const max=Math.max(...d.maquinas.map(m=>m.horas));
+      body.innerHTML=`<div class="breadcrumb">Reparto de <b>${e(motivoSel)}</b> en <b>${e(d.rango.desde)}</b> a <b>${e(d.rango.hasta)}</b> · total <b>${d.total_horas.toFixed(2)} h</b> · ${d.maquinas.length} máquinas.</div>`
+        +this.barList(d.maquinas,{name:m=>m.maquina,val:m=>m.horas,unit:'h',max,
+          extraCols:[{label:'%',val:m=>m.pct+'%'}],color:()=>'#0f766e',clickable:false});
+    }catch(e2){body.innerHTML=`<div class="error">${e2.message}</div>`;}
+  },
   matrizTabla(d){
     const mots=d.motivos||[]; const maqs=d.maquinas||[];
     if(!maqs.length)return '<div class="empty">Sin paros para el filtro seleccionado</div>';
