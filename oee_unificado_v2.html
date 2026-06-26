@@ -74,9 +74,12 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .evm-mot.active{background:#0f766e;color:#fff;font-weight:700}
 .evm-mot small{opacity:.8;font-variant-numeric:tabular-nums}
 .evm-chart{flex:1 1 auto;min-width:0}
-.evm-gran{display:flex;gap:6px;align-items:center}
+.evm-gran{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .evm-gran button{padding:6px 12px;border:1px solid #cbd5d3;background:#fff;border-radius:7px;font-size:13px;cursor:pointer;font-weight:600;color:#334}
 .evm-gran button.active{background:#0f766e;color:#fff;border-color:#0c5d57}
+/* Selector de fechas propio del formulario (independiente del rango global) */
+.evm-fechas{display:flex;gap:6px;align-items:center;font-size:12px;color:#6b7280;font-weight:600}
+.evm-fechas input[type=date]{padding:6px 9px;border:1px solid #cbd5d3;border-radius:7px;font-size:13px;color:#334;font-weight:600}
 /* tabla matriz (popup): cabecera y 1ª columna fijas, scroll horizontal */
 .mtx-wrap{overflow:auto;max-height:calc(100vh - 210px);border:1px solid #e5e7eb;border-radius:8px}
 .mtx{border-collapse:collapse;font-size:12px;white-space:nowrap}
@@ -1969,12 +1972,20 @@ const App={
     return h;
   },
   async openEvolMotivos(){
+    // Rango propio del formulario: arranca con las fechas globales pero es
+    // INDEPENDIENTE (cambiarlo no toca el dashboard ni las fechas globales).
+    const desde0=fDesde.value, hasta0=fHasta.value;
     const ov=document.createElement('div'); ov.className='fullpop';
     ov.innerHTML=`
       <div class="fullpop-head">
-        <h2>📈 Evolución de motivos · Disponibilidad<small>${State.seccion} · ${fDesde.value} a ${fHasta.value} · horas de paro</small></h2>
+        <h2>📈 Evolución de motivos · Disponibilidad<small>${State.seccion} · horas de paro</small></h2>
         <div class="evm-gran">
-          <span style="font-size:12px;color:#6b7280;font-weight:600">Granularidad:</span>
+          <span class="evm-fechas">Desde
+            <input type="date" class="evm-desde" value="${desde0}">
+          hasta
+            <input type="date" class="evm-hasta" value="${hasta0}">
+          </span>
+          <span style="font-size:12px;color:#6b7280;font-weight:600;margin-left:6px">Granularidad:</span>
           <button data-g="day" class="active">Día</button>
           <button data-g="week">Semana</button>
           <button data-g="month">Mes</button>
@@ -1984,7 +1995,7 @@ const App={
       <div class="fullpop-body"><div class="evm-wrap"><div class="evm-list">${this.loadingHtml()}</div><div class="evm-chart"></div></div></div>`;
     document.body.appendChild(ov);
     ov.querySelector('.evmClose').onclick=()=>ov.remove();
-    this._evolMot={ov, gran:'day', motivoSel:null, d:null};
+    this._evolMot={ov, gran:'day', motivoSel:null, d:null, desde:desde0, hasta:hasta0};
     // Botones de granularidad: recargan con la nueva escala conservando el motivo.
     ov.querySelectorAll('.evm-gran button[data-g]').forEach(b=>{
       b.onclick=()=>{
@@ -1994,6 +2005,18 @@ const App={
         this.evolMotLoad();
       };
     });
+    // Selector de fechas propio: al cambiar desde/hasta recarga con el nuevo rango.
+    const iDesde=ov.querySelector('.evm-desde'), iHasta=ov.querySelector('.evm-hasta');
+    const onFecha=()=>{
+      const d=iDesde.value, h=iHasta.value;
+      if(!d||!h)return;                         // rango incompleto: espera a ambas
+      if(d>h){                                  // desde posterior a hasta: iguala hasta a desde
+        iHasta.value=d; this._evolMot.hasta=d;
+      }else{ this._evolMot.hasta=h; }
+      this._evolMot.desde=iDesde.value;
+      this.evolMotLoad();
+    };
+    iDesde.onchange=onFecha; iHasta.onchange=onFecha;
     this.evolMotLoad();
   },
   async evolMotLoad(){
@@ -2001,8 +2024,10 @@ const App={
     const list=ov.querySelector('.evm-list'); const chart=ov.querySelector('.evm-chart');
     list.innerHTML=this.loadingHtml(); chart.innerHTML='';
     try{
+      // Rango propio del formulario (pisa las fechas globales que pone this.common).
       const d=await this.get('oee_unificado_motivos_evolucion.php',
-        this.common({seccion:State.seccion, granularidad:this._evolMot.gran}));
+        this.common({seccion:State.seccion, granularidad:this._evolMot.gran,
+          fecha_desde:this._evolMot.desde, fecha_hasta:this._evolMot.hasta}));
       this._evolMot.d=d;
       if(!d.motivos.length){list.innerHTML='<div class="empty">Sin paros para el filtro seleccionado</div>';return;}
       // Conservar el motivo seleccionado si sigue existiendo; si no, el de más peso.
@@ -2051,7 +2076,7 @@ const App={
   },
   async evolMotMaquinas(bucketKey){
     // Popup (fullpop encima) con el reparto por máquina del motivo en ese bucket.
-    const {motivoSel,gran}=this._evolMot;
+    const {motivoSel,gran,desde,hasta}=this._evolMot;
     const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     const ov=document.createElement('div'); ov.className='fullpop';
     ov.innerHTML=`
@@ -2064,8 +2089,10 @@ const App={
     ov.querySelector('.evmmClose').onclick=()=>ov.remove();
     const body=ov.querySelector('.evmm-body');
     try{
+      // Mismo rango propio del formulario (para que el reparto cuadre con el punto).
       const d=await this.get('oee_unificado_motivo_periodo_maquinas.php',
-        this.common({seccion:State.seccion, granularidad:gran, motivo:motivoSel, bucket:bucketKey}));
+        this.common({seccion:State.seccion, granularidad:gran, motivo:motivoSel, bucket:bucketKey,
+          fecha_desde:desde, fecha_hasta:hasta}));
       if(!d.maquinas.length){body.innerHTML='<div class="empty">Sin paros de este motivo en este periodo</div>';return;}
       const max=Math.max(...d.maquinas.map(m=>m.horas));
       body.innerHTML=`<div class="breadcrumb">Reparto de <b>${e(motivoSel)}</b> en <b>${e(d.rango.desde)}</b> a <b>${e(d.rango.hasta)}</b> · total <b>${d.total_horas.toFixed(2)} h</b> · ${d.maquinas.length} máquinas.</div>`
