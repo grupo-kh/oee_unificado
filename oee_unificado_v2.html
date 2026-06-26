@@ -2034,8 +2034,7 @@ const App={
       chart:{type:'line',height:Math.max(420,ov.querySelector('.fullpop-body').clientHeight-40),
         toolbar:{show:true,tools:{download:true,zoom:true,pan:true,reset:true}},animations:{enabled:false},
         events:{
-          // Clic en un marcador → popup de reparto por máquina de ese bucket.
-          markerClick:(ev,ctx,{dataPointIndex})=>{ if(dataPointIndex!=null&&keys[dataPointIndex]!=null) this.evolMotMaquinas(keys[dataPointIndex]); },
+          // Clic en un punto → popup de reparto por máquina de ese bucket.
           dataPointSelection:(ev,ctx,{dataPointIndex})=>{ if(dataPointIndex!=null&&keys[dataPointIndex]!=null) this.evolMotMaquinas(keys[dataPointIndex]); }
         }},
       series:[{name:mot.motivo,data:vals}],
