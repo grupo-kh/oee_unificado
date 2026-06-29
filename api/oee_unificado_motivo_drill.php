@@ -25,7 +25,10 @@ function _seccion(?string $desc): ?string {
 try {
     $fdesde     = (string) getParam('fecha_desde');
     $fhasta     = (string) getParam('fecha_hasta');
-    $seccion    = (string) getParam('seccion');
+    // Multi-sección: parseSecciones() ya sanitiza contra la lista permitida.
+    // Set vacío = sin filtro = TODAS (comportamiento histórico).
+    $secciones  = parseSecciones(['VARILLAS', 'TROQUELADOS']);
+    $todasSec   = empty($secciones);
     $metrica    = (string) getParam('metrica');
     $motivo     = (string) ($_GET['motivo'] ?? '');
     $codMaqHora = isset($_GET['cod_maquina']) ? trim((string)$_GET['cod_maquina']) : '';
@@ -36,15 +39,15 @@ try {
 
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fdesde)) jsonError('fecha_desde inválida');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fhasta)) jsonError('fecha_hasta inválida');
-    if (!in_array($seccion, ['VARILLAS', 'TROQUELADOS'], true)) jsonError('seccion inválida');
+    // parseSecciones() ya sanitiza; set vacío = todas (válido). Sin validación escalar.
     if (!in_array($metrica, ['disponibilidad', 'rendimiento', 'calidad', 'oee'], true)) jsonError('metrica inválida');
     if ($motivo === '') jsonError('motivo requerido');
 
     $turnos = array_values(array_filter(getListParam('turnos'), fn($t) => in_array($t, ['M','T','N'], true)));
     $excl   = getListParam('excl');
 
-    // Resolver cod_maquinas de la sección (ya filtradas por exclusión global)
-    $codMaqsSeccion = _resolverMaqsSeccion($fdesde, $fhasta, $turnos, $seccion, $excl);
+    // Resolver cod_maquinas de la(s) sección(es) (ya filtradas por exclusión global)
+    $codMaqsSeccion = _resolverMaqsSeccion($fdesde, $fhasta, $turnos, $secciones, $todasSec, $excl);
 
     // Si viene cod_maquina, filtramos SOLO el por_hora a esa máquina;
     // el "detalle" (por máquina) sigue mostrando todas para contexto.
@@ -74,7 +77,7 @@ try {
     }
 
     jsonOk([
-        'seccion'  => $seccion,
+        'seccion'  => $todasSec ? 'TODAS' : implode(',', $secciones),
         'metrica'  => $metrica,
         'motivo'   => $motivo,
         'por'      => $por,
@@ -88,7 +91,7 @@ try {
 
 // ───── Helpers ─────
 
-function _resolverMaqsSeccion(string $fdesde, string $fhasta, array $turnos, string $seccion, array $excl = []): array
+function _resolverMaqsSeccion(string $fdesde, string $fhasta, array $turnos, array $secciones, bool $todasSec, array $excl = []): array
 {
     $where = [
         "CAST(oee.TimePeriod AS DATE) BETWEEN ? AND ?",
@@ -118,7 +121,7 @@ function _resolverMaqsSeccion(string $fdesde, string $fhasta, array $turnos, str
     $rows = fetchAll('mapex', $sql, array_merge([$fdesde, $fhasta], $params));
     $out = [];
     foreach ($rows as $r) {
-        if (_seccion($r['maquina']) === $seccion) {
+        if ($todasSec || in_array(_seccion($r['maquina']), $secciones, true)) {
             $out[$r['cod_maquina']] = $r['maquina'] ?: $r['cod_maquina'];
         }
     }

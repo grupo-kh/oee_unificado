@@ -24,6 +24,8 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .turno-row{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
 .chk{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:500}
 .chk input{width:16px;height:16px;cursor:pointer}
+/* Selector de sección por checkboxes (multiselección, mismo patrón que turnos) */
+.secc-row{display:flex;align-items:center;gap:16px;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;min-height:37px}
 .quick{display:flex;gap:6px;margin-left:auto}
 .quick button{padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;background:#f3f4f6;border:1px solid #d1d5db;border-radius:6px}
 .quick button:hover{background:#e5e7eb}
@@ -218,6 +220,11 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .module-general .mg-title{font-size:15px;font-weight:700;color:#3a2426}
 .module-general .mg-title small{font-weight:500;color:#8a6e70}
 .badge-gen{background:#3a2426;color:#fff;font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;letter-spacing:.6px}
+/* Etiqueta de sumatorio total de horas de paro en la cabecera del módulo general */
+.module-general .mg-total{margin-left:auto;display:inline-flex;align-items:baseline;gap:7px;background:#7a1f2b;color:#fff;padding:6px 14px;border-radius:9px;box-shadow:0 1px 3px rgba(122,31,43,.35);white-space:nowrap}
+.module-general .mg-total .mt-lbl{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;opacity:.85}
+.module-general .mg-total .mt-val{font-size:17px;font-weight:800;line-height:1}
+.module-general .mg-total .mt-val small{font-size:11px;font-weight:600;opacity:.85;margin-left:2px}
 .module-general .mg-body{padding:16px 18px}
 /* ── Filtro de fechas dentro del popup de análisis ── */
 .art-fechas{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;background:#f6f3f4;border:1px solid #d9cccd;border-radius:9px}
@@ -387,7 +394,10 @@ tbody tr:hover{background:#f9fafb}
       <div class="fg"><label>Desde</label><input type="date" id="fDesde"></div>
       <div class="fg"><label>Hasta</label><input type="date" id="fHasta"></div>
       <div class="fg"><label>Sección</label>
-        <select id="fSeccion"><option value="VARILLAS">Varillas</option><option value="TROQUELADOS">Troquelados</option></select>
+        <div class="secc-row" id="fSeccion">
+          <label class="chk"><input type="checkbox" class="secc" value="VARILLAS" checked> Varillas</label>
+          <label class="chk"><input type="checkbox" class="secc" value="TROQUELADOS" checked> Troquelados</label>
+        </div>
       </div>
       <div class="fg"><label>Excluir máquinas</label>
         <div class="btn excl-toggle" id="exclToggle"><span>Seleccionar…</span><span class="excl-count" id="exclCount">0</span></div>
@@ -474,19 +484,38 @@ if(window.ChartDataLabels){
 
 const State={
   data:null, secciones:[], maquinasActivas:[],
-  metrica:'disponibilidad', por:'maquina', seccion:'VARILLAS',
+  metrica:'disponibilidad', por:'maquina',
+  seccionesSel:['VARILLAS','TROQUELADOS'],   // secciones seleccionadas (multiselección)
   excl:new Set()
 };
+// CSV de secciones para las APIs ('' = todas). Si están todas marcadas, se envía igualmente
+// el CSV explícito; el backend lo trata como la unión exacta.
+function seccionCSV(){return State.seccionesSel.join(',');}
+// Etiqueta legible de la selección para títulos y cabeceras.
+function seccionLabel(){
+  if(!State.seccionesSel.length) return '—';
+  if(State.seccionesSel.length>=2) return State.seccionesSel.map(s=>s.charAt(0)+s.slice(1).toLowerCase()).join(' + ');
+  return State.seccionesSel[0];
+}
 
 const App={
   init(){
     const t=new Date().toISOString().slice(0,10);
-    fDesde.value=t; fHasta.value=t; State.seccion=fSeccion.value;
+    fDesde.value=t; fHasta.value=t; this.readSecciones();
     this.bind(); this.loadMain();
+  },
+  // Lee las secciones marcadas en los checkboxes hacia State.seccionesSel.
+  readSecciones(){
+    State.seccionesSel=[...document.querySelectorAll('.secc:checked')].map(c=>c.value);
   },
   bind(){
     fDesde.onchange=fHasta.onchange=()=>{this.clearQuick();this.loadMain();};
-    fSeccion.onchange=()=>{State.seccion=fSeccion.value;this.loadMain();};
+    document.querySelectorAll('.secc').forEach(c=>c.onchange=()=>{
+      this.readSecciones();
+      // Evitar selección vacía: si se desmarcan ambas, se vuelve a marcar la que se acaba de tocar.
+      if(!State.seccionesSel.length){c.checked=true;this.readSecciones();}
+      this.loadMain();
+    });
     document.querySelectorAll('.turno').forEach(c=>c.onchange=()=>this.loadMain());
     document.querySelectorAll('.quick button').forEach(b=>b.onclick=()=>this.quickRange(b.dataset.r,b));
     metricSeg.querySelectorAll('button').forEach(b=>b.onclick=()=>{
@@ -553,7 +582,7 @@ const App={
     machBody.innerHTML='<div class="loading"><div class="spinner"></div>Cargando…</div>';
     panels.innerHTML='';
     try{
-      const d=await this.get('oee_unificado.php',this.common({seccion:State.seccion}));
+      const d=await this.get('oee_unificado.php',this.common({seccion:seccionCSV()}));
       State.data=d; State.secciones=d.secciones||[];
       State.maquinasActivas=(d.global&&d.global.maquinas_activas)||[];
       this.renderInfo(d); this.renderKpis(); this.renderExclList(exclSearch.value);
@@ -562,13 +591,18 @@ const App={
   },
   renderInfo(d){
     iRango.textContent=`${d.fecha_desde} a ${d.fecha_hasta}`;
-    iSeccion.textContent=State.seccion;
+    iSeccion.textContent=seccionLabel();
     iTurnos.textContent=Array.isArray(d.turnos)&&d.turnos.length?d.turnos.join(', '):'M, T, N';
     iOfs.textContent=(d.global&&d.global.num_ofs)??'—';
     iRefs.textContent=(d.global&&d.global.num_refs)??'—';
   },
   renderKpis(){
-    const s=State.secciones.find(x=>x.seccion===State.seccion)||{};
+    // Con una sola sección, los KPIs salen de esa sección (idéntico al comportamiento previo).
+    // Con varias (unión), se leen de 'global', que el backend recalcula sumando los componentes
+    // crudos (M, MT, ...) y reaplicando la fórmula DRC — el OEE NO es promediable entre secciones.
+    const s=(State.seccionesSel.length<=1)
+      ? (State.secciones.find(x=>x.seccion===State.seccionesSel[0])||{})
+      : ((State.data&&State.data.global)||{});
     kpis.innerHTML=`
       <div class="kpi d"><span class="kl">Disponibilidad</span><span class="kv">${s.disponibilidad??0}%</span></div>
       <div class="kpi r"><span class="kl">Rendimiento</span><span class="kv">${s.rendimiento??0}%</span></div>
@@ -578,12 +612,12 @@ const App={
 
   async loadMachines(){
     const esRef=State.por==='referencia';
-    machTitle.textContent=(esRef?'Referencias':'Máquinas')+' · '+this.metricLabel(State.metrica)+' · '+State.seccion;
+    machTitle.textContent=(esRef?'Referencias':'Máquinas')+' · '+this.metricLabel(State.metrica)+' · '+seccionLabel();
     machBody.innerHTML='<div class="loading"><div class="spinner"></div>Cargando…</div>';
     generalBody.innerHTML='';
     try{
       const d=await this.get('oee_unificado_drill.php',
-        this.common({seccion:State.seccion,metrica:State.metrica,por:State.por}));
+        this.common({seccion:seccionCSV(),metrica:State.metrica,por:State.por}));
       const items=d.maquinas||[];
       if(!items.length){machBody.innerHTML='<div class="empty">Sin datos para esta selección</div>';}
       else{
@@ -637,12 +671,23 @@ const App={
     const esRef=State.por==='referencia';
     if(!motivos.length){generalBody.innerHTML='';return;}
     const vf=this.motivoValField();
+    // Sumatorio total de todos los motivos del gráfico (mismo array que alimenta las barras).
+    const totalGen=motivos.reduce((a,m)=>a+(m[vf]||0),0);
+    const esUnidades=(vf==='unidades');
+    const totalTxt=esUnidades
+      ? Math.round(totalGen).toLocaleString('es-ES')
+      : (Math.round(totalGen*10)/10).toLocaleString('es-ES',{minimumFractionDigits:1,maximumFractionDigits:1});
+    const totalUnidad=esUnidades?'uds NOK':'h';
     generalBody.innerHTML=`
       <div class="module-general">
         <div class="mg-head">
           <span class="badge-gen">GENERAL</span>
           <span class="mg-title">Motivos de paro generales
-            <small>· ${State.seccion} · ${this.metricLabel(State.metrica)} · ${esRef?'por referencia':'por máquina'} · barras = ${this.motivoValLabel().toLowerCase()}, línea = % acumulado</small>
+            <small>· ${seccionLabel()} · ${this.metricLabel(State.metrica)} · ${esRef?'por referencia':'por máquina'} · barras = ${this.motivoValLabel().toLowerCase()}, línea = % acumulado</small>
+          </span>
+          <span class="mg-total" title="Suma de ${this.motivoValLabel().toLowerCase()} de todos los motivos del gráfico (${motivos.length} motivos)">
+            <span class="mt-lbl">Total ${esUnidades?'unidades':'horas de paro'}</span>
+            <span class="mt-val">${totalTxt}<small>${totalUnidad}</small></span>
           </span>
         </div>
         <div class="mg-body">
@@ -1109,11 +1154,11 @@ const App={
     const esRef=State.por==='referencia';
     const ent=esRef?'referencia':'máquina';
     const ov=this.push('Motivo «'+motivo+'»',
-      `Desglose por ${ent} y distribución horaria · ${State.seccion} · ${this.metricLabel(State.metrica)}`,
+      `Desglose por ${ent} y distribución horaria · ${seccionLabel()} · ${this.metricLabel(State.metrica)}`,
       this.loadingHtml(), true);
     try{
       const d=await this.get('oee_unificado_motivo_drill.php',
-        this.common({seccion:State.seccion,metrica:State.metrica,motivo,por:State.por}));
+        this.common({seccion:seccionCSV(),metrica:State.metrica,motivo,por:State.por}));
       const det=d.detalle||[];
       const ph=d.por_hora;
       const vf=this.motivoValField();
@@ -1136,11 +1181,11 @@ const App={
   },
   async motivoMaqHora(motivo,cod,name){
     const ov=this.push('Distribución horaria · máquina '+name,
-      `Motivo «${motivo}» · ${State.seccion} · ${this.metricLabel(State.metrica)}`,
+      `Motivo «${motivo}» · ${seccionLabel()} · ${this.metricLabel(State.metrica)}`,
       this.loadingHtml(), true);
     try{
       const d=await this.get('oee_unificado_motivo_drill.php',
-        this.common({seccion:State.seccion,metrica:State.metrica,motivo,por:State.por,cod_maquina:cod}));
+        this.common({seccion:seccionCSV(),metrica:State.metrica,motivo,por:State.por,cod_maquina:cod}));
       const ph=d.por_hora;
       let html=`<div class="breadcrumb">Distribución horaria del motivo <b>${motivo}</b> filtrada a la máquina <b>${name}</b>. Cada barra = franja horaria · duración del paro. <b>Haz clic en una barra</b> para ver la referencia causante.</div>`;
       html+=ph?'<div class="cvh"></div>':'<div class="empty">Sin paros de este motivo para esta máquina en el rango/turnos seleccionados.</div>';
@@ -1151,10 +1196,10 @@ const App={
   async slotRefs(motivo,cod,name,startH,endH){
     const h1=Math.floor(startH), h2=Math.max(h1,Math.ceil(endH)-1);
     const pad=x=>String(x).padStart(2,'0');
-    const ov=this.push('Referencia causante · '+name,`Motivo «${motivo}» · franja ${pad(h1)}:00–${pad(h2+1)}:00 · ${State.seccion}`,this.loadingHtml(),true);
+    const ov=this.push('Referencia causante · '+name,`Motivo «${motivo}» · franja ${pad(h1)}:00–${pad(h2+1)}:00 · ${seccionLabel()}`,this.loadingHtml(),true);
     try{
       const d=await this.get('oee_unificado_motivo_maq_hora_refs.php',
-        this.common({seccion:State.seccion,motivo,cod_maquina:cod,hora_desde:h1,hora_hasta:h2}));
+        this.common({seccion:seccionCSV(),motivo,cod_maquina:cod,hora_desde:h1,hora_hasta:h2}));
       const refs=d.referencias||[];
       if(!refs.length){this.body(ov).innerHTML='<div class="empty">Sin referencia identificada en esa franja</div>';return;}
       const max=Math.max(...refs.map(r=>r.horas||0),1);
@@ -1300,7 +1345,7 @@ const App={
 
   /* ---------- selector de máquina ---------- */
   machineSelector(cod,name){
-    const ov=this.push('Máquina '+name+' · ¿qué quieres analizar?',State.seccion+' · '+this.metricLabel(State.metrica),`
+    const ov=this.push('Máquina '+name+' · ¿qué quieres analizar?',seccionLabel()+' · '+this.metricLabel(State.metrica),`
       <div class="selgrid">
         <div class="selcard" data-a="evo"><div class="ic">📈</div><div class="t">Evolución</div><div class="d">D · R · C · OEE en el tiempo</div></div>
         <div class="selcard" data-a="mot"><div class="ic">⏸️</div><div class="t">Motivos de paro</div><div class="d">Pareto de causas de parada</div></div>
@@ -1316,9 +1361,9 @@ const App={
 
   /* ---------- (a) evolución (solo máquina) ---------- */
   async drillEvolucion(cod,name){
-    const ov=this.push('Evolución de la máquina · '+name,State.seccion+' · Disponibilidad, Rendimiento, Calidad y OEE en el tiempo',this.loadingHtml());
+    const ov=this.push('Evolución de la máquina · '+name,seccionLabel()+' · Disponibilidad, Rendimiento, Calidad y OEE en el tiempo',this.loadingHtml());
     try{
-      const d=await this.get('oee_unificado_evolucion.php',this.common({cod_maquina:cod,seccion:State.seccion}));
+      const d=await this.get('oee_unificado_evolucion.php',this.common({cod_maquina:cod,seccion:seccionCSV()}));
       const per=d.periodos||[];
       this.body(ov).innerHTML=`
         <div class="evo-toggles">
@@ -1345,9 +1390,9 @@ const App={
   async drillMotivos(ctx){
     const ent=ctx.por==='referencia'?'referencia':'máquina';
     const titulo='Motivos de paro de la '+ent+' · '+ctx.name;
-    const ov=this.push(titulo,State.seccion+' · pareto de horas de paro · haz clic en un motivo para profundizar',this.loadingHtml());
+    const ov=this.push(titulo,seccionLabel()+' · pareto de horas de paro · haz clic en un motivo para profundizar',this.loadingHtml());
     try{
-      const extra={seccion:State.seccion,metrica:'disponibilidad'};
+      const extra={seccion:seccionCSV(),metrica:'disponibilidad'};
       if(ctx.por==='referencia')extra.cod_referencia=ctx.cod; else {extra.por='maquina';extra.cod_maquina=ctx.cod;}
       const d=await this.get('oee_unificado_drill.php',this.common(extra));
       const mot=d.motivos||[];
@@ -1361,7 +1406,7 @@ const App={
     }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}
   },
   motivoSelector(ctx){
-    const ov=this.push('Motivo «'+ctx.motivo+'» · ¿cómo verlo?',ctx.name+' · '+State.seccion,`
+    const ov=this.push('Motivo «'+ctx.motivo+'» · ¿cómo verlo?',ctx.name+' · '+seccionLabel(),`
       <div class="selgrid">
         <div class="selcard" data-a="dia"><div class="ic">📅</div><div class="t">Total horas por día</div><div class="d">Serie diaria del rango</div></div>
         <div class="selcard" data-a="hora"><div class="ic">⏰</div><div class="t">Distribución horaria</div><div class="d">24 franjas de un día</div></div>
@@ -1380,7 +1425,7 @@ const App={
     return this.common(e);
   },
   async motivoPorDia(ctx){
-    const ov=this.push('Total horas por día · motivo «'+ctx.motivo+'»',`${ctx.name} · ${State.seccion}`,this.loadingHtml());
+    const ov=this.push('Total horas por día · motivo «'+ctx.motivo+'»',`${ctx.name} · ${seccionLabel()}`,this.loadingHtml());
     try{
       const d=await this.get('oee_unificado_maq_motivo_temporal.php',this.tempParams(ctx,{mode:'por_dia'}));
       const dias=d.dias||[];
@@ -1392,7 +1437,7 @@ const App={
     }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}
   },
   async motivoPorHora(ctx,dia){
-    const ov=this.push('Distribución horaria · motivo «'+ctx.motivo+'»',`${ctx.name} · ${State.seccion}`,this.loadingHtml());
+    const ov=this.push('Distribución horaria · motivo «'+ctx.motivo+'»',`${ctx.name} · ${seccionLabel()}`,this.loadingHtml());
     const run=async(day)=>{
       this.body(ov).innerHTML=this.dayPicker(day)+this.loadingHtml(); this.bindDayPicker(ov,run);
       try{
@@ -1408,7 +1453,7 @@ const App={
     run(dia||fDesde.value);
   },
   async motivoParos(ctx,dia,hora){
-    const ov=this.push('Paros individuales · motivo «'+ctx.motivo+'»',`${ctx.name} · ${State.seccion}`,this.loadingHtml());
+    const ov=this.push('Paros individuales · motivo «'+ctx.motivo+'»',`${ctx.name} · ${seccionLabel()}`,this.loadingHtml());
     ov.classList.add('mod-paros');
     const esRef=ctx.por==='referencia';
     const run=async(day,hr)=>{
@@ -1440,7 +1485,7 @@ const App={
 
   /* ---------- (c) horas de paro -> ref -> acumulado ---------- */
   async drillHoras(cod,name){
-    const ov=this.push('Horas de paro de la máquina '+name+' · por referencia fabricada',State.seccion+' · clic en una referencia para ver el acumulado de paro',this.loadingHtml());
+    const ov=this.push('Horas de paro de la máquina '+name+' · por referencia fabricada',seccionLabel()+' · clic en una referencia para ver el acumulado de paro',this.loadingHtml());
     try{
       const d=await this.get('oee_unificado_maq_refs.php',this.common({cod_maquina:cod}));
       const refs=d.referencias||[];
@@ -1454,7 +1499,7 @@ const App={
     }catch(e){this.body(ov).innerHTML=`<div class="error">${e.message}</div>`;}
   },
   async refAcumulado(cod,codRef,refName){
-    const ov=this.push('Acumulado de paro · referencia '+refName,State.seccion+' · horas de paro por día y curva acumulada',this.loadingHtml());
+    const ov=this.push('Acumulado de paro · referencia '+refName,seccionLabel()+' · horas de paro por día y curva acumulada',this.loadingHtml());
     try{
       const d=await this.get('oee_unificado_maq_ref_paros.php',this.common({cod_maquina:cod,cod_referencia:codRef}));
       const pd=d.por_dia||[]; let acc=0; const cum=pd.map(x=>Math.round((acc+=x.horas)*10)/10);
@@ -1530,7 +1575,7 @@ const App={
     // (y lo que tuviera abierto dentro) para no acumular información en pantalla.
     [...panels.querySelectorAll('.panel-maqrefs')].forEach(p=>p.remove());
     const ov=this.push('Referencias fabricadas · '+name,
-      State.seccion+' · piezas/hora OK y NOK por referencia · clic en una referencia para ver sus OFs',
+      seccionLabel()+' · piezas/hora OK y NOK por referencia · clic en una referencia para ver sus OFs',
       this.loadingHtml());
     ov.classList.add('panel-maqrefs');
     const self=this;
@@ -1739,7 +1784,7 @@ const App={
   topModule(kind){
     const isMaq=kind==='maquinas';
     const accent=isMaq?'#8c181a':'#6e6d6b';
-    const st={seccion:State.seccion, excl:new Set(), maqs:[]};
+    const st={seccion:seccionCSV(), excl:new Set(), maqs:[]};
     const ov=document.createElement('div'); ov.className='fullpop';
     const lbl=t=>`<span style="font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase">${t}</span>`;
     const nOpts=[3,5,8,10,15,20].map(n=>`<option value="${n}" ${n===5?'selected':''}>Top ${n}</option>`).join('');
@@ -1855,15 +1900,15 @@ const App={
     ov.onclick=e=>{if(e.target===ov)ov.remove();};
   },
 
-  exportExcel(){window.open(API+'oee_unificado_export.php?'+this.common({seccion:State.seccion,metrica:'disponibilidad',por:'maquina'}).toString());},
+  exportExcel(){window.open(API+'oee_unificado_export.php?'+this.common({seccion:seccionCSV(),metrica:'disponibilidad',por:'maquina'}).toString());},
 
   /* ---------- Matriz (motivos × máquina/referencia) ---------- */
-  exportMatriz(){window.open(API+'oee_unificado_matriz_export.php?'+this.common({seccion:State.seccion}).toString());},
+  exportMatriz(){window.open(API+'oee_unificado_matriz_export.php?'+this.common({seccion:seccionCSV()}).toString());},
   async openMatriz(){
     const ov=document.createElement('div'); ov.className='fullpop';
     ov.innerHTML=`
       <div class="fullpop-head">
-        <h2>🧮 Matriz motivos × máquina/referencia<small>${State.seccion} · ${fDesde.value} a ${fHasta.value} · horas de paro</small></h2>
+        <h2>🧮 Matriz motivos × máquina/referencia<small>${seccionLabel()} · ${fDesde.value} a ${fHasta.value} · horas de paro</small></h2>
         <div style="display:flex;gap:10px">
           <button class="btn btn-matriz mtxXlsx">⬇️ Excel</button>
           <button class="mtxClose">✕ Cerrar</button>
@@ -1876,7 +1921,7 @@ const App={
     ov.querySelector('.mtxXlsx').onclick=()=>this.exportMatriz();
     const body=ov.querySelector('.mtxBody');
     try{
-      const d=await this.get('oee_unificado_matriz_export.php',this.common({seccion:State.seccion,format:'json'}));
+      const d=await this.get('oee_unificado_matriz_export.php',this.common({seccion:seccionCSV(),format:'json'}));
       body.innerHTML=this.matrizTabla(d);
       [...body.querySelectorAll('.mtx-maq td.mtx-first')].forEach(td=>{
         td.onclick=()=>this.histMaquina(td.dataset.cod,td.dataset.name,td.dataset.disp);
@@ -1891,7 +1936,7 @@ const App={
     const ov=document.createElement('div'); ov.className='fullpop';
     ov.innerHTML=`
       <div class="fullpop-head">
-        <h2>🧮 Matriz 2 · Paros por referencia (Actividad × Tipo de paro)<small>${State.seccion} · ${fDesde.value} a ${fHasta.value} · horas de paro</small></h2>
+        <h2>🧮 Matriz 2 · Paros por referencia (Actividad × Tipo de paro)<small>${seccionLabel()} · ${fDesde.value} a ${fHasta.value} · horas de paro</small></h2>
         <div style="display:flex;gap:10px;align-items:center">
           <input type="search" class="mtx2-search" placeholder="Filtrar máquina o referencia…" style="padding:7px 11px;border:1px solid #d9cccd;border-radius:7px;font-size:13px;min-width:220px">
           <button class="btn btn-pri mtx2Xlsx">⬇️ Excel</button>
@@ -1901,10 +1946,10 @@ const App={
       <div class="fullpop-body"><div class="mtx2Body">${this.loadingHtml()}</div></div>`;
     document.body.appendChild(ov);
     ov.querySelector('.mtx2Close').onclick=()=>ov.remove();
-    ov.querySelector('.mtx2Xlsx').onclick=()=>window.open(API+'oee_unificado_matriz2_export.php?'+this.common({seccion:State.seccion}).toString());
+    ov.querySelector('.mtx2Xlsx').onclick=()=>window.open(API+'oee_unificado_matriz2_export.php?'+this.common({seccion:seccionCSV()}).toString());
     const body=ov.querySelector('.mtx2Body');
     try{
-      const d=await this.get('oee_unificado_matriz2.php',this.common({seccion:State.seccion}));
+      const d=await this.get('oee_unificado_matriz2.php',this.common({seccion:seccionCSV()}));
       this._mtx2=d;
       // Columnas de motivo siempre visibles: no hay expand/collapse, el render basta.
       body.innerHTML=this.matriz2Tabla(d);
@@ -2016,7 +2061,7 @@ const App={
     ov.innerHTML=`
       <div class="fullpop-head">
         <div class="evm-title"><img src="assets/img/logo-kh.png" alt="KH" class="evm-logo">
-          <h2>📈 Evolución de motivos · Disponibilidad<small>${State.seccion} · horas de paro</small></h2>
+          <h2>📈 Evolución de motivos · Disponibilidad<small>${seccionLabel()} · horas de paro</small></h2>
         </div>
         <div class="evm-gran">
           <span class="evm-vista">
@@ -2133,7 +2178,7 @@ const App={
     const list=ov.querySelector('.evm-list'); const chart=ov.querySelector('.evm-chart');
     const selm=ov.querySelector('.evm-selmot');
     list.innerHTML=this.loadingHtml(); chart.innerHTML='';
-    const filtros={seccion:State.seccion, granularidad:st.gran, fecha_desde:st.desde, fecha_hasta:st.hasta};
+    const filtros={seccion:seccionCSV(), granularidad:st.gran, fecha_desde:st.desde, fecha_hasta:st.hasta};
     try{
       if(st.vista==='maquina'){
         // Necesita un motivo elegido. Se asegura el catálogo de motivos para el
@@ -2368,7 +2413,7 @@ const App={
     try{
       // Mismo rango propio del formulario (para que el reparto cuadre con el punto).
       const d=await this.get('oee_unificado_motivo_periodo_maquinas.php',
-        this.common({seccion:State.seccion, granularidad:gran, motivo, bucket:bucketKey,
+        this.common({seccion:seccionCSV(), granularidad:gran, motivo, bucket:bucketKey,
           fecha_desde:desde, fecha_hasta:hasta}));
       if(!d.maquinas.length){body.innerHTML='<div class="empty">Sin paros de este motivo en este periodo</div>';return;}
       const max=Math.max(...d.maquinas.map(m=>m.horas));
@@ -2409,7 +2454,7 @@ const App={
     const body=ov.querySelector('.evmm-body');
     try{
       const d=await this.get('oee_unificado_maquina_periodo_motivos.php',
-        this.common({seccion:State.seccion, granularidad:gran, cod_maquina:codMaq, bucket:bucketKey,
+        this.common({seccion:seccionCSV(), granularidad:gran, cod_maquina:codMaq, bucket:bucketKey,
           fecha_desde:desde, fecha_hasta:hasta}));
       if(!d.motivos.length){body.innerHTML='<div class="empty">Sin paros de esta máquina en este periodo</div>';return;}
       const max=Math.max(...d.motivos.map(m=>m.horas));

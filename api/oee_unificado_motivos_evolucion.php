@@ -14,20 +14,25 @@ require_once __DIR__ . '/../lib/PlanAttainmentAgg.php';
  *
  * Filtros idénticos a Matriz 2: excluye paro 11 (CERRADA) y actividad 1 (CERRADA).
  *
- * GET: fecha_desde, fecha_hasta (req), seccion (VARILLAS|TROQUELADOS|''),
+ * GET: fecha_desde, fecha_hasta (req), seccion (selección múltiple: CSV o
+ *      array de VARILLAS/TROQUELADOS; vacío o 'TODAS' = todas las secciones),
  *      turnos (CSV M,T,N), granularidad (day|week|month, req).
  */
 function motivosEvolucionData(): array
 {
     $fdesde = (string) getParam('fecha_desde');
     $fhasta = (string) getParam('fecha_hasta');
-    $seccion = strtoupper((string) getParam('seccion', ''));
+    // Selección múltiple de secciones: parseSecciones() ya sanitiza contra la
+    // lista permitida y normaliza a mayúsculas. Set vacío = SIN filtro = todas
+    // (comportamiento histórico). No hay validación escalar para no rechazar
+    // 'VARILLAS,TROQUELADOS'.
+    $secciones = parseSecciones(['VARILLAS','TROQUELADOS']);
+    $todasSec  = empty($secciones);
     $gran = (string) getParam('granularidad', 'day');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fdesde)) throw new Exception('fecha_desde inválida');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fhasta)) throw new Exception('fecha_hasta inválida');
     if ($fdesde > $fhasta) throw new Exception('fecha_desde no puede ser posterior a fecha_hasta');
     if (!in_array($gran, ['day','week','month'], true)) throw new Exception('granularidad inválida (day|week|month)');
-    if ($seccion !== '' && !in_array($seccion, ['VARILLAS','TROQUELADOS'], true)) throw new Exception('seccion inválida');
     $turnos = array_values(array_filter(getListParam('turnos'), fn($t) => in_array($t, ['M','T','N'], true)));
 
     // Bucket SQL según granularidad (mismo patrón que oee_unificado_evolucion.php),
@@ -78,7 +83,7 @@ function motivosEvolucionData(): array
     $pesoMotivo = [];  // motivo => horas totales
     foreach ($rows as $r) {
         $maq = (string) $r['maquina'];
-        if ($seccion !== '' && (PlanAttainmentAgg::MAQUINA_TO_SECCION_EXT[$maq] ?? null) !== $seccion) continue;
+        if (!$todasSec && !in_array(PlanAttainmentAgg::MAQUINA_TO_SECCION_EXT[$maq] ?? '', $secciones, true)) continue;
         $motivo = (string) $r['motivo'];
         $bk = substr((string) $r['bucket_start'], 0, 10);
         $h = (int) $r['segundos'] / 3600.0;
@@ -112,7 +117,7 @@ function motivosEvolucionData(): array
 
     return [
         'granularidad' => $gran,
-        'seccion'      => $seccion ?: null,
+        'seccion'      => $todasSec ? 'TODAS' : implode(',', $secciones),
         'buckets'      => $buckets,
         'motivos'      => $motivos,
     ];

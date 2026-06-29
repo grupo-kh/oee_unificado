@@ -237,8 +237,10 @@ try {
     if (!empty($codMaqs)) {
         $w = [
             "CAST(hp.Dia_productivo AS DATE) BETWEEN ? AND ?",
-            "cp.Cod_paro <> 11",
-            "cp.Id_actividad <> 1",   // excluir actividad CERRADA (igual que Matriz 2)
+            "cp.Cod_paro <> 11",   // excluir CERRADA (alineado con el gráfico de motivos generales)
+            // NOTA: NO se excluye Id_actividad=1. Antes se filtraba 'cp.Id_actividad <> 1', lo que
+            // descartaba MICRO PARO (Cod 2) y NO JUSTIFICADO (Cod 1) — ambos horas de paro reales —
+            // y descuadraba el total frente al gráfico (353,16 h vs 400,2 h). Se incluyen igual que el drill.
             "hpp.Fecha_fin IS NOT NULL",
         ];
         $p = [$fdesde, $fhasta];

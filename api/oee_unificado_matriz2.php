@@ -35,18 +35,23 @@ function matriz2Data(): array
 {
     $fdesde  = (string) getParam('fecha_desde');
     $fhasta  = (string) getParam('fecha_hasta');
-    $seccion = strtoupper((string) getParam('seccion'));
+    // Selección MULTI-SECCIÓN: parseSecciones sanitiza contra la lista permitida.
+    // Array vacío = SIN filtro = TODAS las secciones (comportamiento histórico).
+    $secciones = parseSecciones(['VARILLAS','TROQUELADOS']);
+    $todasSec  = empty($secciones);
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fdesde)) throw new Exception('fecha_desde inválida');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fhasta)) throw new Exception('fecha_hasta inválida');
     $turnos = array_values(array_filter(getListParam('turnos'), fn($t) => in_array($t, ['M','T','N'], true)));
 
-    // Filtros: excluir el paro 11 (CERRADA) y, además, toda la actividad CERRADA
-    // (Id_actividad = 1) — no debe aparecer ni sumar en Matriz 2. Los paros sin
-    // producto SÍ se cuentan (se agrupan bajo «Sin referencia»).
+    // Filtros: excluir el paro 11 (CERRADA). Los paros sin producto SÍ se cuentan
+    // (se agrupan bajo «Sin referencia»).
+    // NOTA: se eliminó el filtro 'cp.Id_actividad <> 1' para cuadrar con el gráfico de
+    // motivos generales y la Matriz: incluía MICRO PARO (Cod 2) y NO JUSTIFICADO (Cod 1),
+    // que son horas de paro reales aunque tengan Id_actividad=1. CERRADA se sigue
+    // excluyendo por su Cod_paro (11).
     $where  = [
         "CAST(hp.Dia_productivo AS DATE) BETWEEN ? AND ?",
         "cp.Cod_paro <> 11",          // excluir paro CERRADA
-        "cp.Id_actividad <> 1",       // excluir toda la actividad CERRADA
         "hpp.Fecha_fin IS NOT NULL",
     ];
     $params = [$fdesde, $fhasta];
@@ -105,8 +110,9 @@ function matriz2Data(): array
     $pesoMot = [];       // "categoría||paro" => horas (motivo dentro de su categoría)
     foreach ($rows as $r) {
         $maq = (string) $r['maquina'];
-        if ($seccion !== '' && in_array($seccion, ['VARILLAS','TROQUELADOS'], true)
-            && (PlanAttainmentAgg::MAQUINA_TO_SECCION_EXT[$maq] ?? null) !== $seccion) {
+        // Filtro de sección (siempre en PHP): la sección se deriva de la descripción
+        // de máquina vía MAQUINA_TO_SECCION_EXT, nunca es columna de BD.
+        if (!$todasSec && !in_array(PlanAttainmentAgg::MAQUINA_TO_SECCION_EXT[$maq] ?? '', $secciones, true)) {
             continue;
         }
         // Paro sin producto asignado → «Sin referencia» (se cuenta, como en Matriz).
@@ -189,7 +195,7 @@ function matriz2Data(): array
     }
 
     return [
-        'seccion'             => $seccion,
+        'seccion'             => $todasSec ? 'TODAS' : implode(',', $secciones),
         'actividades'         => $actividades,
         'categorias'          => $categorias,
         'paros_por_categoria' => $parosPorCategoria,

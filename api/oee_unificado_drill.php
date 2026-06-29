@@ -39,7 +39,9 @@ function _drc(float $M, float $MT, float $MOT, float $MOKT, float $PP, float $PC
 try {
     $fdesde  = (string) getParam('fecha_desde');
     $fhasta  = (string) getParam('fecha_hasta');
-    $seccion = (string) getParam('seccion');
+    // Selección múltiple de sección (CSV). Array vacío = todas las válidas.
+    $secciones = parseSecciones(['VARILLAS','TROQUELADOS']);
+    $todasSec  = empty($secciones);
     $metrica = (string) getParam('metrica');
     $codMaq  = getParam('cod_maquina');
     // Filtro opcional por referencia (Cod_producto) para el paso intermedio
@@ -52,7 +54,7 @@ try {
 
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fdesde)) jsonError('fecha_desde inválida');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fhasta)) jsonError('fecha_hasta inválida');
-    if (!in_array($seccion, ['VARILLAS', 'TROQUELADOS'], true)) jsonError('seccion inválida');
+    // parseSecciones() ya sanitiza contra la lista permitida; set vacío = todas.
     if (!in_array($metrica, ['disponibilidad', 'rendimiento', 'calidad', 'oee'], true)) jsonError('metrica inválida');
 
     $turnos = array_values(array_filter(getListParam('turnos'), fn($t) => in_array($t, ['M','T','N'], true)));
@@ -102,7 +104,7 @@ try {
     $codMaqsSeccion = []; // cod_maquina values that belong to the section
     foreach ($rows as $r) {
         $sec = _seccion($r['maquina']);
-        if ($sec !== $seccion) continue;
+        if (!$todasSec && !in_array($sec, $secciones, true)) continue;
 
         $codMaqsSeccion[] = $r['cod_maquina'];
 
@@ -136,7 +138,7 @@ try {
         $maquinas = _refsParos($fdesde, $fhasta, $turnos, $codMaqsSeccion);
     } elseif ($por === 'referencia' && $metrica === 'rendimiento') {
         // Rendimiento por referencia: mismo cálculo OEE pero agrupado por producto.
-        $maquinas = _refsRendimiento($fdesde, $fhasta, $turnos, $seccion);
+        $maquinas = _refsRendimiento($fdesde, $fhasta, $turnos, $secciones, $todasSec);
     }
 
     // ───── 2) Motivos según la métrica ─────
@@ -154,7 +156,7 @@ try {
     }
 
     jsonOk([
-        'seccion'     => $seccion,
+        'seccion'     => $todasSec ? 'TODAS' : implode(',', $secciones),
         'metrica'     => $metrica,
         'por'         => $por,
         'cod_maquina' => $codMaq ?: null,
@@ -251,7 +253,7 @@ function _motivosParos(string $fdesde, string $fhasta, array $turnos, array $cod
  * rendimiento (%) por referencia. Reusa los campos cod_maquina/maquina para que
  * el render del cliente lo trate como una fila más sin duplicar lógica.
  */
-function _refsRendimiento(string $fdesde, string $fhasta, array $turnos, string $seccion): array
+function _refsRendimiento(string $fdesde, string $fhasta, array $turnos, array $secciones, bool $todasSec): array
 {
     $where = [
         "CAST(oee.TimePeriod AS DATE) BETWEEN ? AND ?",
@@ -290,10 +292,10 @@ function _refsRendimiento(string $fdesde, string $fhasta, array $turnos, string 
     ";
     $rows = fetchAll('mapex', $sql, array_merge([$fdesde, $fhasta], $params));
 
-    // Consolidar por referencia, sumando solo máquinas de la sección pedida.
+    // Consolidar por referencia, sumando solo máquinas de las secciones pedidas.
     $acc = [];
     foreach ($rows as $r) {
-        if (_seccion($r['maquina']) !== $seccion) continue;
+        if (!$todasSec && !in_array(_seccion($r['maquina']), $secciones, true)) continue;
         $cod = (string) $r['cod_referencia'];
         if (!isset($acc[$cod])) {
             $acc[$cod] = ['ref' => (string)($r['referencia'] ?: $cod),

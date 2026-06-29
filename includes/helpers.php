@@ -58,3 +58,26 @@ function parseTurnos(array $allowed = ['M','T','N','C'], array $defaultIfEmpty =
     )));
     return $list ?: $defaultIfEmpty;
 }
+
+/**
+ * Resuelve la lista de secciones a aplicar en un endpoint (selección múltiple).
+ * Acepta:
+ *   - seccion=VARILLAS,TROQUELADOS  (CSV, preferido)
+ *   - seccion[]=VARILLAS&seccion[]=TROQUELADOS  (array)
+ *   - seccion=VARILLAS  (un único valor, compat hacia atrás)
+ *   - seccion=TODAS | seccion=''  → array vacío = SIN filtro (todas las secciones)
+ * Sanitiza contra $allowed (por defecto VARILLAS/TROQUELADOS/OTROS), normaliza a mayúsculas.
+ * IMPORTANTE: un array vacío significa "todas" (comportamiento histórico de cada endpoint),
+ * NO "ninguna". Por eso los endpoints deben filtrar solo cuando el array NO está vacío.
+ */
+function parseSecciones(array $allowed = ['VARILLAS','TROQUELADOS','OTROS']): array {
+    $list = getListParam('seccion');
+    // 'TODAS' (en cualquier posición) equivale a no filtrar.
+    if (in_array('TODAS', array_map(fn($s) => strtoupper((string)$s), $list), true)) {
+        return [];
+    }
+    return array_values(array_unique(array_filter(
+        array_map(fn($s) => strtoupper((string)$s), $list),
+        fn($s) => in_array($s, $allowed, true)
+    )));
+}

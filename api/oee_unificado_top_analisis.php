@@ -24,7 +24,7 @@ function _topSeccion(?string $desc): ?string {
     return PlanAttainmentAgg::MAQUINA_TO_SECCION_EXT[$desc] ?? null;
 }
 
-function _topResolverMaqsSeccion(string $fdesde, string $fhasta, array $turnos, string $seccion, array $excl): array
+function _topResolverMaqsSeccion(string $fdesde, string $fhasta, array $turnos, array $secciones, bool $todasSec, array $excl): array
 {
     $where = [
         "CAST(oee.TimePeriod AS DATE) BETWEEN ? AND ?",
@@ -53,7 +53,7 @@ function _topResolverMaqsSeccion(string $fdesde, string $fhasta, array $turnos, 
     $rows = fetchAll('mapex', $sql, array_merge([$fdesde, $fhasta], $params));
     $out = [];
     foreach ($rows as $r) {
-        if (_topSeccion($r['maquina']) === $seccion) {
+        if ($todasSec || in_array(_topSeccion($r['maquina']), $secciones, true)) {
             $out[$r['cod_maquina']] = $r['maquina'] ?: $r['cod_maquina'];
         }
     }
@@ -207,17 +207,20 @@ try {
     $mode    = (string) getParam('mode', 'maquinas');
     $fdesde  = (string) getParam('fecha_desde');
     $fhasta  = (string) getParam('fecha_hasta');
-    $seccion = (string) getParam('seccion');
+    // Multi-sección: parseSecciones sanitiza contra la lista permitida.
+    // Set vacío = sin filtro = TODAS las secciones (comportamiento histórico).
+    $secciones = parseSecciones(['VARILLAS', 'TROQUELADOS']);
+    $todasSec  = empty($secciones);
+    $seccionStr = $todasSec ? 'TODAS' : implode(',', $secciones);
 
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fdesde)) jsonError('fecha_desde inválida');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fhasta)) jsonError('fecha_hasta inválida');
     if ($fdesde > $fhasta) jsonError('fecha_desde no puede ser posterior a fecha_hasta');
-    if (!in_array($seccion, ['VARILLAS', 'TROQUELADOS'], true)) jsonError('seccion inválida');
 
     $turnos = array_values(array_filter(getListParam('turnos'), fn($t) => in_array($t, ['M','T','N'], true)));
     $excl   = getListParam('excl');
 
-    $maqMap  = _topResolverMaqsSeccion($fdesde, $fhasta, $turnos, $seccion, $excl);
+    $maqMap  = _topResolverMaqsSeccion($fdesde, $fhasta, $turnos, $secciones, $todasSec, $excl);
     $codMaqs = array_keys($maqMap);
 
     switch ($mode) {
@@ -225,7 +228,7 @@ try {
             // Lista de máquinas de la sección para el selector de exclusión.
             // No aplica `excl` aquí: queremos que el selector muestre TODAS
             // (incluidas las ya excluidas, para poder reactivarlas).
-            $maqMapFull = _topResolverMaqsSeccion($fdesde, $fhasta, $turnos, $seccion, []);
+            $maqMapFull = _topResolverMaqsSeccion($fdesde, $fhasta, $turnos, $secciones, $todasSec, []);
             $listado = [];
             foreach ($maqMapFull as $cod => $desc) {
                 $listado[] = ['cod_maquina' => $cod, 'maquina' => $desc];
@@ -233,7 +236,7 @@ try {
             usort($listado, fn($a, $b) => strcmp((string)$a['maquina'], (string)$b['maquina']));
             jsonOk([
                 'mode'     => 'maquinas_seccion',
-                'seccion'  => $seccion,
+                'seccion'  => $seccionStr,
                 'maquinas' => $listado,
             ]);
         }
@@ -243,7 +246,7 @@ try {
             if ($n > 20) $n = 20;
             jsonOk([
                 'mode'     => 'maquinas',
-                'seccion'  => $seccion,
+                'seccion'  => $seccionStr,
                 'top_n'    => $n,
                 'maquinas' => _topMaquinas($fdesde, $fhasta, $turnos, $codMaqs, $n),
             ]);
@@ -254,7 +257,7 @@ try {
             if ($n > 20) $n = 20;
             jsonOk([
                 'mode'    => 'motivos',
-                'seccion' => $seccion,
+                'seccion' => $seccionStr,
                 'top_n'   => $n,
                 'motivos' => _topMotivos($fdesde, $fhasta, $turnos, $codMaqs, $n),
             ]);
@@ -264,7 +267,7 @@ try {
             if ($cod === '') jsonError('cod_maquina requerido');
             jsonOk([
                 'mode'        => 'detalle_fecha_maquina',
-                'seccion'     => $seccion,
+                'seccion'     => $seccionStr,
                 'cod_maquina' => $cod,
                 'maquina'     => $maqMap[$cod] ?? $cod,
                 'fechas'      => _topDetalleFechaMaquina($fdesde, $fhasta, $turnos, $codMaqs, $cod),
@@ -275,7 +278,7 @@ try {
             if ($motivo === '') jsonError('motivo requerido');
             jsonOk([
                 'mode'    => 'detalle_fecha_motivo',
-                'seccion' => $seccion,
+                'seccion' => $seccionStr,
                 'motivo'  => $motivo,
                 'fechas'  => _topDetalleFechaMotivo($fdesde, $fhasta, $turnos, $codMaqs, $motivo),
             ]);

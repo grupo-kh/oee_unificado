@@ -53,6 +53,9 @@ try {
     // turnos[]: si llega como string CSV o como array, normalizamos a array
     $turnos = array_values(array_filter(getListParam('turnos'), fn($t) => in_array($t, ['M','T','N'], true)));
 
+    // secciones: selección múltiple (CSV 'VARILLAS,TROQUELADOS'). Array vacío = todas (sin filtro).
+    $secciones_in = parseSecciones();
+
     // excl: máquinas (cod_maquina) excluidas del análisis (filtro global)
     $excl = getListParam('excl');
 
@@ -112,6 +115,10 @@ try {
         $PNP  = (float)$r['PNP'];
         $sec  = _seccionDeDesc($r['maquina']);
 
+        // Filtro multi-sección: si se pidieron secciones concretas, descartar el resto
+        // ANTES de acumular, para que $global sea la unión exacta de lo seleccionado.
+        if (!empty($secciones_in) && !in_array($sec ?: 'OTROS', $secciones_in, true)) continue;
+
         $globalAcc['M']   += $M;   $globalAcc['MT']  += $MT;
         $globalAcc['MOT'] += $MOT; $globalAcc['MOKT']+= $MOKT;
         $globalAcc['PP']  += $PP;  $globalAcc['PC']  += $PC;
@@ -164,6 +171,22 @@ try {
         $ph = implode(',', array_fill(0, count($excl), '?'));
         $whereOf[] = "mq.Cod_maquina NOT IN ($ph)";
         $paramsOf = array_merge($paramsOf, $excl);
+    }
+    // Filtro multi-sección para los KPIs de OFs/refs: restringe por descripción de máquina
+    // a las máquinas que pertenecen a las secciones solicitadas (coherente con el OEE).
+    if (!empty($secciones_in)) {
+        $descsSec = array_keys(array_filter(
+            PlanAttainmentAgg::MAQUINA_TO_SECCION_EXT,
+            fn($s) => in_array($s, $secciones_in, true)
+        ));
+        if (!empty($descsSec)) {
+            $ph = implode(',', array_fill(0, count($descsSec), '?'));
+            $whereOf[] = "mq.Desc_maquina IN ($ph)";
+            $paramsOf = array_merge($paramsOf, $descsSec);
+        } else {
+            // Secciones pedidas sin máquinas mapeadas → ningún OF/ref
+            $whereOf[] = "1 = 0";
+        }
     }
     $sqlOf = "
         SELECT COUNT(DISTINCT fa.Id_his_of) AS num_ofs
@@ -233,9 +256,13 @@ try {
         'num_refs'    => (int)$r['num_refs'],
     ], $rowsRefMaq);
 
-    // Secciones: garantizamos VARILLAS + TROQUELADOS siempre presentes; OTROS solo si tiene datos
+    // Secciones: garantizamos VARILLAS + TROQUELADOS siempre presentes; OTROS solo si tiene datos.
+    // Si se pidió un subconjunto concreto, solo se devuelven las secciones solicitadas.
+    $secEmitir = empty($secciones_in)
+        ? ['VARILLAS','TROQUELADOS']
+        : array_values(array_filter(['VARILLAS','TROQUELADOS'], fn($s) => in_array($s, $secciones_in, true)));
     $secciones = [];
-    foreach (['VARILLAS','TROQUELADOS'] as $sec) {
+    foreach ($secEmitir as $sec) {
         if (!isset($secAcc[$sec])) {
             $secciones[] = [
                 'seccion'        => $sec,

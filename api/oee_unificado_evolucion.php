@@ -15,11 +15,11 @@ require_once __DIR__ . '/../lib/PlanAttainmentAgg.php';
  *   - fecha_desde, fecha_hasta (YYYY-MM-DD)
  *   - turnos  (CSV: M,T,N) — vacío = todos
  *   - excl    (CSV cod_maquina excluidas)
- *   - seccion (VARILLAS | TROQUELADOS | '' = todas) — filtra máquinas
+ *   - seccion (CSV: VARILLAS,TROQUELADOS | 'TODAS' | '' = todas) — filtra máquinas
  *
  * Devuelve:
  *   - granularidad: "DAY" | "WEEK" | "MONTH"
- *   - seccion: la elegida (o null si todas)
+ *   - seccion: "TODAS" o el CSV de secciones elegidas
  *   - periodos: [{ bucket_start, label, oee, disponibilidad, rendimiento, calidad,
  *                  tipo_dia ('normal'|'weekend'|'holiday'  ·  solo DAY) }, ...]
  *   - festivos: [YYYY-MM-DD, ...] (festivos del rango, info para el cliente)
@@ -96,15 +96,15 @@ try {
     // para esa máquina (usado por el drill métrica al clicar una máquina).
     $codMaqFiltro = isset($_GET['cod_maquina']) ? trim((string)$_GET['cod_maquina']) : '';
 
-    $seccion = (string) getParam('seccion', '');
-    if ($seccion !== '' && !in_array($seccion, ['VARILLAS', 'TROQUELADOS'], true)) {
-        jsonError('seccion inválida');
-    }
-    // Si hay sección, lista de DESC de máquinas que pertenecen a esa sección
+    // Selección múltiple de secciones. Array vacío = SIN filtro = todas (histórico).
+    // parseSecciones ya sanitiza contra la lista permitida; no hace falta validación escalar.
+    $secciones = parseSecciones(['VARILLAS', 'TROQUELADOS']);
+    $todasSec  = empty($secciones);
+    // Si hay secciones concretas, lista de DESC de máquinas que pertenecen a ellas
     $descsSeccion = [];
-    if ($seccion !== '') {
+    if (!$todasSec) {
         foreach (PlanAttainmentAgg::MAQUINA_TO_SECCION_EXT as $desc => $sec) {
-            if ($sec === $seccion) $descsSeccion[] = $desc;
+            if (in_array($sec, $secciones, true)) $descsSeccion[] = $desc;
         }
         if (empty($descsSeccion)) jsonError('Sección sin máquinas configuradas');
     }
@@ -211,7 +211,7 @@ try {
 
     jsonOk([
         'granularidad' => $granularidad,
-        'seccion'      => $seccion ?: null,
+        'seccion'      => $todasSec ? 'TODAS' : implode(',', $secciones),
         'periodos'     => $periodos,
         'festivos'     => $festivos,
     ]);
