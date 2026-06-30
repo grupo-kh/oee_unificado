@@ -54,9 +54,12 @@ class ScadaMural
                    cm.Rt_Unidades_ok_of, cm.Rt_Unidades_nok_of, cm.Rt_Unidades_repro_of,
                    cm.Rt_Seg_produccion_turno, cm.Rt_Seg_preparacion, cm.Rt_Seg_paro_turno,
                    fa.Unidades_planning AS plan_of,
+                   LTRIM(RTRIM(prod.Cod_producto)) AS cod_articulo,
                    GETDATE() AS ahora
             FROM cfg_maquina cm
             LEFT JOIN his_fase fa ON fa.Id_his_fase = cm.Rt_Id_his_fase
+            LEFT JOIN his_of      o    ON o.Cod_of      = cm.Rt_Cod_of
+            LEFT JOIN cfg_producto prod ON prod.Id_producto = o.Id_producto
             WHERE cm.activo = 1
               AND cm.Rt_Id_actividad >= 2
               AND cm.Rt_Cod_of NOT IN ('', '--')
@@ -166,7 +169,9 @@ class ScadaMural
                 'estado'       => trim((string)$r['Rt_Desc_actividad']),
                 'id_actividad' => (int)$r['Rt_Id_actividad'],
                 'of'           => $of,
-                'producto'     => trim((string)$r['Rt_Desc_producto']),
+                // Referencia mostrada = código de artículo de Sage (cfg_producto.Cod_producto),
+                // obtenido vía la OF. Fallback a la descripción técnica si no hay código.
+                'producto'     => trim((string)($r['cod_articulo'] ?? '')) ?: trim((string)$r['Rt_Desc_producto']),
                 'operario'     => trim((string)$r['Rt_Desc_operario']),
                 'turno'        => trim((string)$r['Rt_Desc_turno']),
                 'paro' => [
