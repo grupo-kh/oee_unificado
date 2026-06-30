@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCADA · Máquinas en producción</title>
+<style>
+  :root{
+    --kh:#8c181a; --kh2:#a52225;
+    --verde:#2e9e5b; --verde-bg:#e8f5ec;
+    --ambar:#d99000; --ambar-bg:#fbf3e0;
+    --rojo:#d23b3b;  --rojo-bg:#fbe9e9;
+    --azul:#3b7fd2;
+    --gris:#6b7280; --linea:#e5e7eb; --texto:#1f2430;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+       background:#f3f4f6;color:var(--texto)}
+  header.barra{display:flex;align-items:center;gap:16px;padding:10px 18px;
+       background:linear-gradient(90deg,var(--kh),var(--kh2));color:#fff}
+  header.barra h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.3px}
+  header.barra .estado{margin-left:auto;font-size:13px;display:flex;align-items:center;gap:10px}
+  .punto{width:9px;height:9px;border-radius:50%;background:#9ae6b4;display:inline-block}
+  .punto.err{background:#feb2b2}
+  #mural{display:grid;gap:14px;padding:16px;
+       grid-template-columns:repeat(auto-fill,minmax(360px,1fr))}
+  .tarjeta{background:#fff;border:1px solid var(--linea);border-radius:10px;
+       padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;flex-direction:column;gap:10px}
+  /* Cabecera */
+  .cab{display:flex;align-items:flex-start;gap:8px}
+  .cab .nom{font-size:20px;font-weight:800;line-height:1}
+  .cab .cod{font-size:12px;color:var(--gris);font-weight:700;margin-top:4px}
+  .cab .badge{margin-left:auto;font-size:11px;font-weight:700;padding:4px 9px;border-radius:20px;
+       text-transform:uppercase;white-space:nowrap;display:flex;align-items:center;gap:5px}
+  .cab .tiempo{font-size:12px;color:var(--gris);margin-left:6px;align-self:flex-start;font-weight:600}
+  .b-prod{background:var(--verde-bg);color:var(--verde)}
+  .b-prep{background:var(--ambar-bg);color:var(--ambar)}
+  .b-paro{background:var(--rojo-bg);color:var(--rojo)}
+  .of-linea{display:flex;gap:8px;align-items:center;font-size:12px}
+  .of-cod{background:#f3f4f6;border:1px solid var(--linea);border-radius:6px;padding:5px 8px;
+       font-weight:700;white-space:nowrap}
+  .of-prod{color:var(--gris);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .op{display:flex;align-items:center;gap:8px;font-size:13px}
+  .op .et{font-size:10px;color:var(--gris);font-weight:700}
+  .op .turno{margin-left:auto;font-size:11px;font-weight:700;background:#f3f4f6;
+       border:1px solid var(--linea);border-radius:5px;padding:3px 8px}
+  .banda-paro{display:flex;align-items:center;gap:10px;background:var(--ambar-bg);
+       border-radius:7px;padding:7px 10px;font-size:13px;font-weight:700}
+  .banda-paro .tag{background:#fff;border:1px solid var(--ambar);color:var(--ambar);
+       font-size:10px;padding:2px 7px;border-radius:5px}
+  .banda-paro .t{margin-left:auto;color:var(--ambar)}
+  hr{border:none;border-top:1px solid var(--linea);margin:2px 0}
+  .seccion-tit{font-size:11px;color:var(--gris);font-weight:800;letter-spacing:.5px}
+  /* OEE grande */
+  .oee-fila{display:flex;align-items:center;gap:12px}
+  .oee-num{font-size:34px;font-weight:800;line-height:1}
+  .oee-lab{font-size:11px;color:var(--gris);font-weight:700}
+  .barra{flex:1;height:7px;background:#eef0f3;border-radius:4px;overflow:hidden}
+  .barra>span{display:block;height:100%}
+  /* DRC */
+  .drc{display:flex;gap:14px}
+  .drc .item{flex:1}
+  .drc .et{font-size:10px;color:var(--gris);font-weight:700}
+  .drc .v{font-size:16px;font-weight:800}
+  .uds{display:flex;gap:6px;font-size:12px;color:var(--gris);flex-wrap:wrap}
+  .uds b{color:var(--texto)}
+  .uds .uh{margin-left:auto}
+  /* reparto */
+  .rep-barra{height:8px;border-radius:4px;overflow:hidden;display:flex}
+  .rep-barra>span{height:100%}
+  .leyenda{display:flex;gap:14px;font-size:11px;flex-wrap:wrap}
+  .leyenda i{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:4px}
+  /* progreso + cajas */
+  .prog{display:flex;align-items:center;gap:10px;font-size:12px}
+  .prog .txt{margin-left:auto;font-weight:700}
+  .cajas{display:flex;gap:8px}
+  .caja{flex:1;border:1px solid var(--linea);border-radius:8px;padding:8px;text-align:center}
+  .caja .et{font-size:9px;color:var(--gris);font-weight:800;letter-spacing:.4px}
+  .caja .v{font-size:13px;font-weight:700;margin-top:3px}
+  .nums{display:flex;gap:8px}
+  .num{flex:1;border-radius:8px;padding:8px;text-align:center}
+  .num .v{font-size:18px;font-weight:800}
+  .num .et{font-size:9px;font-weight:800;letter-spacing:.4px}
+  .n-plan{background:#eaf1fb;color:var(--azul)}
+  .n-ok{background:var(--verde-bg);color:var(--verde)}
+  .n-nok{background:var(--rojo-bg);color:var(--rojo)}
+  .n-rwk{background:#fbf3e0;color:var(--ambar)}
+  .vacio{padding:40px;text-align:center;color:var(--gris)}
+</style>
+</head>
+<body>
+<header class="barra">
+  <h1>SCADA · Máquinas en producción</h1>
+  <div class="estado">
+    <span id="punto" class="punto"></span>
+    <span id="info">Cargando…</span>
+  </div>
+</header>
+<div id="mural"><div class="vacio">Cargando máquinas…</div></div>
+
+<script>
+const REFRESCO_MS = 12000;
+let ultimoOK = null;   // conserva el último mural válido si falla un refresco
+
+const fmt = n => (n===null||n===undefined||n==='') ? '—' : n;
+const pct = v => Math.max(0, Math.min(100, Number(v)||0));
+
+// Color de la barra según valor (rojo<50, ámbar<75, verde)
+function colorPct(v){ v=Number(v)||0; return v<50?'var(--rojo)':v<75?'var(--ambar)':'var(--verde)'; }
+
+// Clase de badge de estado
+function badgeEstado(idAct, estado){
+  if (idAct===2 || idAct===20) return 'b-prod';       // PRODUCCION / MEJORAS
+  if (idAct===3 || idAct===5)  return 'b-prep';       // PREPARACION / AJUSTES
+  return 'b-paro';
+}
+// "5m", "1h 20m", "33m"
+function dur(seg){
+  seg=Number(seg)||0; if(seg<=0) return '';
+  const d=Math.floor(seg/86400), h=Math.floor(seg%86400/3600), m=Math.floor(seg%3600/60);
+  if(d>0) return `${d}d ${h}h`;
+  if(h>0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function drcBloque(k){
+  return `
+    <div class="oee-fila">
+      <div class="oee-num" style="color:${colorPct(k.oee)}">${fmt(k.oee)}</div>
+      <div><div class="oee-lab">OEE</div>
+        <div class="barra"><span style="width:${pct(k.oee)}%;background:${colorPct(k.oee)}"></span></div></div>
+    </div>
+    <div class="drc">
+      ${['disp','rend','cal'].map(c=>{
+        const lab={disp:'DISP',rend:'REND',cal:'CAL'}[c];
+        return `<div class="item"><div class="et">${lab}</div>
+          <div class="v" style="color:${colorPct(k[c])}">${fmt(k[c])}%</div>
+          <div class="barra"><span style="width:${pct(k[c])}%;background:${colorPct(k[c])}"></span></div></div>`;
+      }).join('')}
+    </div>`;
+}
+
+function tarjeta(m){
+  const t=m.turno_kpi, o=m.of_kpi;
+  const enParo = m.paro && m.paro.motivo;
+  const bandaParo = enParo ? `
+    <div class="banda-paro"><span class="tag">EN PARO</span>${m.paro.motivo}
+      <span class="t">${dur(m.paro.seg)}</span></div>` : '';
+  return `
+  <div class="tarjeta">
+    <div class="cab">
+      <div><div class="nom">${m.desc_maquina}</div><div class="cod">${m.cod_maquina}</div></div>
+      <span class="badge ${badgeEstado(m.id_actividad,m.estado)}">${m.estado}</span>
+      <span class="tiempo">${dur(m.paro&&m.paro.seg?m.paro.seg:0)}</span>
+    </div>
+    <div class="of-linea">
+      <span class="of-cod">${fmt(m.of)}</span>
+      <span class="of-prod" title="${m.producto||''}">${fmt(m.producto)}</span>
+    </div>
+    <div class="op"><span class="et">OP</span>${fmt(m.operario)}
+      <span class="turno">${fmt(m.turno)}</span></div>
+    ${bandaParo}
+    <hr>
+    <div class="seccion-tit">MÉTRICAS DE TURNO</div>
+    ${drcBloque(t)}
+    <div class="uds">OK <b>${t.ok}</b> · RWK <b>${t.rwk}</b> &nbsp; NOK <b>${t.nok}</b>
+      <span class="uh">${t.uh} u/h</span></div>
+    <div class="rep-barra">
+      <span style="width:${t.rep_prod}%;background:var(--verde)"></span>
+      <span style="width:${t.rep_prep}%;background:var(--azul)"></span>
+      <span style="width:${t.rep_paro}%;background:var(--rojo)"></span>
+    </div>
+    <div class="leyenda">
+      <span><i style="background:var(--verde)"></i>Producción ${t.rep_prod}%</span>
+      <span><i style="background:var(--azul)"></i>Preparación ${t.rep_prep}%</span>
+      <span><i style="background:var(--rojo)"></i>Paro ${t.rep_paro}%</span>
+    </div>
+    <hr>
+    <div class="seccion-tit">MÉTRICAS DE OF</div>
+    ${drcBloque(o)}
+    <div class="prog"><span>Progreso de la orden</span>
+      <span class="txt">${o.ok} / ${o.plan} · ${o.progreso_pct}%</span></div>
+    <div class="barra"><span style="width:${pct(o.progreso_pct)}%;background:${colorPct(o.progreso_pct)}"></span></div>
+    <div class="cajas">
+      <div class="caja"><div class="et">INICIO</div><div class="v">${fmt(o.inicio)}</div></div>
+      <div class="caja"><div class="et">FIN EST.</div><div class="v">${fmt(o.fin_est)}</div></div>
+      <div class="caja"><div class="et">RESTANTE</div><div class="v">${fmt(o.restante)}</div></div>
+    </div>
+    <div class="nums">
+      <div class="num n-plan"><div class="v">${o.plan}</div><div class="et">PLAN</div></div>
+      <div class="num n-ok"><div class="v">${o.ok}</div><div class="et">OK</div></div>
+      <div class="num n-nok"><div class="v">${o.nok}</div><div class="et">NOK</div></div>
+      <div class="num n-rwk"><div class="v">${o.rwk}</div><div class="et">RWK</div></div>
+    </div>
+  </div>`;
+}
+
+function pinta(data){
+  const mural=document.getElementById('mural');
+  if(!data.maquinas || !data.maquinas.length){
+    mural.innerHTML='<div class="vacio">No hay máquinas en producción ahora mismo.</div>';
+    return;
+  }
+  mural.innerHTML = data.maquinas.map(tarjeta).join('');
+}
+
+async function cargar(){
+  const punto=document.getElementById('punto'), info=document.getElementById('info');
+  try{
+    const r = await fetch('api/scada_mural.php', {cache:'no-store'});
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error||'respuesta no OK');
+    ultimoOK = j.data;
+    pinta(j.data);
+    punto.className='punto';
+    info.textContent = `${j.data.maquinas.length} máquinas · actualizado ${new Date().toLocaleTimeString('es-ES')}`;
+  }catch(e){
+    punto.className='punto err';
+    info.textContent = 'Sin conexión con MAPEX · mostrando último dato';
+    if(ultimoOK) pinta(ultimoOK);   // no vaciar el mural ante un fallo puntual
+  }
+}
+
+cargar();
+setInterval(cargar, REFRESCO_MS);
+</script>
+</body>
+</html>
