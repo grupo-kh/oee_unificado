@@ -205,6 +205,115 @@ class ScadaMural
         return ['ahora' => $ahora, 'maquinas' => $out];
     }
 
+    // ───────── Modal de detalle por máquina (pestañas RESUMEN / PAROS / OFS) ─────────
+
+    /** Datos de la pestaña RESUMEN del modal para una máquina. */
+    public static function resumenMaquina(string $cod): array
+    {
+        $sql = "
+            SELECT cm.Cod_maquina, cm.Rt_Cod_of,
+                   cm.Rt_Rendimientonominal1,
+                   cm.Rt_Unidades_ok_turno, cm.Rt_Unidades_nok_turno, cm.Rt_Unidades_repro_turno,
+                   cm.Rt_Unidades_ok_of, cm.Rt_Seg_produccion_turno,
+                   fa.Unidades_planning AS plan_of
+            FROM cfg_maquina cm
+            LEFT JOIN his_fase fa ON fa.Id_his_fase = cm.Rt_Id_his_fase
+            WHERE cm.Cod_maquina = ?";
+        $r = fetchAll('mapex', $sql, [$cod])[0] ?? null;
+        if (!$r) return [
+            'ritmo'    => ['real'=>0,'teorico'=>0,'desvio'=>0],
+            'oee'      => ['turno'=>0,'of'=>0,'rend_turno'=>0],
+            'orden'    => ['ok'=>0,'plan'=>0,'pct'=>0,'faltan'=>0],
+            'unidades' => ['ok'=>0,'nok'=>0,'rwk'=>0],
+        ];
+
+        $uh      = (float)$r['Rt_Rendimientonominal1'];
+        $segProd = (int)$r['Rt_Seg_produccion_turno'];
+        $okT     = (int)$r['Rt_Unidades_ok_turno'];
+        $teorico = $uh > 0 ? (int)round($segProd * $uh / 3600) : 0;
+
+        $kt = self::kpiTurnoTodas()[$cod] ?? self::calcDRC(0,0,0,0,0,0);
+        $of = trim((string)$r['Rt_Cod_of']);
+        $ko = self::kpiOfTodas([$of])["$cod|$of"] ?? self::calcDRC(0,0,0,0,0,0);
+
+        $okOf = (int)$r['Rt_Unidades_ok_of'];
+        $plan = (int)($r['plan_of'] ?? 0);
+
+        return [
+            'ritmo' => ['real'=>$okT, 'teorico'=>$teorico, 'desvio'=>$okT-$teorico],
+            'oee'   => ['turno'=>$kt['oee'], 'of'=>$ko['oee'], 'rend_turno'=>$kt['rendimiento']],
+            'orden' => ['ok'=>$okOf, 'plan'=>$plan,
+                        'pct'=>$plan>0?(int)round($okOf*100/$plan):0,
+                        'faltan'=>max(0,$plan-$okOf)],
+            'unidades' => ['ok'=>$okT, 'nok'=>(int)$r['Rt_Unidades_nok_turno'],
+                           'rwk'=>(int)$r['Rt_Unidades_repro_turno']],
+        ];
+    }
+
+    /** Paros de una máquina en un día (o rango de $dias hacia atrás). */
+    public static function parosMaquina(string $cod, string $fecha, int $dias = 1): array
+    {
+        $dias = max(1, $dias);
+        $ini = date('Y-m-d', strtotime("$fecha -" . ($dias - 1) . " days"));
+        $sql = "
+            SELECT hpp.Fecha_ini, hpp.Fecha_fin,
+                   DATEDIFF(SECOND, hpp.Fecha_ini, ISNULL(hpp.Fecha_fin, GETDATE())) AS seg,
+                   cp.Desc_paro AS motivo, o.Cod_of AS ofx
+            FROM his_prod_paro hpp
+            INNER JOIN his_prod hp     ON hp.Id_his_prod = hpp.Id_his_prod
+            INNER JOIN cfg_maquina mq  ON mq.Id_maquina  = hp.Id_maquina
+            LEFT  JOIN cfg_paro cp     ON cp.Id_paro     = hpp.Id_paro
+            LEFT  JOIN his_fase fa     ON fa.Id_his_fase = hp.Id_his_fase
+            LEFT  JOIN his_of o        ON o.Id_his_of    = fa.Id_his_of
+            WHERE mq.Cod_maquina = ?
+              AND CAST(hpp.Fecha_ini AS DATE) BETWEEN ? AND ?
+            ORDER BY hpp.Fecha_ini DESC";
+        $rows = fetchAll('mapex', $sql, [$cod, $ini, $fecha]);
+        $paros = []; $tot = 0;
+        foreach ($rows as $r) {
+            $seg = (int)$r['seg']; $tot += $seg;
+            $paros[] = [
+                'ini'    => date('d/m H:i', strtotime((string)$r['Fecha_ini'])),
+                'fin'    => $r['Fecha_fin'] ? date('d/m H:i', strtotime((string)$r['Fecha_fin'])) : '—',
+                'seg'    => $seg,
+                'motivo' => trim((string)($r['motivo'] ?? 'DESCONOCIDO')),
+                'of'     => trim((string)($r['ofx'] ?? '')),
+            ];
+        }
+        return ['fecha'=>$fecha, 'total_seg'=>$tot, 'paros'=>$paros];
+    }
+
+    /** OFs producidas por una máquina en un día. */
+    public static function ofsMaquina(string $cod, string $fecha): array
+    {
+        $sql = "
+            SELECT o.Cod_of, prod.Desc_producto AS producto,
+                   MAX(fa.Unidades_planning)        AS plan_of,
+                   SUM(ISNULL(hp.Unidades_ok,0))    AS ok,
+                   SUM(ISNULL(hp.Unidades_repro,0)) AS rwk
+            FROM his_prod hp
+            INNER JOIN cfg_maquina mq  ON mq.Id_maquina  = hp.Id_maquina
+            INNER JOIN his_fase fa     ON fa.Id_his_fase = hp.Id_his_fase
+            INNER JOIN his_of o        ON o.Id_his_of    = fa.Id_his_of
+            LEFT  JOIN cfg_producto prod ON prod.Id_producto = o.Id_producto
+            WHERE mq.Cod_maquina = ?
+              AND CAST(hp.Dia_productivo AS DATE) = ?
+              AND o.Cod_of <> '--'
+            GROUP BY o.Cod_of, prod.Desc_producto
+            ORDER BY o.Cod_of";
+        $ofs = [];
+        foreach (fetchAll('mapex', $sql, [$cod, $fecha]) as $r) {
+            $plan = (int)$r['plan_of']; $ok = (int)$r['ok'];
+            $ofs[] = [
+                'of'       => trim((string)$r['Cod_of']),
+                'producto' => trim((string)($r['producto'] ?? '')),
+                'plan'     => $plan, 'ok' => $ok, 'rwk' => (int)$r['rwk'],
+                'pct'      => $plan > 0 ? (int)round($ok*100/$plan) : 0,
+            ];
+        }
+        return ['fecha'=>$fecha, 'ofs'=>$ofs];
+    }
+
     /** Segundos entre una fecha MAPEX y "ahora"; 0 si nula/inválida. */
     private static function segDesde($fecha, string $ahora): int
     {
