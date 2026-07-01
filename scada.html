@@ -130,6 +130,29 @@
   .of-card .nums .ok{color:var(--verde);font-weight:700}
   .of-card .pct{float:right;font-weight:800}
   .m-cargando{color:var(--gris);padding:30px;text-align:center}
+  /* ── Barra de menú SCADA ── */
+  .menu-scada{background:#fff;border-bottom:1px solid var(--linea);padding:8px 16px;display:flex;flex-direction:column;gap:8px}
+  .ms-fila{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .ms-cont{display:flex;gap:8px}
+  .ms-cont .c{border:1px solid var(--linea);border-radius:16px;padding:4px 10px;font-size:12px;cursor:pointer;font-weight:700}
+  .ms-cont .c.on{background:#8c181a;color:#fff;border-color:#8c181a}
+  .ms-cont .c b{font-size:14px;margin-right:4px}
+  .ms-dens{margin-left:auto;display:flex;gap:4px}
+  .ms-dens button,.ms-orden button,.ms-tog{font-size:12px;font-weight:600;padding:5px 10px;border:1px solid var(--linea);border-radius:6px;background:#fff;cursor:pointer;color:#374151}
+  .ms-dens button.on,.ms-orden button.on,.ms-tog.on{background:#8c181a;border-color:#8c181a;color:#fff}
+  .ms-zoom{display:flex;align-items:center;gap:4px;font-size:12px}
+  .ms-zoom button{width:24px;height:24px;border:1px solid var(--linea);border-radius:4px;background:#fff;cursor:pointer}
+  .ms-orden{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-left:auto}
+  .ms-orden-lbl{font-size:10px;color:var(--gris);font-weight:800;margin-right:4px}
+  /* densidades */
+  #mural{--fz:1}
+  #mural.dens-compacta{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+  #mural.dens-comoda{grid-template-columns:repeat(auto-fill,minmax(440px,1fr))}
+  .tarjeta.compacta{gap:6px}
+  .tarjeta.compacta .c-ref,.tarjeta.compacta .c-est{font-size:12px}
+  .tarjeta.compacta .et{font-size:9px;color:var(--gris);font-weight:800;letter-spacing:.4px}
+  .tarjeta .nom{font-size:calc(20px * var(--fz))}
+  .t-ocultar{margin-left:auto;background:none;border:none;color:var(--gris);cursor:pointer;font-size:14px;line-height:1}
 </style>
 </head>
 <body>
@@ -140,6 +163,36 @@
     <span id="info">Cargando…</span>
   </div>
 </header>
+<div class="menu-scada">
+  <div class="ms-fila">
+    <div class="ms-cont" id="msContadores"></div>
+    <div class="ms-dens">
+      <button data-d="comoda">Cómoda</button>
+      <button data-d="normal" class="on">Normal</button>
+      <button data-d="compacta">Compacta</button>
+    </div>
+    <div class="ms-zoom">
+      <button data-z="-">−</button><span id="msZoomV">100%</span><button data-z="+">+</button>
+      &nbsp;<b>A</b><button data-f="-">−</button><span id="msFzV">100%</span><button data-f="+">+</button>
+    </div>
+  </div>
+  <div class="ms-fila">
+    <button class="ms-tog" id="msProblemas">● Solo problemas <b id="msProbN">0</b></button>
+    <button class="ms-tog" id="msOcultas">👁 Ocultas <b id="msOcN">0</b></button>
+    <div class="ms-orden" id="msOrden">
+      <span class="ms-orden-lbl">ORDEN</span>
+      <button data-o="urgencia">Urgencia</button>
+      <button data-o="oee">OEE bajo primero</button>
+      <button data-o="restante">Tiempo restante OF</button>
+      <button data-o="prep">Preparación primero</button>
+      <button data-o="prod" class="on">Producción primero</button>
+      <button data-o="codigo">Código A-Z</button>
+      <button data-o="motivo">Motivo de paro</button>
+      <button data-o="finest">FIN EST. OF</button>
+      <button data-o="tiempoparo">Tiempo de paro</button>
+    </div>
+  </div>
+</div>
 <div id="mural"><div class="vacio">Cargando máquinas…</div></div>
 
 <div class="modal-overlay" id="modalOverlay">
@@ -202,11 +255,16 @@ function drcBloque(k){
     </div>`;
 }
 
+// Paleta de categorías de paro (nivel Matriz2) para colorear la banda de paro.
+const CAT_PARO_COL={'Mantenimiento':'#8c181a','Calidad':'#b5179e','Cambio MP/Utillajes':'#d99000','Ajustes y Programacion':'#3b7fd2','Esperas':'#6b7280','Interrupciones':'#c9a227','Mejoras':'#2e9e5b'};
 function tarjeta(m){
   const t=m.turno_kpi, o=m.of_kpi;
   const enParo = m.paro && m.paro.motivo;
+  const cCol=CAT_PARO_COL[m.paro_categoria]||'#d99000';
   const bandaParo = enParo ? `
-    <div class="banda-paro"><span class="tag">EN PARO</span>${m.paro.motivo}
+    <div class="banda-paro" style="background:${cCol}22;border-left:4px solid ${cCol}">
+      <span class="tag" style="border-color:${cCol};color:${cCol}">EN PARO</span>
+      ${m.paro_categoria?`<b style="color:${cCol}">${m.paro_categoria}</b> · `:''}${m.paro.motivo}
       <span class="t">${dur(m.paro.seg)}</span></div>` : '';
   return `
   <div class="tarjeta" data-cod="${m.cod_maquina}" style="cursor:pointer">
@@ -214,6 +272,7 @@ function tarjeta(m){
       <div><div class="nom">${m.desc_maquina}</div><div class="cod">${m.cod_maquina}</div></div>
       <span class="badge ${badgeEstado(m.id_actividad,m.estado)}">${m.estado}</span>
       <span class="tiempo">${dur(m.paro&&m.paro.seg?m.paro.seg:0)}</span>
+      <button class="t-ocultar" data-ocultar="${m.cod_maquina}" title="Ocultar" onclick="event.stopPropagation()">✕</button>
     </div>
     <div class="of-linea">
       <span class="of-cod">${fmt(m.of)}</span>
@@ -257,14 +316,97 @@ function tarjeta(m){
   </div>`;
 }
 
-function pinta(data){
+// ───────── Menú SCADA: estado, contadores, densidad, zoom, filtros, orden ─────────
+const PREF_KEY='scada_prefs';
+const State=Object.assign(
+  {densidad:'normal',orden:'prod',zoom:100,fz:100,soloProblemas:false,filtroEstado:null,ocultas:[]},
+  JSON.parse(localStorage.getItem(PREF_KEY)||'{}'));
+function guardarPrefs(){localStorage.setItem(PREF_KEY,JSON.stringify(State));}
+
+function renderContadores(c){
+  const defs=[['total','Máquinas',null],['produccion','Producción','#2e9e5b'],['preparacion','Preparación','#3b7fd2'],['parada','Paradas','#d23b3b'],['cerrada','Cerradas','#6b7280']];
+  const est={total:null,produccion:'produccion',preparacion:'preparacion',parada:'parada',cerrada:'cerrada'};
+  document.getElementById('msContadores').innerHTML=defs.map(([k,lbl,col])=>
+    `<span class="c ${State.filtroEstado===est[k]?'on':''}" data-est="${est[k]||''}"><b style="${col?'color:'+col:''}">${c[k]||0}</b>${lbl}</span>`).join('');
+  document.querySelectorAll('.ms-cont .c').forEach(el=>el.onclick=()=>{
+    const e=el.dataset.est||null; State.filtroEstado=(State.filtroEstado===e?null:e); guardarPrefs(); aplicarMenu();
+  });
+}
+function aplicarZoom(){
+  const m=document.getElementById('mural');
+  m.style.zoom=State.zoom/100; m.style.setProperty('--fz',State.fz/100);
+  document.getElementById('msZoomV').textContent=State.zoom+'%';
+  document.getElementById('msFzV').textContent=State.fz+'%';
+}
+function wireMenu(){
+  document.querySelectorAll('.ms-dens button').forEach(b=>b.onclick=()=>{State.densidad=b.dataset.d;guardarPrefs();aplicarMenu();});
+  document.querySelectorAll('.ms-orden button').forEach(b=>b.onclick=()=>{State.orden=b.dataset.o;guardarPrefs();aplicarMenu();});
+  document.getElementById('msProblemas').onclick=()=>{State.soloProblemas=!State.soloProblemas;guardarPrefs();aplicarMenu();};
+  document.getElementById('msOcultas').onclick=()=>{State.ocultas=[];guardarPrefs();aplicarMenu();};
+  document.querySelectorAll('[data-z]').forEach(b=>b.onclick=()=>{State.zoom=Math.max(50,Math.min(150,State.zoom+(b.dataset.z==='+'?10:-10)));guardarPrefs();aplicarZoom();});
+  document.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{State.fz=Math.max(70,Math.min(160,State.fz+(b.dataset.f==='+'?10:-10)));guardarPrefs();aplicarZoom();});
+}
+
+// Parsers para ordenar
+function parseMin(t){ if(!t||t==='—'||t==='Completada') return Infinity;
+  let m=0; const d=/(\d+)d/.exec(t),h=/(\d+)h/.exec(t),mi=/(\d+)m/.exec(t);
+  if(d)m+=+d[1]*1440; if(h)m+=+h[1]*60; if(mi)m+=+mi[1]; return m||Infinity; }
+function parseFin(t){ if(!t||t==='—'||t==='Completada') return Infinity;
+  const m=/(\d{2})\/(\d{2}) (\d{2}):(\d{2})/.exec(t); if(!m) return Infinity;
+  return (+m[2])*1e6+(+m[1])*1e4+(+m[3])*100+(+m[4]); }
+const ORDEN_CAT=['Mantenimiento','Calidad','Cambio MP/Utillajes','Ajustes y Programacion','Esperas','Interrupciones','Mejoras'];
+function ordenar(arr){
+  const o=State.orden, byCod=(a,b)=>a.cod_maquina.localeCompare(b.cod_maquina);
+  const cp={parada:0,preparacion:1,produccion:2,otra:3,cerrada:4};
+  const A=arr.slice();
+  if(o==='codigo') A.sort(byCod);
+  else if(o==='oee') A.sort((a,b)=>(a.turno_kpi.oee)-(b.turno_kpi.oee)||byCod(a,b));
+  else if(o==='urgencia') A.sort((a,b)=>(cp[a.estado_cat]-cp[b.estado_cat])||(a.turno_kpi.oee-b.turno_kpi.oee));
+  else if(o==='prep') A.sort((a,b)=>((a.estado_cat==='preparacion'?0:1)-(b.estado_cat==='preparacion'?0:1))||byCod(a,b));
+  else if(o==='prod') A.sort((a,b)=>((a.estado_cat==='produccion'?0:1)-(b.estado_cat==='produccion'?0:1))||byCod(a,b));
+  else if(o==='restante') A.sort((a,b)=>parseMin(a.of_kpi.restante)-parseMin(b.of_kpi.restante));
+  else if(o==='finest') A.sort((a,b)=>parseFin(a.of_kpi.fin_est)-parseFin(b.of_kpi.fin_est));
+  else if(o==='tiempoparo') A.sort((a,b)=>(b.seg_paro||0)-(a.seg_paro||0));
+  else if(o==='motivo') A.sort((a,b)=>{
+    let ia=a.paro_categoria?ORDEN_CAT.indexOf(a.paro_categoria):99, ib=b.paro_categoria?ORDEN_CAT.indexOf(b.paro_categoria):99;
+    if(ia<0)ia=98; if(ib<0)ib=98; return ia-ib||byCod(a,b);
+  });
+  document.querySelectorAll('.ms-orden button').forEach(b=>b.classList.toggle('on',b.dataset.o===o));
+  return A;
+}
+
+// Tarjeta compacta (densidad Compacta)
+function tarjetaCompacta(m){
+  const col={produccion:'#2e9e5b',preparacion:'#d99000',parada:'#d23b3b',cerrada:'#c3cad3',otra:'#6b7280'}[m.estado_cat]||'#6b7280';
+  return `<div class="tarjeta compacta" data-cod="${m.cod_maquina}" style="cursor:pointer;border-top:4px solid ${col}">
+    <div class="cab"><div><div class="nom">${m.desc_maquina}</div><div class="cod">${m.cod_maquina}</div></div>
+      <button class="t-ocultar" data-ocultar="${m.cod_maquina}" title="Ocultar" onclick="event.stopPropagation()">✕</button></div>
+    <div class="c-ref"><div class="et">REFERENCIA</div>${fmt(m.producto)}</div>
+    <div class="c-est"><div class="et">ESTADO</div><span style="color:${col};font-weight:800">● ${m.estado}</span></div>
+  </div>`;
+}
+
+function esProblema(m){ return m.estado_cat==='parada' || (m.turno_kpi.oee||0)<50; }
+function aplicarMenu(){
+  let ms=(window._ultimoMural||[]).slice();
+  ms=ms.filter(m=>!State.ocultas.includes(m.cod_maquina));
+  if(State.filtroEstado) ms=ms.filter(m=>m.estado_cat===State.filtroEstado);
+  if(State.soloProblemas) ms=ms.filter(esProblema);
+  ms=ordenar(ms);
+  document.querySelectorAll('.ms-dens button').forEach(b=>b.classList.toggle('on',b.dataset.d===State.densidad));
+  document.getElementById('msProblemas').classList.toggle('on',State.soloProblemas);
+  document.getElementById('msProbN').textContent=(window._ultimoMural||[]).filter(esProblema).length;
+  document.getElementById('msOcN').textContent=State.ocultas.length;
   const mural=document.getElementById('mural');
-  if(!data.maquinas || !data.maquinas.length){
-    mural.innerHTML='<div class="vacio">No hay máquinas en producción ahora mismo.</div>';
-    return;
-  }
-  mural.innerHTML = data.maquinas.map(tarjeta).join('');
-  window._ultimoMural = data.maquinas;   // para localizar la máquina al clicar
+  mural.className='dens-'+State.densidad;
+  const render=State.densidad==='compacta'?tarjetaCompacta:tarjeta;
+  mural.innerHTML=ms.length?ms.map(render).join(''):'<div class="vacio">Sin máquinas para este filtro.</div>';
+}
+
+function pinta(data){
+  window._ultimoMural = data.maquinas || [];
+  if(data.contadores) renderContadores(data.contadores);
+  aplicarMenu();
 }
 
 async function cargar(){
@@ -397,6 +539,9 @@ async function cargarOfs(){
 }
 
 document.getElementById('mural').addEventListener('click', e=>{
+  const oc=e.target.closest('[data-ocultar]');
+  if(oc){ e.stopPropagation(); const c=oc.dataset.ocultar;
+    if(!State.ocultas.includes(c)) State.ocultas.push(c); guardarPrefs(); aplicarMenu(); return; }
   const t = e.target.closest('.tarjeta'); if(!t) return;
   const m = (window._ultimoMural||[]).find(x=>x.cod_maquina===t.dataset.cod);
   if(m) abrirModal(m);
@@ -410,6 +555,8 @@ document.querySelectorAll('.m-tab').forEach(t=>t.addEventListener('click', ()=>{
 }));
 document.getElementById('mActualizar').addEventListener('click', ()=>cargarPestana(modalPestana));
 
+wireMenu();
+aplicarZoom();
 cargar();
 setInterval(cargar, REFRESCO_MS);
 </script>
