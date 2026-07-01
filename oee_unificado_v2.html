@@ -381,6 +381,17 @@ tbody tr:hover{background:#f9fafb}
 .of-pop-row:last-child{border-bottom:none}
 .of-pop-k{flex:0 0 160px;font-size:12px;font-weight:700;color:#8c181a;text-transform:uppercase;letter-spacing:.3px}
 .of-pop-v{flex:1;font-size:14px;color:#6e6d6b;font-weight:600}
+/* ── Menú hamburguesa de opciones ── */
+.menu-op{position:relative}
+.menu-op-btn{background:#8c181a;color:#fff;border-color:#8c181a}
+.menu-op-lista{position:absolute;top:calc(100% + 6px);right:0;z-index:40;
+  background:#fff;border:1px solid #e5e7eb;border-radius:10px;
+  box-shadow:0 12px 32px rgba(0,0,0,.16);padding:6px;min-width:210px;
+  display:none;flex-direction:column;gap:2px}
+.menu-op-lista.abierto{display:flex}
+.menu-op-item{text-align:left;background:none;border:none;cursor:pointer;
+  font-size:13px;font-weight:600;color:#1f2430;padding:9px 12px;border-radius:7px}
+.menu-op-item:hover{background:#f5eaea;color:#8c181a}
 </style>
 </head>
 <body>
@@ -433,14 +444,19 @@ tbody tr:hover{background:#f9fafb}
     <div class="info"><span class="l">OFs</span><span class="v" id="iOfs">—</span></div>
     <div class="info"><span class="l">Refs</span><span class="v" id="iRefs">—</span></div>
     <div class="actions">
-      <button class="btn btn-hist" onclick="App.openHistograma()">📊 Histograma</button>
-      <button class="btn btn-cof" onclick="App.openCambiosOF()">🔄 Cambios en OF</button>
-      <button class="btn btn-topm" onclick="App.topModule('maquinas')">🏭 Top máquinas</button>
-      <button class="btn btn-topmot" onclick="App.topModule('motivos')">🔧 Top motivos</button>
-      <button class="btn btn-matriz" onclick="App.openMatriz()">🧮 Matriz</button>
-      <button class="btn btn-matriz" onclick="App.openMatriz2()">🧮 Matriz 2</button>
-      <button class="btn btn-evolmot" onclick="App.openEvolMotivos()">📈 Evolución motivos</button>
-      <button class="btn btn-pri" onclick="App.exportExcel()">⬇️ Excel</button>
+      <div class="menu-op">
+        <button class="btn btn-pri menu-op-btn" id="menuOpBtn" onclick="toggleMenuOp(event)">☰ Opciones</button>
+        <div class="menu-op-lista" id="menuOpLista">
+          <button class="menu-op-item" onclick="menuAccion(()=>App.openHistograma())">📊 Histograma</button>
+          <button class="menu-op-item" onclick="menuAccion(()=>App.openCambiosOF())">🔄 Cambios en OF</button>
+          <button class="menu-op-item" onclick="menuAccion(()=>App.topModule('maquinas'))">🏭 Top máquinas</button>
+          <button class="menu-op-item" onclick="menuAccion(()=>App.topModule('motivos'))">🔧 Top motivos</button>
+          <button class="menu-op-item" onclick="menuAccion(()=>App.openMatriz())">🧮 Matriz</button>
+          <button class="menu-op-item" onclick="menuAccion(()=>App.openMatriz2())">🧮 Matriz 2</button>
+          <button class="menu-op-item" onclick="menuAccion(()=>App.openEvolMotivos())">📈 Evolución motivos</button>
+          <button class="menu-op-item" onclick="menuAccion(()=>App.exportExcel())">⬇️ Excel</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2644,6 +2660,24 @@ const App={
   }
 };
 App.init();
+
+/* ── Menú hamburguesa de opciones ── */
+function toggleMenuOp(e){
+  e.stopPropagation();
+  document.getElementById('menuOpLista').classList.toggle('abierto');
+}
+function menuAccion(fn){
+  document.getElementById('menuOpLista').classList.remove('abierto');
+  fn();
+}
+document.addEventListener('click', e=>{
+  const m = document.getElementById('menuOpLista');
+  if(m && m.classList.contains('abierto') && !e.target.closest('.menu-op'))
+    m.classList.remove('abierto');
+});
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape') document.getElementById('menuOpLista')?.classList.remove('abierto');
+});
 </script>
 </body>
 </html>
