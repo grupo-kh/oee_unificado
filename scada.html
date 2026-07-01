@@ -152,6 +152,9 @@
   .tarjeta.compacta .nom{font-size:calc(24px * var(--fz))}
   .tarjeta.compacta .c-ref,.tarjeta.compacta .c-est{font-size:14px}
   .tarjeta.compacta .et{font-size:10px;color:var(--gris);font-weight:800;letter-spacing:.4px}
+  .tarjeta.compacta .c-paro{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
+       border-radius:6px;padding:6px 8px;margin-top:2px}
+  .tarjeta.compacta .c-paro-t{margin-left:auto;font-weight:700;color:var(--gris)}
   /* Cómoda: tarjeta completa MÁS grande y espaciada (se distingue de Normal) */
   #mural.dens-comoda{grid-template-columns:repeat(auto-fill,minmax(460px,1fr));gap:26px}
   #mural.dens-comoda .tarjeta{padding:20px 24px;gap:14px}
@@ -387,11 +390,28 @@ function ordenar(arr){
 // Tarjeta compacta (densidad Compacta)
 function tarjetaCompacta(m){
   const col={produccion:'#2e9e5b',preparacion:'#d99000',parada:'#d23b3b',cerrada:'#c3cad3',otra:'#6b7280'}[m.estado_cat]||'#6b7280';
+  // Si está parada, mostrar el motivo con su categoría (nivel Matriz2) y tiempo.
+  const enParo = m.estado_cat==='parada' && m.paro && m.paro.motivo;
+  const cCol = CAT_PARO_COL[m.paro_categoria]||'#d99000';
+  // Jerarquía Matriz2 (3 niveles): Actividad · Categoría · Motivo.
+  // Si actividad y categoría coinciden en texto, se muestra una sola vez.
+  let niveles='';
+  if(enParo){
+    const arr=[m.estado, m.paro_categoria, m.paro.motivo].filter(Boolean);
+    const vistos=new Set(); const uniq=arr.filter(x=>{const k=x.toUpperCase();if(vistos.has(k))return false;vistos.add(k);return true;});
+    niveles=uniq.join(' · ');
+  }
+  const motivoParo = enParo ? `
+    <div class="c-paro" style="background:${cCol}22;border-left:4px solid ${cCol}">
+      <span style="color:${cCol};font-weight:700">${niveles}</span>
+      <span class="c-paro-t">${dur(m.paro.seg)}</span>
+    </div>` : '';
   return `<div class="tarjeta compacta" data-cod="${m.cod_maquina}" style="cursor:pointer;border-top:4px solid ${col}">
     <div class="cab"><div><div class="nom">${m.desc_maquina}</div><div class="cod">${m.cod_maquina}</div></div>
       <button class="t-ocultar" data-ocultar="${m.cod_maquina}" title="Ocultar" onclick="event.stopPropagation()">✕</button></div>
     <div class="c-ref"><div class="et">REFERENCIA</div>${fmt(m.producto)}</div>
     <div class="c-est"><div class="et">ESTADO</div><span style="color:${col};font-weight:800">● ${m.estado}</span></div>
+    ${motivoParo}
   </div>`;
 }
 
