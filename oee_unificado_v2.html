@@ -568,14 +568,18 @@ const App={
     this.clearQuick(); btn.classList.add('active');
     const t=new Date(),d=new Date();
     if(r==='yesterday'){t.setDate(t.getDate()-1);d.setDate(d.getDate()-1);}
-    else if(r==='week'){d.setDate(d.getDate()-6);}
-    else if(r==='month'){d.setDate(d.getDate()-29);}
-    else if(r==='lastweek'){
-      // Lunes a domingo de la semana anterior (getDay: 0=dom..6=sab).
-      const day=t.getDay(), diffToMon=(day===0?6:day-1);
-      d.setDate(d.getDate()-diffToMon-7);   // lunes de la semana pasada
-      t.setDate(t.getDate()-diffToMon-1);   // domingo de la semana pasada
+    else if(r==='week'||r==='lastweek'){
+      // Semana PRODUCTIVA = día productivo Lunes → Sábado. La noche del domingo
+      // (22:30) tiene día productivo lunes; la noche del viernes (fin de semana
+      // productiva) tiene día productivo sábado, por eso el rango llega al sábado.
+      // getDay(): 0=Dom..6=Sáb.  dow: 0=Lun..6=Dom de la semana en curso.
+      const dow=(t.getDay()+6)%7;
+      const lun=new Date(t); lun.setDate(t.getDate()-dow);      // lunes de ESTA semana
+      if(r==='lastweek') lun.setDate(lun.getDate()-7);          // lunes de la semana pasada
+      const sab=new Date(lun); sab.setDate(lun.getDate()+5);    // sábado (lunes+5)
+      d.setTime(lun.getTime()); t.setTime(sab.getTime());
     }
+    else if(r==='month'){d.setDate(d.getDate()-29);}
     fDesde.value=d.toISOString().slice(0,10); fHasta.value=t.toISOString().slice(0,10);
     this.loadMain();
   },
@@ -2170,12 +2174,15 @@ const App={
     const iso=d=>`${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`;
     const hoy=new Date(); hoy.setHours(0,0,0,0);
     if(tipo==='semana_ant'){
-      // Lunes a domingo de la semana anterior. getDay(): 0=Dom..6=Sáb.
-      const dow=(hoy.getDay()+6)%7;                 // 0=Lun..6=Dom de ESTA semana
+      // Semana PRODUCTIVA anterior = día productivo Lunes → Sábado de la semana
+      // pasada (la noche del domingo cae en día productivo lunes; la noche del
+      // viernes, fin de semana productiva, cae en día productivo sábado).
+      // getDay(): 0=Dom..6=Sáb.  dow: 0=Lun..6=Dom de ESTA semana.
+      const dow=(hoy.getDay()+6)%7;
       const lunEsta=new Date(hoy); lunEsta.setDate(hoy.getDate()-dow);
       const lunAnt=new Date(lunEsta); lunAnt.setDate(lunEsta.getDate()-7);
-      const domAnt=new Date(lunAnt); domAnt.setDate(lunAnt.getDate()+6);
-      return {desde:iso(lunAnt),hasta:iso(domAnt)};
+      const sabAnt=new Date(lunAnt); sabAnt.setDate(lunAnt.getDate()+5);
+      return {desde:iso(lunAnt),hasta:iso(sabAnt)};
     }
     if(tipo==='mes_curso'){
       // Día 1 del mes en curso hasta hoy.
