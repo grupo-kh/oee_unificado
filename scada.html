@@ -331,16 +331,19 @@ function tarjeta(m){
 // ───────── Menú SCADA: estado, contadores, densidad, zoom, filtros, orden ─────────
 const PREF_KEY='scada_prefs';
 const State=Object.assign(
-  {densidad:'normal',orden:'prod',zoom:100,fz:100,soloProblemas:false,filtroEstado:null,ocultas:[]},
+  {densidad:'normal',orden:'prod',zoom:100,fz:100,soloProblemas:false,filtroEstado:null,ocultas:[],verCerradas:false},
   JSON.parse(localStorage.getItem(PREF_KEY)||'{}'));
 function guardarPrefs(){localStorage.setItem(PREF_KEY,JSON.stringify(State));}
 
 function renderContadores(c){
   const defs=[['total','Máquinas',null],['produccion','Producción','#2e9e5b'],['preparacion','Preparación','#3b7fd2'],['parada','Paradas','#d23b3b'],['cerrada','Cerradas','#6b7280']];
   const est={total:null,produccion:'produccion',preparacion:'preparacion',parada:'parada',cerrada:'cerrada'};
+  // "Cerradas" NO filtra: es un toggle mostrar/ocultar (por defecto ocultas).
+  const activo=k=> k==='cerrada' ? State.verCerradas : State.filtroEstado===est[k];
   document.getElementById('msContadores').innerHTML=defs.map(([k,lbl,col])=>
-    `<span class="c ${State.filtroEstado===est[k]?'on':''}" data-est="${est[k]||''}"><b style="${col?'color:'+col:''}">${c[k]||0}</b>${lbl}</span>`).join('');
+    `<span class="c ${activo(k)?'on':''}" data-k="${k}" data-est="${est[k]||''}" title="${k==='cerrada'?'Mostrar/ocultar máquinas cerradas':'Filtrar por estado'}"><b style="${col?'color:'+col:''}">${c[k]||0}</b>${lbl}</span>`).join('');
   document.querySelectorAll('.ms-cont .c').forEach(el=>el.onclick=()=>{
+    if(el.dataset.k==='cerrada'){ State.verCerradas=!State.verCerradas; guardarPrefs(); aplicarMenu(); return; }
     const e=el.dataset.est||null; State.filtroEstado=(State.filtroEstado===e?null:e); guardarPrefs(); aplicarMenu();
   });
 }
@@ -419,6 +422,9 @@ function esProblema(m){ return m.estado_cat==='parada' || (m.turno_kpi.oee||0)<5
 function aplicarMenu(){
   let ms=(window._ultimoMural||[]).slice();
   ms=ms.filter(m=>!State.ocultas.includes(m.cod_maquina));
+  // Las cerradas se ocultan por defecto; el contador "Cerradas" las muestra/oculta.
+  // (Si se filtra explícitamente por 'cerrada', se muestran igualmente.)
+  if(!State.verCerradas && State.filtroEstado!=='cerrada') ms=ms.filter(m=>m.estado_cat!=='cerrada');
   if(State.filtroEstado) ms=ms.filter(m=>m.estado_cat===State.filtroEstado);
   if(State.soloProblemas) ms=ms.filter(esProblema);
   ms=ordenar(ms);
