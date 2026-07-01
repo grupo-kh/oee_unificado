@@ -213,7 +213,8 @@ function _motivosParos(string $fdesde, string $fhasta, array $turnos, array $cod
     $sql = "
         SELECT
             cp.Desc_paro AS motivo,
-            SUM(DATEDIFF(SECOND, hpp.Fecha_ini, hpp.Fecha_fin)) AS segundos
+            SUM(DATEDIFF(SECOND, hpp.Fecha_ini, hpp.Fecha_fin)) AS segundos,
+            MAX(cp.Id_TipoparoOEE) AS tipo_oee
         FROM his_prod_paro hpp
         INNER JOIN cfg_paro cp ON cp.Id_paro = hpp.Id_paro
         INNER JOIN his_prod hp ON hp.Id_his_prod = hpp.Id_his_prod
@@ -242,6 +243,7 @@ function _motivosParos(string $fdesde, string $fhasta, array $turnos, array $cod
             'minutos'  => round($seg / 60, 1),
             'pct'      => round($pct, 2),
             'pct_acum' => round(min($acum, 100), 2),
+            'tipo_oee' => (int)($r['tipo_oee'] ?? 0),
         ];
     }
     return $out;

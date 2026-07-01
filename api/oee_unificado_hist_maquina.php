@@ -208,6 +208,7 @@ try {
                    mq.Desc_maquina AS desc_maquina,
                    prod.Cod_producto  AS cod_referencia,
                    prod.Desc_producto AS referencia,
+                   ac.Desc_actividad  AS actividad,
                    hpp.Fecha_ini   AS fecha_ini,
                    hpp.Fecha_fin   AS fecha_fin,
                    DATEDIFF(SECOND, hpp.Fecha_ini, hpp.Fecha_fin) AS segundos
@@ -216,6 +217,7 @@ try {
             INNER JOIN his_prod    hp  ON hp.Id_his_prod = hpp.Id_his_prod
             INNER JOIN cfg_maquina mq  ON mq.Id_maquina  = hp.Id_maquina
             INNER JOIN cfg_turno   ct  ON ct.Id_turno    = hp.Id_turno
+            LEFT  JOIN cfg_actividad ac ON ac.Id_actividad = hp.Id_actividad
             LEFT  JOIN his_fase    fa  ON fa.Id_his_fase = hp.Id_his_fase
             LEFT  JOIN his_of      o   ON o.Id_his_of    = fa.Id_his_of
             LEFT  JOIN cfg_producto prod ON prod.Id_producto = o.Id_producto
@@ -249,6 +251,7 @@ try {
             'maquina'     => $nMaq,
             'motivo'      => $mot,
             'referencia'  => $ref,
+            'actividad'   => trim((string)($r['actividad'] ?? '')),
             'inicio'      => $ini,
             'fin'         => $fin,
             'segundos'    => $seg,
