@@ -340,8 +340,11 @@ function renderContadores(c){
   const est={total:null,produccion:'produccion',preparacion:'preparacion',parada:'parada',cerrada:'cerrada'};
   // "Cerradas" NO filtra: es un toggle mostrar/ocultar (por defecto ocultas).
   const activo=k=> k==='cerrada' ? State.verCerradas : State.filtroEstado===est[k];
-  document.getElementById('msContadores').innerHTML=defs.map(([k,lbl,col])=>
-    `<span class="c ${activo(k)?'on':''}" data-k="${k}" data-est="${est[k]||''}" title="${k==='cerrada'?'Mostrar/ocultar máquinas cerradas':'Filtrar por estado'}"><b style="${col?'color:'+col:''}">${c[k]||0}</b>${lbl}</span>`).join('');
+  document.getElementById('msContadores').innerHTML=defs.map(([k,lbl,col])=>{
+    // "Cerradas" lleva prefijo Ver/Ocultar según estén ocultas o visibles.
+    const texto = k==='cerrada' ? `${State.verCerradas?'Ocultar':'Ver'} ${lbl}` : lbl;
+    return `<span class="c ${activo(k)?'on':''}" data-k="${k}" data-est="${est[k]||''}" title="${k==='cerrada'?'Mostrar/ocultar máquinas cerradas':'Filtrar por estado'}"><b style="${col?'color:'+col:''}">${c[k]||0}</b>${texto}</span>`;
+  }).join('');
   document.querySelectorAll('.ms-cont .c').forEach(el=>el.onclick=()=>{
     if(el.dataset.k==='cerrada'){ State.verCerradas=!State.verCerradas; guardarPrefs(); aplicarMenu(); return; }
     const e=el.dataset.est||null; State.filtroEstado=(State.filtroEstado===e?null:e); guardarPrefs(); aplicarMenu();
@@ -432,6 +435,7 @@ function aplicarMenu(){
   document.getElementById('msProblemas').classList.toggle('on',State.soloProblemas);
   document.getElementById('msProbN').textContent=(window._ultimoMural||[]).filter(esProblema).length;
   document.getElementById('msOcN').textContent=State.ocultas.length;
+  if(window._contadores) renderContadores(window._contadores);  // refresca texto Ver/Ocultar Cerradas
   const mural=document.getElementById('mural');
   mural.className='dens-'+State.densidad;
   const render=State.densidad==='compacta'?tarjetaCompacta:tarjeta;
@@ -440,7 +444,7 @@ function aplicarMenu(){
 
 function pinta(data){
   window._ultimoMural = data.maquinas || [];
-  if(data.contadores) renderContadores(data.contadores);
+  if(data.contadores) window._contadores = data.contadores;
   aplicarMenu();
 }
 
