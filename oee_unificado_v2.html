@@ -712,6 +712,11 @@ const App={
             <span class="mt-val">${totalTxt}<small>${totalUnidad}</small></span>
           </span>
         </div>
+        <div class="mg-leyenda" style="display:flex;gap:16px;font-size:11px;margin:6px 0 0;padding-left:2px">
+          <span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#2d4d7a;margin-right:4px"></i>Disponibilidad</span>
+          <span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#8c181a;margin-right:4px"></i>Paro planificado</span>
+          <span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#c3cad3;margin-right:4px"></i>Cerrada</span>
+        </div>
         <div class="mg-body">
           <div class="chartbox tall"><canvas class="cv"></canvas></div>
           <div class="hint">Haz clic en un motivo para ver su desglose por ${esRef?'referencia':'máquina'} y su distribución horaria (se abre debajo).</div>
@@ -721,10 +726,17 @@ const App={
     let acc=0;
     const labels=motivos.map(m=>m.motivo);
     const vals=motivos.map(m=>m[vf]||0);
+    // Color por tipo de paro OEE: Disponibilidad=azul, Planificado=granate,
+    // CERRADA=gris claro (prevalece). tipo_oee: 1=Disp, 2=Planificado.
+    const colorMotivo=m=>{
+      if((m.motivo||'').trim().toUpperCase()==='CERRADA') return '#c3cad3';
+      return m.tipo_oee===2 ? '#8c181a' : '#2d4d7a';
+    };
+    const barColors=motivos.map(colorMotivo);
     const acum=motivos.map(m=>m.pct_acum!=null?m.pct_acum:(acc+=(m.pct||0)));
     this.chartDestroy(cv);
     new Chart(cv,{data:{labels,datasets:[
-      {type:'bar',label:this.motivoValLabel(),data:vals,backgroundColor:'#2d4d7a',yAxisID:'y',order:2,
+      {type:'bar',label:this.motivoValLabel(),data:vals,backgroundColor:barColors,yAxisID:'y',order:2,
         datalabels:{anchor:'end',align:'top',color:'#3a2426',formatter:v=>Math.round(v*10)/10}},
       {type:'line',label:'% acumulado',data:acum,borderColor:'#c45a2c',backgroundColor:'#c45a2c',yAxisID:'y1',order:1,tension:0,pointRadius:4,
         datalabels:{anchor:'end',align:'top',color:'#c45a2c',formatter:v=>Math.round(v)+'%'}}
@@ -1735,18 +1747,20 @@ const App={
       ev.forEach(e=>{(byMot[e.motivo]=byMot[e.motivo]||[]).push(e);});
       const motivos=Object.keys(byMot);
       const series=motivos.map(m=>({name:m,data:byMot[m].map(e=>({
-        x:e.maquina,y:[this.ts(e.inicio),this.ts(e.fin)],inicio:e.inicio,fin:e.fin,segundos:e.segundos}))}));
+        x:e.maquina,y:[this.ts(e.inicio),this.ts(e.fin)],inicio:e.inicio,fin:e.fin,
+        segundos:e.segundos,actividad:e.actividad||''}))}));
       const nMaq=new Set(ev.map(e=>e.maquina)).size;
       const h=Math.min(1500,Math.max(420,nMaq*48+140));
       wrap.innerHTML=`<div class="breadcrumb">Total horas de paro: <b>${(d.total_horas||0).toFixed(1)} h</b> · ${ev.length} paros · ${nMaq} máquinas${d.eventos_limitados?' (limitado a 5000)':''}</div><div class="apx"></div>`;
       this.apex(wrap.querySelector('.apx'),{
         chart:{type:'rangeBar',height:h,animations:{enabled:false},toolbar:{show:true,tools:{zoom:true,pan:true,reset:true,zoomin:true,zoomout:true,download:true}},zoom:{enabled:true,type:'x'}},
-        series, colors:motivos.map((m,i)=>PALETTE[i%PALETTE.length]),
+        series, colors:motivos.map((m,i)=> (m||'').trim().toUpperCase()==='CERRADA' ? '#c3cad3' : PALETTE[i%PALETTE.length]),
         plotOptions:{bar:{horizontal:true,barHeight:'80%',rangeBarGroupRows:true}},
         xaxis:{type:'datetime'}, dataLabels:{enabled:false}, legend:{position:'bottom'},
         tooltip:{custom:({seriesIndex,dataPointIndex,w})=>{
           const p=w.config.series[seriesIndex].data[dataPointIndex];
-          return `<div style="padding:8px;font-size:12px"><b>${w.config.series[seriesIndex].name}</b><br>${p.x}<br>${p.inicio} → ${p.fin}<br><b>${(p.segundos/60).toFixed(1)} min</b></div>`;
+          const act=p.actividad?`<br>Actividad: <b>${p.actividad}</b>`:'';
+          return `<div style="padding:8px;font-size:12px"><b>${w.config.series[seriesIndex].name}</b><br>${p.x}<br>${p.inicio} → ${p.fin}<br><b>${(p.segundos/60).toFixed(1)} min</b>${act}</div>`;
         }}
       });
     }catch(e){wrap.innerHTML=`<div class="error">${e.message}</div>`;}
@@ -2622,12 +2636,13 @@ const App={
       wrap.innerHTML=`<div class="breadcrumb">Total horas de paro: <b>${(d.total_horas||0).toFixed(1)} h</b> · ${ev.length} paros · ${nRef} referencias · ${motivos.length} motivos${d.eventos_limitados?' (limitado a 5000)':''}</div><div class="apx"></div>`;
       this.apex(wrap.querySelector('.apx'),{
         chart:{type:'rangeBar',height:h,animations:{enabled:false},toolbar:{show:true,tools:{zoom:true,pan:true,reset:true,zoomin:true,zoomout:true,download:true}},zoom:{enabled:true,type:'x'}},
-        series, colors:motivos.map((m,i)=>PALETTE[i%PALETTE.length]),
+        series, colors:motivos.map((m,i)=> (m||'').trim().toUpperCase()==='CERRADA' ? '#c3cad3' : PALETTE[i%PALETTE.length]),
         plotOptions:{bar:{horizontal:true,barHeight:'80%',rangeBarGroupRows:true}},
         xaxis:{type:'datetime'}, dataLabels:{enabled:false}, legend:{position:'bottom'},
         tooltip:{custom:({seriesIndex,dataPointIndex,w})=>{
           const p=w.config.series[seriesIndex].data[dataPointIndex];
-          return `<div style="padding:8px;font-size:12px"><b>${w.config.series[seriesIndex].name}</b><br>${p.x}<br>${p.inicio} → ${p.fin}<br><b>${(p.segundos/60).toFixed(1)} min</b></div>`;
+          const act=p.actividad?`<br>Actividad: <b>${p.actividad}</b>`:'';
+          return `<div style="padding:8px;font-size:12px"><b>${w.config.series[seriesIndex].name}</b><br>${p.x}<br>${p.inicio} → ${p.fin}<br><b>${(p.segundos/60).toFixed(1)} min</b>${act}</div>`;
         }}
       });
     }catch(e){wrap.innerHTML=`<div class="error">${e.message}</div>`;}
@@ -2655,7 +2670,7 @@ const App={
       wrap.innerHTML=`<div class="breadcrumb">Total horas de paro: <b>${totH.toFixed(1)} h</b> · ${ev.length} paros · ${motivos.length} motivos${d.eventos_limitados?' (datos limitados a 5000)':''}</div><div class="apx"></div>`;
       this.apex(wrap.querySelector('.apx'),{
         chart:{type:'rangeBar',height:h,animations:{enabled:false},toolbar:{show:true,tools:{zoom:true,pan:true,reset:true,zoomin:true,zoomout:true,download:true}},zoom:{enabled:true,type:'x'}},
-        series, colors:motivos.map((m,i)=>PALETTE[i%PALETTE.length]),
+        series, colors:motivos.map((m,i)=> (m||'').trim().toUpperCase()==='CERRADA' ? '#c3cad3' : PALETTE[i%PALETTE.length]),
         plotOptions:{bar:{horizontal:true,barHeight:'70%'}},
         xaxis:{type:'datetime'}, dataLabels:{enabled:false}, legend:{position:'bottom'},
         tooltip:{custom:({seriesIndex,dataPointIndex,w})=>{
