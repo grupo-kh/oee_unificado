@@ -61,8 +61,7 @@ class ScadaMural
             LEFT JOIN his_of      o    ON o.Cod_of      = cm.Rt_Cod_of
             LEFT JOIN cfg_producto prod ON prod.Id_producto = o.Id_producto
             WHERE cm.activo = 1
-              AND cm.Rt_Id_actividad >= 2
-              AND cm.Rt_Cod_of NOT IN ('', '--')
+              AND cm.Cod_maquina <> '--'
             ORDER BY cm.Cod_maquina";
         return fetchAll('mapex', $sql);
     }
@@ -145,6 +144,16 @@ class ScadaMural
         $kpiOf    = self::kpiOfTodas($ofsActivas);  // ["cod|of" => drc]
         $cero = self::calcDRC(0, 0, 0, 0, 0, 0);
 
+        // Categoría de paro (nivel Matriz2) desde PostgreSQL, clave por descripción
+        // de paro en mayúsculas. Si PostgreSQL falla, categorías vacías (no rompe).
+        $catParo = [];
+        try {
+            require_once __DIR__ . '/Db.php';
+            foreach (Db::pgFetchAll('SELECT cod_paro, tipo_paro_1 FROM cfg_paro_categoria') as $c) {
+                $catParo[strtoupper(trim((string)$c['cod_paro']))] = (string)$c['tipo_paro_1'];
+            }
+        } catch (\Throwable $e) { /* sin categorías */ }
+
         $out = [];
         foreach ($filas as $r) {
             $cod = trim((string)$r['Cod_maquina']);
@@ -163,11 +172,27 @@ class ScadaMural
             $planOf = (int)($r['plan_of'] ?? 0);
             $uh     = (float)$r['Rt_Rendimientonominal1'];
 
+            // Clasificación de estado para contadores/filtros del menú.
+            $idAct  = (int)$r['Rt_Id_actividad'];
+            $idParo = (int)$r['Rt_Id_paro'];
+            if     ($idAct === 1)                    $estadoCat = 'cerrada';
+            elseif ($idParo > 0)                     $estadoCat = 'parada';
+            elseif (in_array($idAct, [2, 20], true)) $estadoCat = 'produccion';
+            elseif (in_array($idAct, [3, 5],  true)) $estadoCat = 'preparacion';
+            else                                     $estadoCat = 'otra';
+
+            $motivoParo    = trim((string)$r['Rt_Desc_paro']);
+            $paroCategoria = ($idParo > 0) ? ($catParo[strtoupper($motivoParo)] ?? '') : '';
+            $segParoActual = self::segDesde($r['Rt_Hora_inicio_paro'], $ahora);
+
             $out[] = [
                 'cod_maquina'  => $cod,
                 'desc_maquina' => trim((string)$r['Desc_maquina']),
                 'estado'       => trim((string)$r['Rt_Desc_actividad']),
                 'id_actividad' => (int)$r['Rt_Id_actividad'],
+                'estado_cat'    => $estadoCat,
+                'paro_categoria'=> $paroCategoria,
+                'seg_paro'      => $segParoActual,
                 'of'           => $of,
                 // Referencia mostrada = código de artículo de Sage (cfg_producto.Cod_producto),
                 // obtenido vía la OF. Fallback a la descripción técnica si no hay código.
@@ -202,7 +227,10 @@ class ScadaMural
                 ],
             ];
         }
-        return ['ahora' => $ahora, 'maquinas' => $out];
+        // Contadores por estado para la barra de menú del SCADA.
+        $contadores = ['total' => count($out), 'produccion' => 0, 'preparacion' => 0, 'parada' => 0, 'cerrada' => 0];
+        foreach ($out as $m) { $k = $m['estado_cat']; if (isset($contadores[$k])) $contadores[$k]++; }
+        return ['ahora' => $ahora, 'maquinas' => $out, 'contadores' => $contadores];
     }
 
     // ───────── Modal de detalle por máquina (pestañas RESUMEN / PAROS / OFS) ─────────
