@@ -146,11 +146,20 @@
   .ms-orden-lbl{font-size:10px;color:var(--gris);font-weight:800;margin-right:4px}
   /* densidades */
   #mural{--fz:1}
-  #mural.dens-compacta{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
-  #mural.dens-comoda{grid-template-columns:repeat(auto-fill,minmax(440px,1fr))}
-  .tarjeta.compacta{gap:6px}
-  .tarjeta.compacta .c-ref,.tarjeta.compacta .c-est{font-size:12px}
-  .tarjeta.compacta .et{font-size:9px;color:var(--gris);font-weight:800;letter-spacing:.4px}
+  /* Compacta: cajas medianas (más grandes que antes) */
+  #mural.dens-compacta{grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+  .tarjeta.compacta{gap:8px;padding:16px 18px}
+  .tarjeta.compacta .nom{font-size:calc(24px * var(--fz))}
+  .tarjeta.compacta .c-ref,.tarjeta.compacta .c-est{font-size:14px}
+  .tarjeta.compacta .et{font-size:10px;color:var(--gris);font-weight:800;letter-spacing:.4px}
+  /* Cómoda: tarjeta completa MÁS grande y espaciada (se distingue de Normal) */
+  #mural.dens-comoda{grid-template-columns:repeat(auto-fill,minmax(460px,1fr));gap:26px}
+  #mural.dens-comoda .tarjeta{padding:20px 24px;gap:14px}
+  #mural.dens-comoda .nom{font-size:calc(26px * var(--fz))}
+  #mural.dens-comoda .oee-num{font-size:42px}
+  #mural.dens-comoda .seccion-tit{font-size:12px}
+  #mural.dens-comoda .drc .v{font-size:19px}
+  #mural.dens-comoda .num .v{font-size:22px}
   .tarjeta .nom{font-size:calc(20px * var(--fz))}
   .t-ocultar{margin-left:auto;background:none;border:none;color:var(--gris);cursor:pointer;font-size:14px;line-height:1}
 </style>
