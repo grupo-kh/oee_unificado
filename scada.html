@@ -382,7 +382,9 @@ function ordenar(arr){
   else if(o==='urgencia') A.sort((a,b)=>(cp[a.estado_cat]-cp[b.estado_cat])||(a.turno_kpi.oee-b.turno_kpi.oee));
   else if(o==='prep') A.sort((a,b)=>((a.estado_cat==='preparacion'?0:1)-(b.estado_cat==='preparacion'?0:1))||byCod(a,b));
   else if(o==='prod') A.sort((a,b)=>((a.estado_cat==='produccion'?0:1)-(b.estado_cat==='produccion'?0:1))||byCod(a,b));
-  else if(o==='restante') A.sort((a,b)=>parseMin(a.of_kpi.restante)-parseMin(b.of_kpi.restante));
+  // "Tiempo restante OF" ordena por la fecha FIN EST. exacta (minutos), más
+  // precisa que el restante redondeado a horas. Completada/— van al final.
+  else if(o==='restante') A.sort((a,b)=>parseFin(a.of_kpi.fin_est)-parseFin(b.of_kpi.fin_est));
   else if(o==='finest') A.sort((a,b)=>parseFin(a.of_kpi.fin_est)-parseFin(b.of_kpi.fin_est));
   else if(o==='tiempoparo') A.sort((a,b)=>(b.seg_paro||0)-(a.seg_paro||0));
   else if(o==='motivo') A.sort((a,b)=>{
