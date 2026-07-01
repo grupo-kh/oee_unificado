@@ -135,6 +135,12 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .hist-datebar .hdb-turnos{display:flex;gap:10px;align-items:center;padding-bottom:6px}
 .hist-datebar .hdb-chk{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:500;color:#374151;text-transform:none;cursor:pointer}
 .hist-datebar .hdb-chk input{cursor:pointer}
+/* Filtro rápido por actividad (chips) en el histograma */
+.hact-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.hact-chip{font-size:12px;font-weight:600;padding:6px 12px;border-radius:16px;cursor:pointer;
+  background:#fff;border:1px solid #d1d5db;color:#374151}
+.hact-chip:hover{border-color:#8c181a;color:#8c181a}
+.hact-chip.active{background:#8c181a;border-color:#8c181a;color:#fff}
 /* ── Matriz 2: una tabla · filas = máquina/referencia · cabecera de 3 niveles ──
    (Actividad → Categoría → Motivo). Las columnas de motivo se expanden/colapsan
    por categoría; el resumen de categoría está siempre visible. ── */
@@ -1743,26 +1749,45 @@ const App={
       const d=await this.get('oee_unificado_hist_maquina.php',this.histParams({},desde,hasta,turnos));
       const ev=d.eventos||[];
       if(!ev.length){wrap.innerHTML='<div class="empty">Sin paros en el rango</div>';return;}
-      const byMot={};
-      ev.forEach(e=>{(byMot[e.motivo]=byMot[e.motivo]||[]).push(e);});
-      const motivos=Object.keys(byMot);
-      const series=motivos.map(m=>({name:m,data:byMot[m].map(e=>({
-        x:e.maquina,y:[this.ts(e.inicio),this.ts(e.fin)],inicio:e.inicio,fin:e.fin,
-        segundos:e.segundos,actividad:e.actividad||''}))}));
-      const nMaq=new Set(ev.map(e=>e.maquina)).size;
-      const h=Math.min(1500,Math.max(420,nMaq*48+140));
-      wrap.innerHTML=`<div class="breadcrumb">Total horas de paro: <b>${(d.total_horas||0).toFixed(1)} h</b> · ${ev.length} paros · ${nMaq} máquinas${d.eventos_limitados?' (limitado a 5000)':''}</div><div class="apx"></div>`;
-      this.apex(wrap.querySelector('.apx'),{
-        chart:{type:'rangeBar',height:h,animations:{enabled:false},toolbar:{show:true,tools:{zoom:true,pan:true,reset:true,zoomin:true,zoomout:true,download:true}},zoom:{enabled:true,type:'x'}},
-        series, colors:motivos.map((m,i)=> (m||'').trim().toUpperCase()==='CERRADA' ? '#c3cad3' : PALETTE[i%PALETTE.length]),
-        plotOptions:{bar:{horizontal:true,barHeight:'80%',rangeBarGroupRows:true}},
-        xaxis:{type:'datetime'}, dataLabels:{enabled:false}, legend:{position:'bottom'},
-        tooltip:{custom:({seriesIndex,dataPointIndex,w})=>{
-          const p=w.config.series[seriesIndex].data[dataPointIndex];
-          const act=p.actividad?`<br>Actividad: <b>${p.actividad}</b>`:'';
-          return `<div style="padding:8px;font-size:12px"><b>${w.config.series[seriesIndex].name}</b><br>${p.x}<br>${p.inicio} → ${p.fin}<br><b>${(p.segundos/60).toFixed(1)} min</b>${act}</div>`;
-        }}
+      // Filtro rápido por ACTIVIDAD (en cliente, sobre los eventos ya cargados).
+      const acts=[...new Set(ev.map(e=>(e.actividad||'').trim()).filter(Boolean))].sort();
+      const chips=['<button class="hact-chip active" data-act="">Todas</button>']
+        .concat(acts.map(a=>`<button class="hact-chip" data-act="${a}">${a}</button>`)).join('');
+      wrap.innerHTML=`<div class="hact-bar">${chips}</div>`
+        +`<div class="hist-total"></div><div class="apx"></div>`;
+      const self=this;
+      const pintar=(actSel)=>{
+        const evF = actSel ? ev.filter(e=>(e.actividad||'').trim()===actSel) : ev;
+        const box=wrap.querySelector('.apx'), tot=wrap.querySelector('.hist-total');
+        if(!evF.length){ box.innerHTML='<div class="empty">Sin paros para esta actividad</div>'; tot.innerHTML=''; return; }
+        const byMot={};
+        evF.forEach(e=>{(byMot[e.motivo]=byMot[e.motivo]||[]).push(e);});
+        const motivos=Object.keys(byMot);
+        const series=motivos.map(m=>({name:m,data:byMot[m].map(e=>({
+          x:e.maquina,y:[self.ts(e.inicio),self.ts(e.fin)],inicio:e.inicio,fin:e.fin,
+          segundos:e.segundos,actividad:e.actividad||''}))}));
+        const nMaq=new Set(evF.map(e=>e.maquina)).size;
+        const totH=evF.reduce((a,e)=>a+(e.segundos||0),0)/3600;
+        const h=Math.min(1500,Math.max(420,nMaq*48+140));
+        tot.innerHTML=`<div class="breadcrumb">Total horas de paro: <b>${totH.toFixed(1)} h</b> · ${evF.length} paros · ${nMaq} máquinas${actSel?` · actividad: <b>${actSel}</b>`:''}${d.eventos_limitados?' (limitado a 5000)':''}</div>`;
+        box.innerHTML='';
+        self.apex(box,{
+          chart:{type:'rangeBar',height:h,animations:{enabled:false},toolbar:{show:true,tools:{zoom:true,pan:true,reset:true,zoomin:true,zoomout:true,download:true}},zoom:{enabled:true,type:'x'}},
+          series, colors:motivos.map((m,i)=> (m||'').trim().toUpperCase()==='CERRADA' ? '#c3cad3' : PALETTE[i%PALETTE.length]),
+          plotOptions:{bar:{horizontal:true,barHeight:'80%',rangeBarGroupRows:true}},
+          xaxis:{type:'datetime'}, dataLabels:{enabled:false}, legend:{position:'bottom'},
+          tooltip:{custom:({seriesIndex,dataPointIndex,w})=>{
+            const p=w.config.series[seriesIndex].data[dataPointIndex];
+            const act=p.actividad?`<br>Actividad: <b>${p.actividad}</b>`:'';
+            return `<div style="padding:8px;font-size:12px"><b>${w.config.series[seriesIndex].name}</b><br>${p.x}<br>${p.inicio} → ${p.fin}<br><b>${(p.segundos/60).toFixed(1)} min</b>${act}</div>`;
+          }}
+        });
+      };
+      wrap.querySelectorAll('.hact-chip').forEach(b=>b.onclick=()=>{
+        wrap.querySelectorAll('.hact-chip').forEach(x=>x.classList.remove('active'));
+        b.classList.add('active'); pintar(b.dataset.act);
       });
+      pintar('');
     }catch(e){wrap.innerHTML=`<div class="error">${e.message}</div>`;}
   },
 
