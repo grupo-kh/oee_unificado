@@ -67,23 +67,45 @@ class ScadaMural
     }
 
     /**
-     * KPI D/R/C/OEE de TURNO para todas las máquinas en UNA consulta.
-     * F_his_ct del día de hoy agrupado por WorkGroup. Devuelve
-     * [cod_maquina => calcDRC(...)]. (Antes se hacía 1 consulta por máquina, lo
-     * que disparaba 16+ llamadas a F_his_ct y colgaba el endpoint.)
+     * Turno en curso según la hora del servidor MAPEX y las franjas predefinidas
+     * de la planta KH (M 06:00-14:15, T 14:15-22:30, N 22:30-06:00). Devuelve
+     * ['cod'=>'M|T|N', 'dia'=>'YYYY-MM-DD'] donde 'dia' es el día productivo del
+     * turno (para la noche antes de 06:00 el día productivo es el de hoy, aunque
+     * la franja arrancara ayer 22:30 — F_his_ct usa Dia_productivo y lo resuelve).
+     */
+    public static function turnoActual(): array
+    {
+        $now  = fetchAll('mapex', "SELECT CONVERT(varchar, GETDATE(), 120) AS ahora")[0]['ahora'];
+        $hhmm = substr($now, 11, 5);
+        $hoy  = substr($now, 0, 10);
+        if ($hhmm >= '06:00' && $hhmm < '14:15') return ['cod' => 'M', 'dia' => $hoy];
+        if ($hhmm >= '14:15' && $hhmm < '22:30') return ['cod' => 'T', 'dia' => $hoy];
+        // Noche (22:30-06:00): pertenece al día productivo de hoy. Si es de
+        // madrugada (< 06:00) también es la noche del día productivo de hoy.
+        return ['cod' => 'N', 'dia' => $hoy];
+    }
+
+    /**
+     * KPI D/R/C/OEE del TURNO EN CURSO para todas las máquinas en UNA consulta.
+     * Usa F_his_ct con granularidad 'TURNO' filtrada por el turno actual (franjas
+     * predefinidas), para ser coherente con oee_unificado y con MAPEX (antes se
+     * usaba 'DAY' y mostraba el día completo, no el turno). Devuelve
+     * [cod_maquina => calcDRC(...)].
      */
     public static function kpiTurnoTodas(): array
     {
-        $hoy = date('Y-m-d');
+        $t   = self::turnoActual();
+        $dia = $t['dia'];
         $sql = "
             SELECT oee.WorkGroup AS cod_maquina,
                    SUM(oee.M) AS M, SUM(oee.M_OKNOK_TEO) AS M_OKNOK_TEO,
                    SUM(oee.M_OK_TEO) AS M_OK_TEO, SUM(oee.PPERF) AS PPERF,
                    SUM(oee.PCALIDAD) AS PCALIDAD, SUM(oee.PNP) AS PNP
-            FROM F_his_ct('WORKCENTER','DAY','TURNOS, WO, PRODUCTOS',
+            FROM F_his_ct('WORKCENTER','TURNO','TURNOS, WO, PRODUCTOS',
                           ? + ' 00:00:00', ? + ' 23:59:59', 16) oee
+            WHERE oee.Cod_turno = ?
             GROUP BY oee.WorkGroup";
-        return self::indexarDRC(fetchAll('mapex', $sql, [$hoy, $hoy]), 'cod_maquina');
+        return self::indexarDRC(fetchAll('mapex', $sql, [$dia, $dia, $t['cod']]), 'cod_maquina');
     }
 
     /**
