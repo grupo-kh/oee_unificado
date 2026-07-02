@@ -59,6 +59,12 @@ try {
     // excl: máquinas (cod_maquina) excluidas del análisis (filtro global)
     $excl = getListParam('excl');
 
+    // Filtro por horas: si está activo, las 4 métricas se recalculan desde tablas
+    // base (aproximado pero comparable entre franjas); si no, F_his_ct por día.
+    $horaDesde = (string) getParam('hora_desde', '');
+    $horaHasta = (string) getParam('hora_hasta', '');
+    $filtroHoras = ($horaDesde !== '' && $horaHasta !== '' && $horaDesde !== $horaHasta);
+
     // ───── WHERE base ─────
     $where  = [
         "CAST(oee.TimePeriod AS DATE) BETWEEN ? AND ?",
@@ -97,9 +103,16 @@ try {
         GROUP BY oee.WorkGroup, mq.Desc_maquina
         HAVING SUM(oee.M) + SUM(oee.PNP) > 0
     ";
-    // Los dos primeros params del F_his_ct son fdesde/fhasta también
-    $allParams = array_merge([$fdesde, $fhasta], $params);
-    $rows = fetchAll('mapex', $sql, $allParams);
+    if ($filtroHoras) {
+        require_once __DIR__ . '/../lib/OeeHorario.php';
+        // Recálculo por franja horaria; devuelve las mismas columnas que F_his_ct,
+        // así el resto del endpoint (global/secciones/tabla) no cambia.
+        $rows = OeeHorario::magnitudesPorClave($fdesde, $fhasta, $horaDesde, $horaHasta, $turnos, $excl, 'maquina');
+    } else {
+        // Los dos primeros params del F_his_ct son fdesde/fhasta también
+        $allParams = array_merge([$fdesde, $fhasta], $params);
+        $rows = fetchAll('mapex', $sql, $allParams);
+    }
 
     $globalAcc = ['M'=>0,'MT'=>0,'MOT'=>0,'MOKT'=>0,'PP'=>0,'PC'=>0,'PNP'=>0,'maquinas'=>0];
     $secAcc = [];
@@ -288,6 +301,8 @@ try {
     jsonOk([
         'fecha_desde' => $fdesde,
         'fecha_hasta' => $fhasta,
+        'hora_desde'  => $filtroHoras ? $horaDesde : null,
+        'hora_hasta'  => $filtroHoras ? $horaHasta : null,
         'turnos'      => $turnos,
         'global'      => $global,
         'secciones'   => $secciones,
