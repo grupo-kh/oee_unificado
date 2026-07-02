@@ -632,6 +632,9 @@ const App={
   async loadMain(){
     machBody.innerHTML='<div class="loading"><div class="spinner"></div>Cargando…</div>';
     panels.innerHTML='';
+    // Al cambiar de filtro o de máquina, cerrar cualquier módulo abierto de una
+    // consulta anterior (popups a pantalla completa, popups de OF/motivo, modales).
+    document.querySelectorAll('.fullpop, .of-pop, #ofModal, #motTmpModal').forEach(el=>el.remove());
     try{
       const d=await this.get('oee_unificado.php',this.common({seccion:seccionCSV()}));
       State.data=d; State.secciones=d.secciones||[];
@@ -1410,6 +1413,10 @@ const App={
 
   /* ---------- selector de máquina ---------- */
   machineSelector(cod,name){
+    // Al elegir una máquina, cerrar módulos/paneles de una consulta anterior
+    // (de otra máquina) para no mezclar análisis.
+    panels.innerHTML='';
+    document.querySelectorAll('.fullpop, .of-pop, #ofModal, #motTmpModal, #artModal').forEach(el=>el.remove());
     const ov=this.push('Máquina '+name+' · ¿qué quieres analizar?',seccionLabel()+' · '+this.metricLabel(State.metrica),`
       <div class="selgrid">
         <div class="selcard" data-a="evo"><div class="ic">📈</div><div class="t">Evolución</div><div class="d">D · R · C · OEE en el tiempo</div></div>
@@ -1740,42 +1747,27 @@ const App={
       <label class="hdb-l">Desde<input type="date" class="hfD" value="${d0}"></label>
       <label class="hdb-l">Hasta<input type="date" class="hfH" value="${h0}"></label>
       <span class="hdb-l" style="gap:2px">Turnos<span class="hdb-turnos">${chks}</span></span>
-      <label class="hdb-chk" style="align-self:center"><input type="checkbox" class="hfHoraChk"> Filtrar por horas</label>
-      <span class="hfHoraCampos" style="display:none;align-items:flex-end;gap:8px">
-        <label class="hdb-l">Hora desde<input type="time" class="hfHoraD" value="06:00"></label>
-        <label class="hdb-l">Hora hasta<input type="time" class="hfHoraH" value="14:00"></label>
-      </span>
       <button class="btn btn-pri hfGo">Aplicar</button>
       <button class="btn hfReset" title="Volver al rango y turnos del filtro principal">↺ Rango del filtro</button>
-      <span class="hdb-hint">Acota rango, turnos y franja horaria para leer mejor el cronograma</span>
+      <span class="hdb-hint">Acota rango y turnos para leer mejor el cronograma</span>
     </div>`;
   },
   histWire(el,render){
     const D=el.querySelector('.hfD'),H=el.querySelector('.hfH'),G=el.querySelector('.hfGo'),R=el.querySelector('.hfReset');
-    const chk=el.querySelector('.hfHoraChk'),campos=el.querySelector('.hfHoraCampos');
-    const hD=el.querySelector('.hfHoraD'),hH=el.querySelector('.hfHoraH');
     const tsel=()=>[...el.querySelectorAll('.hfT:checked')].map(c=>c.value);
     const go=()=>{ if(D.value&&H.value) render(D.value,H.value,tsel()); };
     G.onclick=go; D.onchange=go; H.onchange=go;
     [...el.querySelectorAll('.hfT')].forEach(c=>c.onchange=go);
-    chk.onchange=()=>{ campos.style.display=chk.checked?'inline-flex':'none'; go(); };
-    hD.onchange=go; hH.onchange=go;
-    R.onclick=()=>{ D.value=fDesde.value; H.value=fHasta.value; el.querySelectorAll('.hfT').forEach(c=>c.checked=true);
-      chk.checked=false; campos.style.display='none'; go(); };
+    R.onclick=()=>{ D.value=fDesde.value; H.value=fHasta.value; el.querySelectorAll('.hfT').forEach(c=>c.checked=true); go(); };
   },
   // URLSearchParams para el histograma con override de fechas y turnos del popup.
   histParams(extra,desde,hasta,turnos){
     const p=this.common(Object.assign({fecha_desde:desde,fecha_hasta:hasta},extra));
     p.delete('turnos');
     if(turnos&&turnos.length&&turnos.length<3) p.set('turnos',turnos.join(','));
-    // Filtro horario: si el check 'Filtrar por horas' de la barra está activo,
-    // añadir hora_desde/hora_hasta (el endpoint hist_maquina ya los soporta).
-    const bar=document.querySelector('.hist-datebar');
-    const chk=bar&&bar.querySelector('.hfHoraChk');
-    if(chk&&chk.checked){
-      const hd=bar.querySelector('.hfHoraD').value, hh=bar.querySelector('.hfHoraH').value;
-      if(hd&&hh){ p.set('hora_desde',hd); p.set('hora_hasta',hh); }
-    }
+    // El histograma no usa el filtro por horas del menú principal (tiene su
+    // propio cronograma temporal); descartar hora_desde/hora_hasta si vinieran.
+    p.delete('hora_desde'); p.delete('hora_hasta');
     return p;
   },
   async openHistograma(){
