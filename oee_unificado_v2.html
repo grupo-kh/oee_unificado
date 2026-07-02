@@ -413,6 +413,16 @@ tbody tr:hover{background:#f9fafb}
     <div class="filters">
       <div class="fg"><label>Desde</label><input type="date" id="fDesde"></div>
       <div class="fg"><label>Hasta</label><input type="date" id="fHasta"></div>
+      <div class="fg"><label>Horario</label>
+        <div class="secc-row">
+          <label class="chk"><input type="checkbox" id="chkHoras"> Filtrar por horas</label>
+          <span id="horasCampos" style="display:none;gap:6px;align-items:center">
+            <input type="time" id="hDesde" value="06:00">
+            <input type="time" id="hHasta" value="14:00">
+          </span>
+        </div>
+        <small style="font-size:10px;color:#9ca3af">Aplica a los paros; el OEE se calcula por día</small>
+      </div>
       <div class="fg"><label>Sección</label>
         <div class="secc-row" id="fSeccion">
           <label class="chk"><input type="checkbox" class="secc" value="VARILLAS" checked> Varillas</label>
@@ -542,6 +552,12 @@ const App={
       this.loadMain();
     });
     document.querySelectorAll('.turno').forEach(c=>c.onchange=()=>this.loadMain());
+    // Filtro por horas: check muestra/oculta los inputs y recarga.
+    const chkH=document.getElementById('chkHoras');
+    if(chkH){
+      chkH.onchange=()=>{ document.getElementById('horasCampos').style.display=chkH.checked?'inline-flex':'none'; this.loadMain(); };
+      ['hDesde','hHasta'].forEach(id=>{ const el=document.getElementById(id); if(el) el.onchange=()=>{ if(chkH.checked) this.loadMain(); }; });
+    }
     document.querySelectorAll('.quick button').forEach(b=>b.onclick=()=>this.quickRange(b.dataset.r,b));
     metricSeg.querySelectorAll('button').forEach(b=>b.onclick=()=>{
       metricSeg.querySelectorAll('button').forEach(x=>x.classList.remove('active'));
@@ -597,6 +613,12 @@ const App={
     p.set('fecha_desde',fDesde.value); p.set('fecha_hasta',fHasta.value);
     const tu=this.turnos(); if(tu.length&&tu.length<3)p.set('turnos',tu.join(','));
     if(State.excl.size)p.set('excl',[...State.excl].join(','));
+    // Filtro por horas: sólo si el check está activo y ambas horas presentes.
+    const _ch=document.getElementById('chkHoras');
+    if(_ch && _ch.checked){
+      const hd=document.getElementById('hDesde').value, hh=document.getElementById('hHasta').value;
+      if(hd && hh){ p.set('hora_desde',hd); p.set('hora_hasta',hh); }
+    }
     for(const k in extra) if(extra[k]!=null&&extra[k]!=='') p.set(k,extra[k]);
     return p;
   },
@@ -620,6 +642,8 @@ const App={
   },
   renderInfo(d){
     iRango.textContent=`${d.fecha_desde} a ${d.fecha_hasta}`;
+    const _chkH=document.getElementById('chkHoras');
+    if(_chkH && _chkH.checked){ iRango.textContent += ` · ${document.getElementById('hDesde').value}–${document.getElementById('hHasta').value}`; }
     iSeccion.textContent=seccionLabel();
     iTurnos.textContent=Array.isArray(d.turnos)&&d.turnos.length?d.turnos.join(', '):'M, T, N';
     iOfs.textContent=(d.global&&d.global.num_ofs)??'—';
