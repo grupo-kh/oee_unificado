@@ -19,6 +19,8 @@ h1{font-size:22px;color:#111827;margin:0}
 .filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
 .fg{display:flex;flex-direction:column;position:relative}
 label{font-size:11px;font-weight:600;color:#6b7280;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px}
+.fg>label{color:#8c181a}
+input[type=checkbox]{accent-color:#8c181a}
 input[type=date],select,.btn{padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;background:#fff}
 input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow:0 0 0 2px rgba(163,20,22,.15)}
 .turno-row{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
@@ -50,7 +52,7 @@ input[type=date]:focus,select:focus{outline:none;border-color:#A31416;box-shadow
 .excl-clear{font-size:12px;color:#6b7280;background:none;border:none;cursor:pointer;text-decoration:underline}
 .infobar{background:#fff;padding:14px 18px;border-radius:10px;margin-bottom:16px;display:flex;gap:22px;flex-wrap:wrap;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .info{display:flex;align-items:center;gap:7px}
-.info .l{font-size:11px;color:#9ca3af;text-transform:uppercase;font-weight:600}
+.info .l{font-size:11px;color:#8c181a;text-transform:uppercase;font-weight:600}
 .info .v{font-size:14px;font-weight:700;color:#111827}
 .tag{background:#dbeafe;color:#1e40af;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700}
 .actions{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
@@ -438,7 +440,7 @@ tbody tr:hover{background:#f9fafb}
       </div>
     </div>
     <div class="turno-row">
-      <span style="font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase">Turnos:</span>
+      <span style="font-size:11px;font-weight:600;color:#8c181a;text-transform:uppercase">Turnos:</span>
       <label class="chk"><input type="checkbox" class="turno" value="M" checked> Mañana</label>
       <label class="chk"><input type="checkbox" class="turno" value="T" checked> Tarde</label>
       <label class="chk"><input type="checkbox" class="turno" value="N" checked> Noche</label>
