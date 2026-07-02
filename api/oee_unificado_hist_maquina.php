@@ -118,8 +118,9 @@ try {
     // turnos a su día productivo (el turno de noche del 02/06 puede acabar
     // a las 06:00 del 03/06 y aún así pertenecer al "día productivo" 02/06),
     // y eso hacía que el cronograma mostrase fechas/horas fuera del filtro.
+    // NOTA: se INCLUYE CERRADA (Cod_paro=11) en el histograma para poder ver los
+    // intervalos en que la máquina estuvo cerrada (se pintan en gris en el front).
     $where = [
-        "cp.Cod_paro <> 11",
         "hpp.Fecha_fin IS NOT NULL",
     ];
     $params = [];
