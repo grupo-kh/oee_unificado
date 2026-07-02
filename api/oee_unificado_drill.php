@@ -266,6 +266,15 @@ function _motivosParos(string $fdesde, string $fhasta, array $turnos, array $cod
  */
 function _refsRendimiento(string $fdesde, string $fhasta, array $turnos, array $secciones, bool $todasSec): array
 {
+    // Filtro horario: recálculo por franja (por producto+máquina) desde tablas base.
+    $hDesde = (string) getParam('hora_desde', '');
+    $hHasta = (string) getParam('hora_hasta', '');
+    if ($hDesde !== '' && $hHasta !== '' && $hDesde !== $hHasta) {
+        require_once __DIR__ . '/../lib/OeeHorario.php';
+        $rows = OeeHorario::magnitudesPorClave($fdesde, $fhasta, $hDesde, $hHasta, $turnos, [], 'maquina_producto');
+        return _refsRendimientoConsolidar($rows, $secciones, $todasSec);
+    }
+
     $where = [
         "CAST(oee.TimePeriod AS DATE) BETWEEN ? AND ?",
         "oee.WorkGroup NOT IN ('Improductivos','AUX000','AUXI1','SOLD4','SOLD5')",
@@ -302,8 +311,16 @@ function _refsRendimiento(string $fdesde, string $fhasta, array $turnos, array $
         HAVING SUM(oee.M) > 0
     ";
     $rows = fetchAll('mapex', $sql, array_merge([$fdesde, $fhasta], $params));
+    return _refsRendimientoConsolidar($rows, $secciones, $todasSec);
+}
 
-    // Consolidar por referencia, sumando solo máquinas de las secciones pedidas.
+/**
+ * Consolida filas (F_his_ct o recálculo horario) por referencia, sumando solo las
+ * máquinas de las secciones pedidas, y devuelve el rendimiento por referencia.
+ * Usado por _refsRendimiento en ambas ramas (día / franja horaria).
+ */
+function _refsRendimientoConsolidar(array $rows, array $secciones, bool $todasSec): array
+{
     $acc = [];
     foreach ($rows as $r) {
         if (!$todasSec && !in_array(_seccion($r['maquina']), $secciones, true)) continue;
@@ -484,6 +501,28 @@ function _motivosRendimiento(string $fdesde, string $fhasta, array $turnos, arra
 {
     if (empty($codMaqs)) return [];
 
+    // Filtro horario: pérdida de rendimiento por producto desde el recálculo por franja.
+    $hDesde = (string) getParam('hora_desde', '');
+    $hHasta = (string) getParam('hora_hasta', '');
+    if ($hDesde !== '' && $hHasta !== '' && $hDesde !== $hHasta) {
+        require_once __DIR__ . '/../lib/OeeHorario.php';
+        $mags = OeeHorario::magnitudesPorClave($fdesde, $fhasta, $hDesde, $hHasta, $turnos, [], 'maquina_producto');
+        // Filtrar por máquina(s) pedidas y agregar pérdida (M − M_OKNOK_TEO) por producto.
+        $accP = [];
+        foreach ($mags as $r) {
+            $cm = $r['cod_maquina'];
+            $enFiltro = ($codMaq && in_array($codMaq, $codMaqs, true)) ? ($cm === $codMaq) : in_array($cm, $codMaqs, true);
+            if (!$enFiltro) continue;
+            $ref = (string)$r['cod_referencia'];
+            if ($ref === '' || $ref === '--') continue;
+            $perd = max(0, (float)$r['M'] - (float)$r['M_OKNOK_TEO']);
+            if (!isset($accP[$ref])) $accP[$ref] = ['motivo'=>(string)($r['referencia'] ?: $ref), 'perdida_seg'=>0];
+            $accP[$ref]['perdida_seg'] += $perd;
+        }
+        $rows = [];
+        foreach ($accP as $ref => $v) if ($v['perdida_seg'] > 0) $rows[] = ['cod_articulo'=>$ref, 'motivo'=>$v['motivo'], 'perdida_seg'=>$v['perdida_seg']];
+        usort($rows, fn($a,$b)=>$b['perdida_seg'] <=> $a['perdida_seg']);
+    } else {
     $where = [
         "CAST(oee.TimePeriod AS DATE) BETWEEN ? AND ?",
         "oee.WorkGroup NOT IN ('Improductivos','AUX000','AUXI1','SOLD4','SOLD5')",
@@ -522,6 +561,7 @@ function _motivosRendimiento(string $fdesde, string $fhasta, array $turnos, arra
     ";
     $allParams = array_merge([$fdesde, $fhasta], $params);
     $rows = fetchAll('mapex', $sql, $allParams);
+    }
 
     $totSeg = 0;
     foreach ($rows as $r) $totSeg += (float)$r['perdida_seg'];
