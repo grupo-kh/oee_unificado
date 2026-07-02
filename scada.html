@@ -51,8 +51,11 @@
   .banda-paro{display:flex;align-items:center;gap:10px;background:var(--ambar-bg);
        border-radius:7px;padding:7px 10px;font-size:13px;font-weight:700}
   .banda-paro .tag{background:#fff;border:1px solid var(--ambar);color:var(--ambar);
-       font-size:10px;padding:2px 7px;border-radius:5px}
-  .banda-paro .t{margin-left:auto;color:var(--ambar)}
+       font-size:10px;padding:2px 7px;border-radius:5px;flex:none;align-self:flex-start;margin-top:2px}
+  .banda-paro .bp-info{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .banda-paro .bp-cat{font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;opacity:.85}
+  .banda-paro .bp-motivo{font-size:15px;font-weight:800;color:#1f2430;line-height:1.15}
+  .banda-paro .t{margin-left:auto;color:var(--ambar);flex:none;align-self:flex-start;margin-top:2px}
   hr{border:none;border-top:1px solid var(--linea);margin:2px 0}
   .seccion-tit{font-size:11px;color:var(--gris);font-weight:800;letter-spacing:.5px}
   /* OEE grande */
@@ -162,9 +165,12 @@
   .tarjeta.compacta .nom{font-size:calc(24px * var(--fz))}
   .tarjeta.compacta .c-ref,.tarjeta.compacta .c-est{font-size:14px}
   .tarjeta.compacta .et{font-size:10px;color:var(--gris);font-weight:800;letter-spacing:.4px}
-  .tarjeta.compacta .c-paro{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
+  .tarjeta.compacta .c-paro{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;
        border-radius:6px;padding:6px 8px;margin-top:2px}
-  .tarjeta.compacta .c-paro-t{margin-left:auto;font-weight:700;color:var(--gris)}
+  .tarjeta.compacta .c-paro-info{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .tarjeta.compacta .c-paro-cat{font-size:10px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;opacity:.85}
+  .tarjeta.compacta .c-paro-motivo{font-size:14px;font-weight:800;color:#1f2430;line-height:1.15}
+  .tarjeta.compacta .c-paro-t{margin-left:auto;font-weight:700;color:var(--gris);flex:none;align-self:flex-start;margin-top:2px}
   /* Cómoda: tarjeta completa MÁS grande y espaciada (se distingue de Normal) */
   #mural.dens-comoda{grid-template-columns:repeat(auto-fill,minmax(460px,1fr));gap:26px}
   #mural.dens-comoda .tarjeta{padding:20px 24px;gap:14px}
@@ -288,11 +294,14 @@ function tarjeta(m){
   const bandaParo = enParo ? `
     <div class="banda-paro" style="background:${cCol}22;border-left:4px solid ${cCol}">
       <span class="tag" style="border-color:${cCol};color:${cCol}">EN PARO</span>
-      ${m.paro_categoria?`<b style="color:${cCol}">${m.paro_categoria}</b> · `:''}${m.paro.motivo}
+      <span class="bp-info">
+        ${m.paro_categoria?`<span class="bp-cat" style="color:${cCol}">${m.paro_categoria}</span>`:''}
+        <span class="bp-motivo">${m.paro.motivo}</span>
+      </span>
       <span class="t">${dur(m.paro.seg)}</span></div>` : '';
-  // Máquina parada: fondo con tinte corporativo casi translúcido (rgba #8c181a al 11%),
+  // Máquina parada: fondo con tinte corporativo casi translúcido (rgba #8c181a al 9%),
   // se aprecia el matiz corporativo distinguiendo las paradas, sin perder legibilidad.
-  const bgParada = m.estado_cat==='parada' ? 'background:rgba(140,24,26,.11);' : '';
+  const bgParada = m.estado_cat==='parada' ? 'background:rgba(140,24,26,.09);' : '';
   return `
   <div class="tarjeta" data-cod="${m.cod_maquina}" style="cursor:pointer;${bgParada}">
     <div class="cab">
@@ -418,18 +427,23 @@ function tarjetaCompacta(m){
   const cCol = CAT_PARO_COL[m.paro_categoria]||'#d99000';
   // Jerarquía Matriz2 (3 niveles): Actividad · Categoría · Motivo.
   // Si actividad y categoría coinciden en texto, se muestra una sola vez.
-  let niveles='';
+  // Contexto (Actividad · Categoría) separado del MOTIVO, que se destaca.
+  let contexto='';
   if(enParo){
-    const arr=[m.estado, m.paro_categoria, m.paro.motivo].filter(Boolean);
-    const vistos=new Set(); const uniq=arr.filter(x=>{const k=x.toUpperCase();if(vistos.has(k))return false;vistos.add(k);return true;});
-    niveles=uniq.join(' · ');
+    const arr=[m.estado, m.paro_categoria].filter(Boolean);
+    const vistos=new Set([m.paro.motivo.toUpperCase()]);
+    const uniq=arr.filter(x=>{const k=x.toUpperCase();if(vistos.has(k))return false;vistos.add(k);return true;});
+    contexto=uniq.join(' · ');
   }
   const motivoParo = enParo ? `
     <div class="c-paro" style="background:${cCol}22;border-left:4px solid ${cCol}">
-      <span style="color:${cCol};font-weight:700">${niveles}</span>
+      <span class="c-paro-info">
+        ${contexto?`<span class="c-paro-cat" style="color:${cCol}">${contexto}</span>`:''}
+        <span class="c-paro-motivo">${m.paro.motivo}</span>
+      </span>
       <span class="c-paro-t">${dur(m.paro.seg)}</span>
     </div>` : '';
-  const bgParada = m.estado_cat==='parada' ? 'background:rgba(140,24,26,.11);' : '';
+  const bgParada = m.estado_cat==='parada' ? 'background:rgba(140,24,26,.09);' : '';
   return `<div class="tarjeta compacta" data-cod="${m.cod_maquina}" style="cursor:pointer;border-top:4px solid ${col};${bgParada}">
     <div class="cab"><div><div class="nom">${m.desc_maquina}</div><div class="cod">${m.cod_maquina}</div></div>
       <button class="t-ocultar" data-ocultar="${m.cod_maquina}" title="Ocultar" onclick="event.stopPropagation()">✕</button></div>
