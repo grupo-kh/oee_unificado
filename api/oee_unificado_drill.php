@@ -181,6 +181,15 @@ function _motivosParos(string $fdesde, string $fhasta, array $turnos, array $cod
     ];
     $params = [$fdesde, $fhasta];
 
+    // Filtro horario opcional sobre la hora real del paro (hpp.Fecha_ini).
+    $hDesde = (string) getParam('hora_desde', '');
+    $hHasta = (string) getParam('hora_hasta', '');
+    if ($hDesde !== '' && $hHasta !== '' && $hDesde !== $hHasta) {
+        [$hSql, $hParams] = filtroFechaHora('hpp.Fecha_ini', $fdesde, $fhasta, $hDesde, $hHasta);
+        $where[]  = $hSql;
+        $params   = array_merge($params, $hParams);
+    }
+
     if (!empty($turnos)) {
         $ph = implode(',', array_fill(0, count($turnos), '?'));
         $where[] = "ct.Cod_turno IN ($ph)";
