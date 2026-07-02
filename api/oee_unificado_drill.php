@@ -353,6 +353,15 @@ function _refsParos(string $fdesde, string $fhasta, array $turnos, array $codMaq
     ];
     $params = [$fdesde, $fhasta];
 
+    // Filtro horario opcional sobre la hora real del paro (hpp.Fecha_ini).
+    $hDesde = (string) getParam('hora_desde', '');
+    $hHasta = (string) getParam('hora_hasta', '');
+    if ($hDesde !== '' && $hHasta !== '' && $hDesde !== $hHasta) {
+        [$hSql, $hParams] = filtroFechaHora('hpp.Fecha_ini', $fdesde, $fhasta, $hDesde, $hHasta);
+        $where[]  = $hSql;
+        $params   = array_merge($params, $hParams);
+    }
+
     if (!empty($turnos)) {
         $ph = implode(',', array_fill(0, count($turnos), '?'));
         $where[] = "ct.Cod_turno IN ($ph)";
@@ -409,6 +418,16 @@ function _motivosCalidad(string $fdesde, string $fhasta, array $turnos, array $c
         "df.esNOK = 1",
     ];
     $params = [$fdesde, $fhasta];
+
+    // Filtro horario opcional. El defecto no tiene timestamp propio, así que se
+    // filtra por la hora del registro de producción asociado (hp.Fecha_ini).
+    $hDesde = (string) getParam('hora_desde', '');
+    $hHasta = (string) getParam('hora_hasta', '');
+    if ($hDesde !== '' && $hHasta !== '' && $hDesde !== $hHasta) {
+        [$hSql, $hParams] = filtroFechaHora('hp.Fecha_ini', $fdesde, $fhasta, $hDesde, $hHasta);
+        $where[]  = $hSql;
+        $params   = array_merge($params, $hParams);
+    }
 
     if (!empty($turnos)) {
         $ph = implode(',', array_fill(0, count($turnos), '?'));
