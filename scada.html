@@ -120,6 +120,14 @@
   .fecha-fil{display:flex;gap:8px;align-items:center;margin-bottom:12px;font-size:13px}
   .fecha-fil input{padding:5px 8px;border:1px solid var(--linea);border-radius:6px}
   .fecha-fil .b{padding:5px 10px;border:1px solid var(--linea);border-radius:6px;background:#fff;cursor:pointer;font-size:12px}
+  .fecha-fil .b.activa{background:var(--kh);color:#fff;border-color:var(--kh)}
+  .t-turnos{width:100%;border-collapse:collapse;font-size:13px}
+  .t-turnos th{text-align:right;padding:7px 10px;font-size:11px;color:var(--gris);font-weight:700;
+       text-transform:uppercase;border-bottom:2px solid var(--linea)}
+  .t-turnos th:first-child,.t-turnos th:nth-child(2){text-align:left}
+  .t-turnos td{text-align:right;padding:8px 10px;border-bottom:1px solid var(--linea);font-variant-numeric:tabular-nums}
+  .t-turnos td:first-child,.t-turnos td:nth-child(2){text-align:left}
+  .t-turnos tbody tr:hover{background:#faf5f5}
   .paro-row{display:grid;grid-template-columns:auto auto auto 1fr auto;gap:14px;align-items:center;
        padding:10px 12px;border:1px solid var(--linea);border-radius:8px;margin-bottom:8px;font-size:13px}
   .paro-row .t{color:var(--gris);font-variant-numeric:tabular-nums}
@@ -222,6 +230,7 @@
       <button class="m-tab activa" data-p="resumen">RESUMEN</button>
       <button class="m-tab" data-p="paros">PAROS</button>
       <button class="m-tab" data-p="ofs">OFS</button>
+      <button class="m-tab" data-p="turnos">TURNOS</button>
       <button class="m-actualizar" id="mActualizar">↻ Actualizar</button>
     </div>
     <div class="m-body" id="mBody"><div class="m-cargando">Cargando…</div></div>
@@ -501,6 +510,8 @@ async function cargarPestana(nombre){
     if(nombre==='resumen'){
       const r = await fetch(`api/scada_maquina_resumen.php?cod=${encodeURIComponent(modalMaq.cod_maquina)}`,{cache:'no-store'});
       const j = await r.json(); if(!j.ok) throw 0; body.innerHTML = renderResumen(j.data);
+    } else if(nombre==='turnos'){
+      await cargarTurnos(body, 7);
     } else {
       renderFiltroFecha(body, nombre);
     }
@@ -529,6 +540,51 @@ function renderResumen(d){
     <div style="margin-top:10px;font-size:13px">
       <span style="color:var(--verde);font-weight:700">OK ${d.unidades.ok}</span> &nbsp;
       NOK ${d.unidades.nok} &nbsp; RWK ${d.unidades.rwk}</div>`;
+}
+
+async function cargarTurnos(body, dias){
+  const TNOM = {M:'Mañana', T:'Tarde', N:'Noche'};
+  body.innerHTML = `
+    <div class="fecha-fil">
+      <span>Rango:</span>
+      ${[1,3,7,15].map(d=>`<button class="b bTur${d===dias?' activa':''}" data-d="${d}">${d} día${d>1?'s':''}</button>`).join('')}
+    </div>
+    <div id="mLista"><div class="m-cargando">Cargando…</div></div>`;
+  body.querySelectorAll('.bTur').forEach(b=>b.addEventListener('click', ()=>{
+    body.querySelectorAll('.bTur').forEach(x=>x.classList.remove('activa'));
+    b.classList.add('activa');
+    pintarTurnos(body, +b.dataset.d);
+  }));
+  await pintarTurnos(body, dias);
+}
+
+async function pintarTurnos(body, dias){
+  const TNOM = {M:'Mañana', T:'Tarde', N:'Noche'};
+  const cont = body.querySelector('#mLista');
+  cont.innerHTML = '<div class="m-cargando">Cargando…</div>';
+  try{
+    const r = await fetch(`api/scada_maquina_turnos.php?cod=${encodeURIComponent(modalMaq.cod_maquina)}&dias=${dias}`,{cache:'no-store'});
+    const j = await r.json(); if(!j.ok) throw 0;
+    const t = j.data.turnos || [];
+    if(!t.length){ cont.innerHTML = '<div class="m-cargando">Sin turnos con producción en el rango.</div>'; return; }
+    cont.innerHTML = `
+      <div class="m-tit">TURNOS ANTERIORES · ${dmy(j.data.desde)} a ${dmy(j.data.hasta)}</div>
+      <table class="t-turnos">
+        <thead><tr><th>Fecha</th><th>Turno</th><th>OEE</th><th>Disp.</th><th>Rend.</th><th>Cal.</th><th>OK</th><th>NOK</th></tr></thead>
+        <tbody>
+        ${t.map(x=>`<tr>
+          <td>${dmy((x.dia||'').replace(/\//g,'-'))}</td>
+          <td>${TNOM[x.turno]||x.turno}</td>
+          <td style="font-weight:800;color:${colorPct(x.oee)}">${x.oee}%</td>
+          <td>${x.disponibilidad}%</td>
+          <td>${x.rendimiento}%</td>
+          <td>${x.calidad}%</td>
+          <td style="color:var(--verde);font-weight:700">${x.ok}</td>
+          <td>${x.nok}</td>
+        </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }catch(e){ cont.innerHTML = '<div class="m-cargando">No se pudieron cargar los turnos.</div>'; }
 }
 
 function renderFiltroFecha(body, pestana){
