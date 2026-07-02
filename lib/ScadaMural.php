@@ -154,6 +154,57 @@ class ScadaMural
         return $out;
     }
 
+    /**
+     * Histórico de turnos anteriores de UNA máquina en los últimos $dias días.
+     * Una fila por (día productivo, turno) con D/R/C/OEE (mismo cálculo que el
+     * KPI de turno, F_his_ct por TURNO) más unidades OK/NOK. Ordenado de más
+     * reciente a más antiguo. Excluye el turno en curso incompleto no se filtra:
+     * se muestran todos los turnos con producción en el rango.
+     *
+     * @param string $cod  Cod_maquina
+     * @param int    $dias 1 | 3 | 7 | 15
+     * @return array lista de ['dia','turno','disponibilidad','rendimiento','calidad','oee','ok','nok']
+     */
+    public static function turnosAnteriores(string $cod, int $dias): array
+    {
+        $dias = in_array($dias, [1, 3, 7, 15], true) ? $dias : 7;
+        $t    = self::turnoActual();
+        $fin  = $t['dia'];                                            // hoy (día productivo)
+        $ini  = date('Y-m-d', strtotime($fin . ' -' . ($dias - 1) . ' days'));
+        // Granularidad DAY: F_his_ct devuelve una fila por (día, turno) con
+        // TimePeriod = fecha del día productivo (la noche ya se asigna a su día).
+        $sql  = "
+            SELECT oee.TimePeriod AS dia,
+                   oee.Cod_turno AS turno,
+                   SUM(oee.M) AS M, SUM(oee.M_OKNOK_TEO) AS M_OKNOK_TEO,
+                   SUM(oee.M_OK_TEO) AS M_OK_TEO, SUM(oee.PPERF) AS PPERF,
+                   SUM(oee.PCALIDAD) AS PCALIDAD, SUM(oee.PNP) AS PNP,
+                   SUM(oee.Unidades_OK) AS ok, SUM(oee.Unidades_NOK) AS nok
+            FROM F_his_ct('WORKCENTER','DAY','TURNOS, WO, PRODUCTOS',
+                          ? + ' 00:00:00', ? + ' 23:59:59', 16) oee
+            WHERE oee.WorkGroup = ?
+            GROUP BY oee.TimePeriod, oee.Cod_turno
+            HAVING SUM(oee.M) + SUM(oee.PNP) > 0
+            ORDER BY oee.TimePeriod DESC, oee.Cod_turno DESC";
+        $filas = fetchAll('mapex', $sql, [$ini, $fin, $cod]);
+        $out   = [];
+        foreach ($filas as $r) {
+            $drc = self::calcDRC((float)$r['M'], (float)$r['M_OKNOK_TEO'], (float)$r['M_OK_TEO'],
+                (float)$r['PPERF'], (float)$r['PCALIDAD'], (float)$r['PNP']);
+            $out[] = [
+                'dia'            => $r['dia'],
+                'turno'          => trim((string)$r['turno']),
+                'disponibilidad' => $drc['disponibilidad'],
+                'rendimiento'    => $drc['rendimiento'],
+                'calidad'        => $drc['calidad'],
+                'oee'            => $drc['oee'],
+                'ok'             => (int)$r['ok'],
+                'nok'            => (int)$r['nok'],
+            ];
+        }
+        return ['cod' => $cod, 'dias' => $dias, 'desde' => $ini, 'hasta' => $fin, 'turnos' => $out];
+    }
+
     /** Construye el array completo del mural (una llamada = todas las máquinas). */
     public static function mural(): array
     {
