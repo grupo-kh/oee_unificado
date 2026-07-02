@@ -81,3 +81,42 @@ function parseSecciones(array $allowed = ['VARILLAS','TROQUELADOS','OTROS']): ar
         fn($s) => in_array($s, $allowed, true)
     )));
 }
+
+if (!function_exists('filtroFechaHora')) {
+    /**
+     * Fragmento WHERE + params para filtrar una columna datetime por rango de
+     * fechas y (opcional) franja horaria. Soporta franja que cruza medianoche.
+     * Sin horas válidas → solo filtro de fecha (equivalente al filtro actual).
+     *
+     * @param string $col    columna datetime cualificada (p.ej. "hpp.Fecha_ini")
+     * @param string $fdesde YYYY-MM-DD
+     * @param string $fhasta YYYY-MM-DD
+     * @param string $hDesde HH:MM o '' (sin filtro horario)
+     * @param string $hHasta HH:MM o ''
+     * @return array{0:string,1:array}  [sqlFragment, params]
+     */
+    function filtroFechaHora(string $col, string $fdesde, string $fhasta, string $hDesde = '', string $hHasta = ''): array
+    {
+        $horaOk = preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $hDesde)
+               && preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $hHasta)
+               && $hDesde !== $hHasta;
+        if (!$horaOk) {
+            return ["CAST($col AS DATE) BETWEEN ? AND ?", [$fdesde, $fhasta]];
+        }
+        $hh = "CONVERT(varchar(5), $col, 108)";
+        if ($hDesde < $hHasta) {
+            return [
+                "(CAST($col AS DATE) BETWEEN ? AND ? AND $hh >= ? AND $hh < ?)",
+                [$fdesde, $fhasta, $hDesde, $hHasta],
+            ];
+        }
+        // Cruza medianoche (p.ej. 22:00 → 06:00)
+        $fdesdeP1 = date('Y-m-d', strtotime($fdesde . ' +1 day'));
+        $fhastaP1 = date('Y-m-d', strtotime($fhasta . ' +1 day'));
+        return [
+            "((CAST($col AS DATE) BETWEEN ? AND ? AND $hh >= ?)"
+            . " OR (CAST($col AS DATE) BETWEEN ? AND ? AND $hh < ?))",
+            [$fdesde, $fhasta, $hDesde, $fdesdeP1, $fhastaP1, $hHasta],
+        ];
+    }
+}
