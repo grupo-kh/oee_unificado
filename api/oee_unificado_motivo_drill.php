@@ -141,6 +141,15 @@ function _parosPorMaquina(string $fdesde, string $fhasta, array $turnos, array $
     ];
     $params = [$fdesde, $fhasta, $motivo];
 
+    // Filtro horario opcional sobre la hora real del paro (hpp.Fecha_ini).
+    $hDesde = (string) getParam('hora_desde', '');
+    $hHasta = (string) getParam('hora_hasta', '');
+    if ($hDesde !== '' && $hHasta !== '' && $hDesde !== $hHasta) {
+        [$hSql, $hParams] = filtroFechaHora('hpp.Fecha_ini', $fdesde, $fhasta, $hDesde, $hHasta);
+        $where[]  = $hSql;
+        $params   = array_merge($params, $hParams);
+    }
+
     if (!empty($turnos)) {
         $ph = implode(',', array_fill(0, count($turnos), '?'));
         $where[] = "ct.Cod_turno IN ($ph)";
@@ -204,6 +213,15 @@ function _parosPorReferencia(string $fdesde, string $fhasta, array $turnos, arra
         "prod.Cod_producto <> '--'",
     ];
     $params = [$fdesde, $fhasta, $motivo];
+
+    // Filtro horario opcional sobre la hora real del paro (hpp.Fecha_ini).
+    $hDesde = (string) getParam('hora_desde', '');
+    $hHasta = (string) getParam('hora_hasta', '');
+    if ($hDesde !== '' && $hHasta !== '' && $hDesde !== $hHasta) {
+        [$hSql, $hParams] = filtroFechaHora('hpp.Fecha_ini', $fdesde, $fhasta, $hDesde, $hHasta);
+        $where[]  = $hSql;
+        $params   = array_merge($params, $hParams);
+    }
 
     if (!empty($turnos)) {
         $ph = implode(',', array_fill(0, count($turnos), '?'));
@@ -270,6 +288,15 @@ function _rechazosPorMaquina(string $fdesde, string $fhasta, array $turnos, arra
         "df.Desc_defecto = ?",
     ];
     $params = [$fdesde, $fhasta, $motivo];
+
+    // Filtro horario opcional sobre la hora real del paro (hpp.Fecha_ini).
+    $hDesde = (string) getParam('hora_desde', '');
+    $hHasta = (string) getParam('hora_hasta', '');
+    if ($hDesde !== '' && $hHasta !== '' && $hDesde !== $hHasta) {
+        [$hSql, $hParams] = filtroFechaHora('hpp.Fecha_ini', $fdesde, $fhasta, $hDesde, $hHasta);
+        $where[]  = $hSql;
+        $params   = array_merge($params, $hParams);
+    }
 
     if (!empty($turnos)) {
         $ph = implode(',', array_fill(0, count($turnos), '?'));
@@ -458,6 +485,15 @@ function _parosPorHora(string $fdesde, string $fhasta, array $turnos, array $maq
     ];
     $params = [$fdesde, $fhasta, $motivo];
 
+    // Filtro horario opcional sobre la hora real del paro (hpp.Fecha_ini).
+    $hDesde = (string) getParam('hora_desde', '');
+    $hHasta = (string) getParam('hora_hasta', '');
+    if ($hDesde !== '' && $hHasta !== '' && $hDesde !== $hHasta) {
+        [$hSql, $hParams] = filtroFechaHora('hpp.Fecha_ini', $fdesde, $fhasta, $hDesde, $hHasta);
+        $where[]  = $hSql;
+        $params   = array_merge($params, $hParams);
+    }
+
     if (!empty($turnos)) {
         $ph = implode(',', array_fill(0, count($turnos), '?'));
         $where[] = "ct.Cod_turno IN ($ph)";
@@ -530,6 +566,15 @@ function _parosPorHoraReferencia(string $fdesde, string $fhasta, array $turnos, 
     ];
     $params = [$fdesde, $fhasta, $motivo];
 
+    // Filtro horario opcional sobre la hora real del paro (hpp.Fecha_ini).
+    $hDesde = (string) getParam('hora_desde', '');
+    $hHasta = (string) getParam('hora_hasta', '');
+    if ($hDesde !== '' && $hHasta !== '' && $hDesde !== $hHasta) {
+        [$hSql, $hParams] = filtroFechaHora('hpp.Fecha_ini', $fdesde, $fhasta, $hDesde, $hHasta);
+        $where[]  = $hSql;
+        $params   = array_merge($params, $hParams);
+    }
+
     if (!empty($turnos)) {
         $ph = implode(',', array_fill(0, count($turnos), '?'));
         $where[] = "ct.Cod_turno IN ($ph)";
@@ -600,6 +645,15 @@ function _rechazosPorHora(string $fdesde, string $fhasta, array $turnos, array $
         "df.Desc_defecto = ?",
     ];
     $params = [$fdesde, $fhasta, $motivo];
+
+    // Filtro horario opcional sobre la hora real del paro (hpp.Fecha_ini).
+    $hDesde = (string) getParam('hora_desde', '');
+    $hHasta = (string) getParam('hora_hasta', '');
+    if ($hDesde !== '' && $hHasta !== '' && $hDesde !== $hHasta) {
+        [$hSql, $hParams] = filtroFechaHora('hpp.Fecha_ini', $fdesde, $fhasta, $hDesde, $hHasta);
+        $where[]  = $hSql;
+        $params   = array_merge($params, $hParams);
+    }
 
     if (!empty($turnos)) {
         $ph = implode(',', array_fill(0, count($turnos), '?'));
