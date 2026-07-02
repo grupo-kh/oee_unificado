@@ -553,7 +553,7 @@ const App={
       if(!State.seccionesSel.length){c.checked=true;this.readSecciones();}
       this.loadMain();
     });
-    document.querySelectorAll('.turno').forEach(c=>c.onchange=()=>this.loadMain());
+    document.querySelectorAll('.turno').forEach(c=>c.onchange=()=>{this.autoHorarioTurno();this.loadMain();});
     // Filtro por horas: check muestra/oculta los inputs y recarga.
     const chkH=document.getElementById('chkHoras');
     if(chkH){
@@ -610,6 +610,24 @@ const App={
   },
 
   turnos(){return [...document.querySelectorAll('.turno:checked')].map(c=>c.value);},
+  // Al marcar un ÚNICO turno, autocompletar y activar el filtro horario con su
+  // franja (Noche cruza medianoche; el backend ya lo soporta). Al pasar a 0 o
+  // >1 turnos, se desactiva el filtro horario (vuelve a día completo).
+  autoHorarioTurno(){
+    const tu=this.turnos();
+    const FRANJA={M:['06:00','14:15'], T:['14:15','22:30'], N:['22:30','06:00']};
+    const chk=document.getElementById('chkHoras');
+    if(tu.length===1 && FRANJA[tu[0]]){
+      const [hd,hh]=FRANJA[tu[0]];
+      document.getElementById('hDesde').value=hd;
+      document.getElementById('hHasta').value=hh;
+      chk.checked=true;
+      document.getElementById('horasCampos').style.display='inline-flex';
+    } else {
+      chk.checked=false;
+      document.getElementById('horasCampos').style.display='none';
+    }
+  },
   common(extra={}){
     const p=new URLSearchParams();
     p.set('fecha_desde',fDesde.value); p.set('fecha_hasta',fHasta.value);
