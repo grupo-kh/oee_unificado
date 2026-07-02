@@ -325,6 +325,7 @@ function _refsRendimientoConsolidar(array $rows, array $secciones, bool $todasSe
     foreach ($rows as $r) {
         if (!$todasSec && !in_array(_seccion($r['maquina']), $secciones, true)) continue;
         $cod = (string) $r['cod_referencia'];
+        if ($cod === '' || $cod === '--') continue;   // sin producto identificado
         if (!isset($acc[$cod])) {
             $acc[$cod] = ['ref' => (string)($r['referencia'] ?: $cod),
                 'M'=>0,'MT'=>0,'MOT'=>0,'MOKT'=>0,'PP'=>0,'PC'=>0,'PNP'=>0];
