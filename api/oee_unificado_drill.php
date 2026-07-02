@@ -97,8 +97,17 @@ try {
         GROUP BY oee.WorkGroup, mq.Desc_maquina
         HAVING SUM(oee.M) + SUM(oee.PNP) > 0
     ";
-    $allParams = array_merge([$fdesde, $fhasta], $params);
-    $rows = fetchAll('mapex', $sql, $allParams);
+    // Filtro horario: la tabla de máquinas (D/R/C/OEE por máquina) se recalcula
+    // desde tablas base cuando hay franja; si no, F_his_ct por día.
+    $hDesdeMaq = (string) getParam('hora_desde', '');
+    $hHastaMaq = (string) getParam('hora_hasta', '');
+    if ($hDesdeMaq !== '' && $hHastaMaq !== '' && $hDesdeMaq !== $hHastaMaq) {
+        require_once __DIR__ . '/../lib/OeeHorario.php';
+        $rows = OeeHorario::magnitudesPorClave($fdesde, $fhasta, $hDesdeMaq, $hHastaMaq, $turnos, $excl, 'maquina');
+    } else {
+        $allParams = array_merge([$fdesde, $fhasta], $params);
+        $rows = fetchAll('mapex', $sql, $allParams);
+    }
 
     $maquinas = [];
     $codMaqsSeccion = []; // cod_maquina values that belong to the section
