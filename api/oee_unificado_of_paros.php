@@ -49,6 +49,13 @@ try {
     // 2) Motivos de paro de la OF (his_prod_paro → his_of.Cod_of).
     $w2 = ["CAST(hp.Dia_productivo AS DATE) BETWEEN ? AND ?", "o.Cod_of = ?", "cp.Cod_paro <> 11", "hpp.Fecha_fin IS NOT NULL"];
     $p2 = [$fdesde, $fhasta, $codOf];
+    // Filtro horario opcional sobre la hora real del paro (hpp.Fecha_ini).
+    $hDesde = (string) getParam('hora_desde', '');
+    $hHasta = (string) getParam('hora_hasta', '');
+    if ($hDesde !== '' && $hHasta !== '' && $hDesde !== $hHasta) {
+        [$hSql, $hParams] = filtroFechaHora('hpp.Fecha_ini', $fdesde, $fhasta, $hDesde, $hHasta);
+        $w2[] = $hSql; $p2 = array_merge($p2, $hParams);
+    }
     if ($cod !== '') { $w2[] = "mq.Cod_maquina = ?"; $p2[] = $cod; }
     if (!empty($turnos)) {
         $ph = implode(',', array_fill(0, count($turnos), '?'));

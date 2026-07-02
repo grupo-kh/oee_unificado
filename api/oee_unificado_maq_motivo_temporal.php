@@ -65,7 +65,16 @@ function _maqMotFragmentos(string $por, string $cod, string $motivo, array $turn
 
 function _maqMotPorDia(string $fdesde, string $fhasta, array $turnos, string $por, string $cod, string $motivo): array {
     [$joins, $filtrosSQL, $extraParams] = _maqMotFragmentos($por, $cod, $motivo, $turnos);
-    $params = array_merge([$fdesde, $fhasta], $extraParams);
+    // Filtro horario opcional sobre la hora real del paro (hpp.Fecha_ini).
+    $hDesde = (string) getParam('hora_desde', '');
+    $hHasta = (string) getParam('hora_hasta', '');
+    $horaSQL = ''; $horaParams = [];
+    if ($hDesde !== '' && $hHasta !== '' && $hDesde !== $hHasta) {
+        [$horaSQL, $horaParams] = filtroFechaHora('hpp.Fecha_ini', $fdesde, $fhasta, $hDesde, $hHasta);
+        $horaSQL = " AND $horaSQL";
+    }
+    // Orden de params: fecha (2) + horario + resto de filtros.
+    $params = array_merge([$fdesde, $fhasta], $horaParams, $extraParams);
     $sql = "
         SELECT
             CAST(hp.Dia_productivo AS DATE) AS dia,
@@ -77,7 +86,7 @@ function _maqMotPorDia(string $fdesde, string $fhasta, array $turnos, string $po
         INNER JOIN cfg_maquina mq ON mq.Id_maquina  = hp.Id_maquina
         INNER JOIN cfg_turno   ct ON ct.Id_turno    = hp.Id_turno
         $joins
-        WHERE CAST(hp.Dia_productivo AS DATE) BETWEEN ? AND ?
+        WHERE CAST(hp.Dia_productivo AS DATE) BETWEEN ? AND ?$horaSQL
           AND $filtrosSQL
         GROUP BY CAST(hp.Dia_productivo AS DATE)
         HAVING SUM(DATEDIFF(SECOND, hpp.Fecha_ini, hpp.Fecha_fin)) > 0
