@@ -15,11 +15,13 @@
     --gris:#6b7280; --linea:#e5e7eb; --texto:#1f2430;
   }
   *{box-sizing:border-box}
-  /* El html en color corporativo: al rebotar el scroll (overscroll) en los
-     límites superior/inferior asoma el rojo corporativo. */
-  html{background:var(--kh)}
   body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-       background:#d7dce2;color:var(--texto);min-height:100vh}
+       background:#d7dce2;color:var(--texto)}
+  /* Sombra corporativa rojiza fija en los bordes de la ventana (indica que hay
+     más contenido al hacer scroll). No intercepta clics (pointer-events:none). */
+  .scroll-sombra{position:fixed;left:0;right:0;height:22px;z-index:50;pointer-events:none}
+  .scroll-sombra.top{top:0;background:linear-gradient(to bottom,rgba(140,24,26,.35),rgba(140,24,26,0))}
+  .scroll-sombra.bot{bottom:0;background:linear-gradient(to top,rgba(140,24,26,.35),rgba(140,24,26,0))}
   header.barra{display:flex;align-items:center;gap:16px;padding:10px 18px;
        background:linear-gradient(90deg,var(--kh),var(--kh2));color:#fff}
   header.barra .barra-logo{height:30px;width:auto;background:#fff;border-radius:6px;padding:3px 6px}
@@ -187,6 +189,8 @@
 </style>
 </head>
 <body>
+<div class="scroll-sombra top"></div>
+<div class="scroll-sombra bot"></div>
 <header class="barra">
   <img src="assets/img/logo-kh.png" alt="KH" class="barra-logo">
   <h1>SCADA · Máquinas en producción</h1>
