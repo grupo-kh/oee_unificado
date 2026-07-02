@@ -290,9 +290,9 @@ function tarjeta(m){
       <span class="tag" style="border-color:${cCol};color:${cCol}">EN PARO</span>
       ${m.paro_categoria?`<b style="color:${cCol}">${m.paro_categoria}</b> · `:''}${m.paro.motivo}
       <span class="t">${dur(m.paro.seg)}</span></div>` : '';
-  // Máquina parada: fondo con tinte corporativo suave (rgba #8c181a al 8%),
-  // distinguible del blanco pero sin comprometer la legibilidad de las etiquetas.
-  const bgParada = m.estado_cat==='parada' ? 'background:rgba(140,24,26,.08);' : '';
+  // Máquina parada: fondo con tinte corporativo casi translúcido (rgba #8c181a al 11%),
+  // se aprecia el matiz corporativo distinguiendo las paradas, sin perder legibilidad.
+  const bgParada = m.estado_cat==='parada' ? 'background:rgba(140,24,26,.11);' : '';
   return `
   <div class="tarjeta" data-cod="${m.cod_maquina}" style="cursor:pointer;${bgParada}">
     <div class="cab">
@@ -429,7 +429,7 @@ function tarjetaCompacta(m){
       <span style="color:${cCol};font-weight:700">${niveles}</span>
       <span class="c-paro-t">${dur(m.paro.seg)}</span>
     </div>` : '';
-  const bgParada = m.estado_cat==='parada' ? 'background:rgba(140,24,26,.08);' : '';
+  const bgParada = m.estado_cat==='parada' ? 'background:rgba(140,24,26,.11);' : '';
   return `<div class="tarjeta compacta" data-cod="${m.cod_maquina}" style="cursor:pointer;border-top:4px solid ${col};${bgParada}">
     <div class="cab"><div><div class="nom">${m.desc_maquina}</div><div class="cod">${m.cod_maquina}</div></div>
       <button class="t-ocultar" data-ocultar="${m.cod_maquina}" title="Ocultar" onclick="event.stopPropagation()">✕</button></div>
