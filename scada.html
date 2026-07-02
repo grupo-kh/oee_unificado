@@ -290,8 +290,10 @@ function tarjeta(m){
       <span class="tag" style="border-color:${cCol};color:${cCol}">EN PARO</span>
       ${m.paro_categoria?`<b style="color:${cCol}">${m.paro_categoria}</b> · `:''}${m.paro.motivo}
       <span class="t">${dur(m.paro.seg)}</span></div>` : '';
+  // Máquina parada: fondo con tinte corporativo (rgba #8c181a al 40%).
+  const bgParada = m.estado_cat==='parada' ? 'background:rgba(140,24,26,.4);' : '';
   return `
-  <div class="tarjeta" data-cod="${m.cod_maquina}" style="cursor:pointer">
+  <div class="tarjeta" data-cod="${m.cod_maquina}" style="cursor:pointer;${bgParada}">
     <div class="cab">
       <div><div class="nom">${m.desc_maquina}</div><div class="cod">${m.cod_maquina}</div></div>
       <span class="badge ${badgeEstado(m.id_actividad,m.estado)}">${m.estado}</span>
@@ -426,7 +428,8 @@ function tarjetaCompacta(m){
       <span style="color:${cCol};font-weight:700">${niveles}</span>
       <span class="c-paro-t">${dur(m.paro.seg)}</span>
     </div>` : '';
-  return `<div class="tarjeta compacta" data-cod="${m.cod_maquina}" style="cursor:pointer;border-top:4px solid ${col}">
+  const bgParada = m.estado_cat==='parada' ? 'background:rgba(140,24,26,.4);' : '';
+  return `<div class="tarjeta compacta" data-cod="${m.cod_maquina}" style="cursor:pointer;border-top:4px solid ${col};${bgParada}">
     <div class="cab"><div><div class="nom">${m.desc_maquina}</div><div class="cod">${m.cod_maquina}</div></div>
       <button class="t-ocultar" data-ocultar="${m.cod_maquina}" title="Ocultar" onclick="event.stopPropagation()">✕</button></div>
     <div class="c-ref"><div class="et">REFERENCIA</div>${fmt(m.producto)}</div>
