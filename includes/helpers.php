@@ -110,13 +110,16 @@ if (!function_exists('filtroFechaHora')) {
                 [$fdesde, $fhasta, $hDesde, $hHasta],
             ];
         }
-        // Cruza medianoche (p.ej. 22:00 → 06:00)
-        $fdesdeP1 = date('Y-m-d', strtotime($fdesde . ' +1 day'));
-        $fhastaP1 = date('Y-m-d', strtotime($fhasta . ' +1 day'));
+        // Cruza medianoche (p.ej. 22:30 → 06:00): es la NOCHE del día productivo.
+        // La parte "≥ hDesde" (22:30) ocurre la tarde-noche del día ANTERIOR
+        // (fdesde-1 .. fhasta-1) y la parte "< hHasta" (06:00) la madrugada del
+        // propio día (fdesde .. fhasta). Coincide con Dia_productivo.
+        $fdesdeM1 = date('Y-m-d', strtotime($fdesde . ' -1 day'));
+        $fhastaM1 = date('Y-m-d', strtotime($fhasta . ' -1 day'));
         return [
             "((CAST($col AS DATE) BETWEEN ? AND ? AND $hh >= ?)"
             . " OR (CAST($col AS DATE) BETWEEN ? AND ? AND $hh < ?))",
-            [$fdesde, $fhasta, $hDesde, $fdesdeP1, $fhastaP1, $hHasta],
+            [$fdesdeM1, $fhastaM1, $hDesde, $fdesde, $fhasta, $hHasta],
         ];
     }
 }
